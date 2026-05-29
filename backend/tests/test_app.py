@@ -26,8 +26,8 @@ def test_app_generates_agreement_plug_metadata():
     assert result.plugs is not None
     assert len(result.plugs) == 1
     assert result.plugs[0].model_dump() == {
-        "id": "agreement-playground",
-        "name": "Playground",
+        "id": "agreement-adobe",
+        "name": "Adobe",
         "description": "Synchronize the current agreement with Marketplace data.",
         "icon": None,
         "socket": "portal.commerce.agreements.agreement",

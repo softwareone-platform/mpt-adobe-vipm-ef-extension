@@ -25,10 +25,15 @@ htmlcov/
 # Environments
 **/.env
 **/.venv
+venv/
+env/
+ENV/
 
 # mypy / ruff
 .mypy_cache/
 .ruff_cache/
+.dmypy.json
+dmypy.json
 
 # IDE
 .idea
@@ -56,3 +61,22 @@ static/*
 # Frontend
 **/node_modules/
 **/dist/
+
+# Frontend build/test artifacts
+*.tsbuildinfo
+coverage/
+.eslintcache
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sonar scanner
+.scannerwork/
+
+# SonarLint plugin (IDE)
+.sonarlint/
+
+# Adobe
+adobe_authorizations.json
+adobe_credentials.json
