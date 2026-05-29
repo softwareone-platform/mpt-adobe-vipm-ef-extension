@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: "Get the version"
+      id: get_version
+      run: echo  "VERSION=${GITHUB_REF/refs\/tags\//}" >> "$GITHUB_OUTPUT"
+
+    - name: "Setup Node.js"
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: "Build frontend static assets"
+      working-directory: frontend
+      run: |
+        npm ci
+        npm run build
+
+    - name: "Build and push image"
+      uses: azure/docker-login@v2
+      with:
+        login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+        username: ${{ secrets.REGISTRY_USERNAME }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    - run: |
+        docker build --target prod -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-playground:${{ steps.get_version.outputs.VERSION }} .
+        docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/swo-extensions-playground:${{ steps.get_version.outputs.VERSION }}
+
+  dtrack:
+    uses: softwareone-platform/ops-template/.github/workflows/dependency-track-python-uv.yml@v2
+    with:
+      projectName: 'swo-extension-playground'
+    secrets:
+      DEPENDENCYTRACK_APIKEY: ${{ secrets.DEPENDENCYTRACK_APIKEY }}

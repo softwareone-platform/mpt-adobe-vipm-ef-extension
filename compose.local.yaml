@@ -1,0 +1,10 @@
+services:
+  backend:
+    command: "uv run mpt-ext run --local"
+    env_file:
+      - path: backend/.env
+        required: false
+      - path: backend/.env.local
+        required: true
+    ports:
+      - "8080:8080"

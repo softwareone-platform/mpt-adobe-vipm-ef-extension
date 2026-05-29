@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Unit test / coverage reports
+.coverage
+.coverage.*
+.cache
+coverage.xml
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# Environments
+**/.env
+**/.venv
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea
+.vscode
+.devcontainer/
+
+# OS
+.DS_Store
+
+# Makefile local overrides
+make/local.mk
+
+# mpt-tool
+.migrations-state.json
+
+# Generated extension UI assets
+static/*
+!static/.gitkeep
+
+# Runtime identity and meta
+*_identity.json
+**/meta.yaml
+**/meta.generated.yaml
+
+# Frontend
+**/node_modules/
+**/dist/

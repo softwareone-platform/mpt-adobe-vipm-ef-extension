@@ -1,0 +1,210 @@
+[project]
+name = "swo-extension-playground"
+version = "6.0.0"
+description = "Playground repository for SoftwareOne Marketplace extensions."
+authors = [{ name = "SoftwareOne AG" }]
+requires-python = ">=3.12,<4"
+license = { text = "Apache-2.0 license" }
+dependencies = [
+    "mpt-extension-sdk==6.3.*",
+    "mpt-tool==6.0.*",
+]
+
+[tool.uv]
+override-dependencies = ["typer>=0.25.0", "mpt-api-client>=6.1.0"]
+
+[dependency-groups]
+dev = [
+  "flake8==7.3.*",
+  "flake8-aaa==0.17.*",
+  "flake8-pyproject==1.2.*",
+  "mypy==2.0.*",
+  "pre-commit==4.6.*",
+  "pytest-asyncio==1.3.*",
+  "pytest-cov==7.1.*",
+  "pytest-deadfixtures==3.1.*",
+  "pytest-mock==3.15.*",
+  "pytest-randomly==4.1.*",
+  "pytest-xdist==3.8.*",
+  "ruff==0.15.*", # force ruff version to have same formatting everywhere, also update in pre-commit config
+  "wemake-python-styleguide==1.6.*",   # also update pre-commit config
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["swo_playground"]
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+pythonpath = "."
+addopts = "--cov=swo_playground --cov-report=term-missing --cov-report=xml  --import-mode=importlib"
+log_cli = false
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+  "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
+]
+
+[tool.coverage.run]
+relative_files = true
+branch = true
+omit = [
+  "**/__init__.py"
+]
+
+[tool.flake8]
+allowed-domain-names = ["result"]
+aaa_act_block_style = "large"
+doctests = true
+extend-ignore = ["WPS226"]
+extend-exclude = [
+  ".coverage",
+  ".github",
+  ".idea",
+  ".mypy_cache",
+  ".pytest_cache",
+  ".ruff_cache",
+  "uv.lock",
+  ".venv",
+]
+format = "wemake"
+max-imports = 17
+max-line-length = 100
+select = ["AAA", "E999", "WPS"]
+show-source = true
+statistics = false
+per-file-ignores = [
+  # The leading `*` makes this match both CI (`migrations/...`) and pre-commit (`backend/migrations/...`) paths.
+  "*migrations/**:WPS102",
+  "*tests/**:WPS202",
+]
+
+[tool.ruff]
+preview = true
+target-version = "py312"
+output-format = "full"
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = false
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "B",
+  "C4",
+  "C90",
+  "COM",
+  "D",
+  "DTZ",
+  "E",
+  "ERA",
+  "EXE",
+  "F",
+  "FBT",
+  "FLY",
+  "FURB",
+  "G",
+  "I",
+  "ICN",
+  "ISC",
+  "LOG",
+  "N",
+  "PERF",
+  "PIE",
+  "PL",
+  "PT",
+  "PTH",
+  "Q",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "SLF",
+  "SLOT",
+  "T100",
+  "TRY",
+  "UP",
+  "W",
+  "YTT",
+]
+ignore = [
+  "A005",
+  "B904",
+  "COM812",
+  "D100",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  "D203",
+  "D212",
+  "D401",
+  "D404",
+  "D405",
+  "ISC001",
+  "ISC003",
+  "PLR09",
+  "PLR2004",
+  "PLR6301",
+  "PT011",
+  "TRY003",
+]
+external = ["AAA", "WPS"]
+
+[tool.ruff.lint.flake8-import-conventions]
+banned-from = ["ast", "datetime"]
+aliases = { datetime = "dt" }
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 6
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+ignore-decorators = ["property"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["swo_playground"]
+known-third-party = ["mpt_extension_sdk"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**/*.py" = [
+  "D101", # missing docstring in public class
+  "D102", # missing docstring in public method
+  "D103", # missing docstring in public function
+  "PT011", # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+  "S101", # asserts
+  "S105", # hardcoded passwords
+  "S404", # subprocess calls are for tests
+  "S603", # do not require `shell=True`
+  "S607", # partial executable paths
+]
+
+[tool.mypy]
+enable_error_code = [
+  "truthy-bool",
+  "truthy-iterable",
+  "redundant-expr",
+  "unused-awaitable",
+  "ignore-without-code",
+  "possibly-undefined",
+  "redundant-self",
+  "explicit-override",
+  "mutable-override",
+  "unimported-reveal",
+  "deprecated",
+]
+exclude = ["tests"]
+exclude_gitignore = true
+ignore_missing_imports = true
+local_partial_types = true
+strict = true
+warn_unreachable = true

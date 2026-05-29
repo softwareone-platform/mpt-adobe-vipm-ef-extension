@@ -1,0 +1,77 @@
+@use '@softwareone-platform/sdk-react-ui-v0/design-tokens' as *;
+@use '@softwareone-platform/sdk-react-ui-v0/design-tokens/style';
+
+.playground {
+  display: grid;
+  gap: var(--spacing-5);
+  grid-template-columns: minmax(180px, 220px) 1fr;
+  padding: var(--spacing-4) 0;
+}
+
+.playground__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.playground__sidebar-heading {
+  margin: 0;
+  text-transform: none;
+}
+
+.playground__sidebar-item {
+  border-left: 2px solid transparent;
+  color: inherit;
+  display: block;
+  padding: var(--spacing-2) var(--spacing-3);
+  text-decoration: none;
+}
+
+.playground__sidebar-item--active {
+  border-left-color: var(--blue-6);
+  color: var(--blue-7);
+}
+
+.playground__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+
+.playground__content-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.playground__content-title {
+  margin: 0;
+}
+
+.playground__section {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.playground__section-title {
+  margin: 0;
+}
+
+.playground__fields {
+  display: grid;
+  gap: var(--spacing-2) var(--spacing-4);
+  grid-template-columns: minmax(160px, max-content) 1fr;
+  margin: 0;
+}
+
+.playground__field {
+  display: contents;
+}
+
+.playground__field-label,
+.playground__field-value {
+  margin: 0;
+}
