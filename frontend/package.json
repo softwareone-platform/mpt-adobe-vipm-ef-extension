@@ -18,8 +18,8 @@
     "../static"
   ],
   "dependencies": {
-    "@mpt-extension/sdk": "^0.0.5",
-    "@mpt-extension/sdk-react": "^0.0.5",
+    "@mpt-extension/sdk": "^0.0.7",
+    "@mpt-extension/sdk-react": "^0.0.7",
     "@softwareone-platform/sdk-react-ui-v0": "^0.0.2",
     "esbuild-sass-plugin": "^3.6.0",
     "react": "^19.2.0",
