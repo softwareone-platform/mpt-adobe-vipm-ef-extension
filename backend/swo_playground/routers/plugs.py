@@ -9,8 +9,8 @@ def agreement_plugs() -> list[Plug]:
     """Declare agreement UI plugs served from the static asset bridge."""
     return [
         Plug(
-            id="agreement-playground",
-            name="Playground",
+            id="agreement-adobe",
+            name="Adobe",
             description="Synchronize the current agreement with Marketplace data.",
             socket="portal.commerce.agreements.agreement",
             href="/static/agreement/index.js",
