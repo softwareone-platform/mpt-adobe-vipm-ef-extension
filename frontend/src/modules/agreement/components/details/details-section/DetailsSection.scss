@@ -1,0 +1,17 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.details-section {
+    @extend %flex_col;
+
+    align-items: flex-start;
+
+    &__label {
+        @extend %medium2;
+
+        margin-bottom: $var-spacing-1;
+    }
+
+    &__content {
+        @extend %regular2;
+    }
+}
