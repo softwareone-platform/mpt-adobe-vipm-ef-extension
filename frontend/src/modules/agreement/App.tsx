@@ -36,13 +36,13 @@ export default function App() {
         timeFormat: 'HH:mm',
       }}
     >
-      <div className="playground">
-        <aside className="playground__sidebar" aria-label="Playground sections">
+      <div className="extension">
+        <aside className="extension__sidebar" aria-label="Extension sections">
           <RegularText
             as="h3"
             size={1}
             color="grey-5"
-            className="playground__sidebar-heading"
+            className="extension__sidebar-heading"
           >
             Manage account
           </RegularText>
@@ -50,16 +50,16 @@ export default function App() {
             <a
               href="#sync-account"
               aria-current="location"
-              className="playground__sidebar-item playground__sidebar-item--active"
+              className="extension__sidebar-item extension__sidebar-item--active"
             >
               <BoldText as="span" size={2}>Sync account</BoldText>
             </a>
           </nav>
         </aside>
 
-        <section className="playground__content" id="sync-account">
-          <header className="playground__content-header">
-            <BoldText as="h2" size={4} className="playground__content-title">
+        <section className="extension__content" id="sync-account">
+          <header className="extension__content-header">
+            <BoldText as="h2" size={4} className="extension__content-title">
               Sync account
             </BoldText>
             <RegularText as="p" size={2} color="grey-5">
@@ -77,11 +77,11 @@ export default function App() {
             If agreement synchronisation fails, please create a Helpdesk case.
           </InlineNotification>
 
-          <section className="playground__section">
-            <BoldText as="h3" size={3} className="playground__section-title">
+          <section className="extension__section">
+            <BoldText as="h3" size={3} className="extension__section-title">
               Synchronisation status
             </BoldText>
-            <dl className="playground__fields">
+            <dl className="extension__fields">
               <Field label="Current status">
                 <Chip color={STATUS_COLOR[status]} label={STATUS_LABEL[status]} />
               </Field>
@@ -97,8 +97,8 @@ export default function App() {
 
           <Divider />
 
-          <section className="playground__section">
-            <BoldText as="h3" size={3} className="playground__section-title">
+          <section className="extension__section">
+            <BoldText as="h3" size={3} className="extension__section-title">
               Synchronise now
             </BoldText>
             <RegularText as="p" size={2} color="grey-5">
@@ -121,7 +121,7 @@ export default function App() {
           )}
           {status === 'success' && (
             <InlineNotification status="warning" isStandalone>
-              This is a demo playground. The agreement was not modified.
+              This is a demo extension. The agreement was not modified.
             </InlineNotification>
           )}
         </section>

@@ -46,7 +46,7 @@ repos:
     rev: v2.0.0
     hooks:
       - id: mypy
-        args: ["--config-file=backend/pyproject.toml", "backend/swo_playground"]
+        args: ["--config-file=backend/pyproject.toml", "backend/mpt_adobe_vipm_ef"]
         pass_filenames: false
         additional_dependencies:
           - mpt-extension-sdk==6.3.*

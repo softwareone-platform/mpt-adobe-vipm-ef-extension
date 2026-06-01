@@ -2,7 +2,7 @@ from logging import Logger
 
 from mpt_extension_sdk.pipeline import OrderContext
 
-from swo_playground.flows.steps.log_order import LogOrderStep
+from mpt_adobe_vipm_ef.flows.steps.log_order import LogOrderStep
 
 
 async def test_log_order_step(mocker):
@@ -12,4 +12,4 @@ async def test_log_order_step(mocker):
 
     await step.process(ctx)  # act
 
-    logger.info.assert_called_once_with("%s - Playground order pipeline executed.", "ORD-1")
+    logger.info.assert_called_once_with("%s - Order pipeline executed.", "ORD-1")

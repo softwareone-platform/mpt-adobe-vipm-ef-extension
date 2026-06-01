@@ -21,7 +21,7 @@ When applicable, read the repository in this order:
 
 Then inspect the code paths relevant to the task:
 
-- [`backend/swo_playground/app.py`](backend/swo_playground/app.py): Extension SDK application entry point
+- [`backend/mpt_adobe_vipm_ef/app.py`](backend/mpt_adobe_vipm_ef/app.py): Extension SDK application entry point
 - [`backend/pyproject.toml`](backend/pyproject.toml): backend dependencies, lint, test, and type-check configuration
 - [`backend/migrations/`](backend/migrations/): migration files managed by `mpt-tool`
 - [`backend/tests/`](backend/tests/): backend test suite

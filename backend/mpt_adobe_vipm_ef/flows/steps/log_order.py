@@ -9,4 +9,4 @@ class LogOrderStep(BaseStep):
     @override
     async def process(self, ctx: OrderContext) -> None:
         """Log the order id from the runtime context."""
-        ctx.logger.info("%s - Playground order pipeline executed.", ctx.order_id)
+        ctx.logger.info("%s - Order pipeline executed.", ctx.order_id)

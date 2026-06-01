@@ -5,9 +5,9 @@ import pytest
 def agreement_payload():
     return {
         "id": "AGR-1234-5678",
-        "name": "Playground Agreement",
+        "name": "Test Agreement",
         "status": "Active",
-        "product": {"id": "PRD-1111-1111", "name": "Playground Product"},
+        "product": {"id": "PRD-1111-1111", "name": "Test Product"},
         "client": {"id": "ACC-1111-1111", "name": "Client"},
         "seller": {"id": "ACC-2222-2222", "name": "Seller"},
         "buyer": {"id": "ACC-3333-3333", "name": "Buyer"},

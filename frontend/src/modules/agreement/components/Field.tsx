@@ -9,11 +9,11 @@ interface FieldProps {
 
 export function Field({ label, children }: FieldProps) {
   return (
-    <div className="playground__field">
-      <RegularText as="dt" size={2} color="grey-5" className="playground__field-label">
+    <div className="extension__field">
+      <RegularText as="dt" size={2} color="grey-5" className="extension__field-label">
         {label}
       </RegularText>
-      <dd className="playground__field-value">
+      <dd className="extension__field-value">
         {typeof children === 'string' ? (
           <RegularText as="span" size={2}>
             {children}
