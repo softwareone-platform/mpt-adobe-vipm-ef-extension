@@ -7,6 +7,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "outDir": "../static/types",
+    "rootDir": "src",
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2020"

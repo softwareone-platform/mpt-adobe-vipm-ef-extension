@@ -15,12 +15,14 @@
 }
 
 .extension__sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
   margin: 0;
-  text-transform: none;
 }
 
 .extension__sidebar-item {
-  border-left: 2px solid transparent;
+  position: relative;
   color: inherit;
   display: block;
   padding: var(--spacing-2) var(--spacing-3);
@@ -28,14 +30,24 @@
 }
 
 .extension__sidebar-item--active {
-  border-left-color: var(--blue-6);
-  color: var(--blue-7);
+  color: var(--brand-primary);
+}
+
+.extension__sidebar-item--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 1em;
+  background-color: var(--brand-primary);
 }
 
 .extension__content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
+  gap: var(--spacing-3);
   min-width: 0;
 }
 
@@ -62,7 +74,7 @@
 
 .extension__fields {
   display: grid;
-  gap: var(--spacing-2) var(--spacing-4);
+  gap: var(--spacing-2) var(--spacing-3);
   grid-template-columns: minmax(160px, max-content) 1fr;
   margin: 0;
 }

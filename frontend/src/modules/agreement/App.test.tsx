@@ -1,16 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
-import { http } from '@mpt-extension/sdk';
 import { useMPTContext } from '@mpt-extension/sdk-react';
 
 import App from './App';
-
-jest.mock('@mpt-extension/sdk', () => ({
-  http: {
-    post: jest.fn(),
-  },
-}), { virtual: true });
 
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTContext: jest.fn(),
@@ -31,22 +24,6 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => {
       isDisabled?: boolean;
       onClick?: () => void;
     }) => React.createElement('button', { disabled: isDisabled || isBusy, onClick }, children),
-  };
-});
-
-jest.mock('@softwareone-platform/sdk-react-ui-v0/chip', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-
-  return {
-    Chip: ({ label }: { label?: string }) => React.createElement('span', null, label),
-  };
-});
-
-jest.mock('@softwareone-platform/sdk-react-ui-v0/divider', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-
-  return {
-    Divider: () => React.createElement('hr', null),
   };
 });
 
@@ -75,52 +52,87 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => {
   };
 });
 
-jest.mock('@softwareone-platform/sdk-react-ui-v0/utils', () => {
+jest.mock('@softwareone-platform/sdk-react-ui-v0/icon', () => {
   const React = jest.requireActual<typeof import('react')>('react');
 
   return {
-    DesignSystemOptionsProvider: ({ children }: { children?: import('react').ReactNode }) =>
-      React.createElement(React.Fragment, null, children),
+    Icon: ({ name }: { name?: string }) => React.createElement('span', { 'data-icon': name }),
   };
 });
 
-const mockPost = jest.mocked(http.post);
 const mockUseMPTContext = jest.mocked(useMPTContext);
+
+const NAV_LABELS = ['Sync account', '3-year commitment', 'Linked membership', 'Global customer'];
 
 describe('agreement plug app', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('marks the sync as successful after a successful request', async () => {
     mockUseMPTContext.mockReturnValue({ data: { agreement: { id: 'AGR-1234-5678-9012' } } });
-    mockPost.mockResolvedValue({ data: { data: {} } });
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
-
-    await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1234-5678-9012/sync');
-    });
-    expect(await screen.findAllByText('Success')).not.toHaveLength(0);
   });
 
-  it('disables synchronization when the agreement context is missing', () => {
+  it('renders the manage-account navigation', () => {
+    render(<App />);
+
+    expect(screen.getByText('Manage account')).toBeInTheDocument();
+    for (const label of NAV_LABELS) {
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('opens on the 3-year commitment section by default', () => {
+    render(<App />);
+
+    expect(screen.getByRole('link', { name: '3-year commitment' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(screen.getByRole('link', { name: 'Sync account' })).not.toHaveAttribute('aria-current');
+
+    expect(screen.getByText('Current commitment')).toBeInTheDocument();
+    expect(screen.getByText('Commitment request')).toBeInTheDocument();
+    expect(screen.getByText('Recommitment request')).toBeInTheDocument();
+  });
+
+  it('switches the active section when a nav item is clicked', () => {
+    render(<App />);
+
+    expect(screen.getByText('Current commitment')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+
+    expect(screen.getByRole('link', { name: 'Linked membership' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(screen.getByRole('link', { name: '3-year commitment' })).not.toHaveAttribute(
+      'aria-current'
+    );
+    // Leaving the section unmounts the 3-year commitment content.
+    expect(screen.queryByText('Current commitment')).not.toBeInTheDocument();
+  });
+
+  it('renders commitment values pulled from the agreement parameters', () => {
+    render(<App />);
+
+    // Licenses/consumables values from the fulfillment parameters.
+    expect(screen.getAllByText('100').length).toBeGreaterThan(0);
+    // Commitment request start/end dates.
+    expect(screen.getAllByText('2026-01-01').length).toBeGreaterThan(0);
+    // Fields with no matching parameter (Status, recommitment licenses, …) fall back to em dashes.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('enables Request commitment when an agreement id is present', () => {
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: 'Request commitment' })).toBeEnabled();
+  });
+
+  it('disables Request commitment when the agreement context is missing', () => {
     mockUseMPTContext.mockReturnValue({});
 
     render(<App />);
 
-    expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
-    expect(screen.getByText('Agreement context was not provided by Marketplace.')).toBeInTheDocument();
-  });
-
-  it('renders synchronization errors', async () => {
-    mockUseMPTContext.mockReturnValue({ data: { agreement: { id: 'AGR-1234-5678-9012' } } });
-    mockPost.mockRejectedValue(new Error('Marketplace unavailable'));
-
-    render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }));
-
-    expect(await screen.findByText('Marketplace unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request commitment' })).toBeDisabled();
   });
 });

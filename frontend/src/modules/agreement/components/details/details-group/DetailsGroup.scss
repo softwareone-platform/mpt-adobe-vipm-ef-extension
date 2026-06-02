@@ -1,0 +1,19 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.details-group {
+    @extend %flex_col;
+
+    align-items: flex-start;
+    gap: $var-spacing-2;
+
+    &__label {
+      @extend %medium4;
+    }
+
+    &__content {
+      display: flex;
+      flex-direction: row;
+      padding: $var-spacing-3 $var-spacing-3 $var-spacing-3 0;
+      gap: $var-spacing-6;
+    }
+  }
