@@ -4,7 +4,7 @@ from mpt_extension_sdk.api.models.events import Event
 from mpt_extension_sdk.pipeline import OrderContext
 from mpt_extension_sdk.routing import EventRouter
 
-from swo_playground.flows.pipelines.purchase import PurchasePipeline
+from mpt_adobe_vipm_ef.flows.pipelines.purchase import PurchasePipeline
 
 logger = logging.getLogger(__name__)
 

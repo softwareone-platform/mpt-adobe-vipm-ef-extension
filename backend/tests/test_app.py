@@ -4,7 +4,7 @@ from mpt_extension_sdk.routing import (
     PlugRouteDefinition,
 )
 
-from swo_playground.app import ext_app
+from mpt_adobe_vipm_ef.app import ext_app
 
 
 def test_app_registers_event_routes():
