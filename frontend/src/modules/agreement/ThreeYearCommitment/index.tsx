@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { BoldText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { useAgreementId } from "../hooks/useAgreementId";
@@ -6,7 +8,10 @@ import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
 import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
 import { useAgreement } from "../hooks/useAgreement";
-import { AgreementParameter } from "../model";
+import { useThreeYearCommitmentRequest } from "../hooks/useThreeYearCommitmentRequest";
+import { AgreementParameter, readParameter } from "../model";
+import { toNumberOrNull, toStringOrNull } from "../../utils/coerce";
+import { RequestCommitmentModal } from "./RequestCommitmentModal/RequestCommitmentModal";
 
 import "./index.scss";
 
@@ -52,7 +57,7 @@ function CommitmentGroup({
     <DetailsGroup title={title}>
       {fields.map((field) => {
         const value = field.externalId
-          ? parameters?.find((parameter) => parameter.externalId === field.externalId)?.value
+          ? readParameter(parameters, field.externalId)
           : undefined;
 
         return (
@@ -71,6 +76,20 @@ export function ThreeYearCommitment() {
   const agreementId = useAgreementId();
   const adobeCustomer = useAdobeCustomer();
   const agreement = useAgreement();
+  const { error, status, submitRequest, reset } = useThreeYearCommitmentRequest();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const fulfillment = agreement?.parameters?.fulfillment;
+  const currentEnrollStatus = toStringOrNull(readParameter(fulfillment, '3YCEnrollStatus'));
+  const currentMinimumLicenses = toNumberOrNull(readParameter(fulfillment, '3YCMinLicenses'));
+  const currentMinimumConsumables = toNumberOrNull(
+    readParameter(fulfillment, '3YCMinConsumables'),
+  );
+
+  function closeModal() {
+    setIsModalOpen(false);
+    reset();
+  }
 
   return (
     <>
@@ -125,14 +144,24 @@ export function ThreeYearCommitment() {
           <Button
             isDisabled={!agreementId}
             type="secondary"
-            onClick={() => {
-              // TODO: open the Request commitment modal once it is migrated
-            }}
+            onClick={() => setIsModalOpen(true)}
           >
             Request commitment
           </Button>
         </aside>
       </div>
+
+      <RequestCommitmentModal
+        currentEnrollStatus={currentEnrollStatus}
+        currentMinimumConsumables={currentMinimumConsumables}
+        currentMinimumLicenses={currentMinimumLicenses}
+        disableCommitmentOption={currentEnrollStatus === 'COMMITTED'}
+        error={error}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onSubmit={submitRequest}
+        status={status}
+      />
     </>
   );
 }
