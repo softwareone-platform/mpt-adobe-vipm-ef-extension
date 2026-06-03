@@ -37,3 +37,10 @@ export interface AdobeCustomer {
 export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }
+
+export function readParameter(
+  parameters: AgreementParameter[] | undefined,
+  externalId: string,
+): unknown {
+  return parameters?.find((parameter) => parameter.externalId === externalId)?.value;
+}
