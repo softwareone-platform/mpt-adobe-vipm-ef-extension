@@ -72,6 +72,45 @@ const mockGet = jest.mocked(http.get);
 
 const NAV_LABELS = ['Sync account', '3-year commitment', 'Linked membership', 'Global customer'];
 
+const SETTINGS_PAYLOAD = { products: [{ id: 'PRD-1111-1111', segment: 'COM' }] };
+
+// Adobe customer payload returned by the backend's /customer endpoint. The 3YC
+// section renders entirely from this, so the displayed values live here.
+const ADOBE_CUSTOMER = {
+  customerId: 'P1005419036',
+  status: '1000',
+  benefits: [
+    {
+      type: 'THREE_YEAR_COMMIT',
+      commitment: {
+        status: 'COMMITTED',
+        startDate: '2024-01-01',
+        endDate: '2027-01-01',
+        minimumQuantities: [
+          { offerType: 'LICENSE', quantity: 100 },
+          { offerType: 'CONSUMABLES', quantity: 100 },
+        ],
+      },
+      commitmentRequest: {
+        status: 'REQUESTED',
+        startDate: '2026-01-01',
+        endDate: '2026-01-01',
+        minimumQuantities: [{ offerType: 'LICENSE', quantity: 100 }],
+      },
+      recommitmentRequest: null,
+    },
+  ],
+};
+
+// Routes the shared http.get mock by endpoint: the settings fetch returns the
+// product allowlist, the customer fetch returns the Adobe 3YC payload.
+function mockBackend(customer: unknown = ADOBE_CUSTOMER, settings: unknown = SETTINGS_PAYLOAD) {
+  mockGet.mockImplementation((url: string) => {
+    const payload = url.endsWith('/customer') ? customer : settings;
+    return Promise.resolve({ data: { data: payload } });
+  });
+}
+
 // Renders App and flushes the async useSettings fetch so its state update is wrapped in act().
 async function renderApp() {
   render(<App />);
@@ -81,9 +120,7 @@ async function renderApp() {
 describe('agreement plug app', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGet.mockResolvedValue({
-      data: { data: { products: [{ id: 'PRD-1111-1111', segment: 'COM' }] } },
-    });
+    mockBackend();
     mockUseMPTContext.mockReturnValue({
       auth: { account: { type: 'Vendor' } },
       data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
@@ -131,14 +168,16 @@ describe('agreement plug app', () => {
     expect(screen.queryByText('Current commitment')).not.toBeInTheDocument();
   });
 
-  it('renders commitment values pulled from the agreement parameters', async () => {
+  it('renders commitment values pulled from the Adobe customer payload', async () => {
     await renderApp();
 
-    // Licenses/consumables values from the fulfillment parameters.
+    // Commitment status comes from the Adobe benefit, not agreement parameters.
+    expect(screen.getByText('COMMITTED')).toBeInTheDocument();
+    // Minimum license/consumable quantities from the benefit.
     expect(screen.getAllByText('100').length).toBeGreaterThan(0);
     // Commitment request start/end dates.
     expect(screen.getAllByText('2026-01-01').length).toBeGreaterThan(0);
-    // Fields with no matching parameter (Status, recommitment licenses, …) fall back to em dashes.
+    // The recommitment request is null, so its fields fall back to em dashes.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -182,9 +221,7 @@ describe('agreement plug app', () => {
   });
 
   it('hides Request commitment when the product segment is LGA', async () => {
-    mockGet.mockResolvedValue({
-      data: { data: { products: [{ id: 'PRD-1111-1111', segment: 'LGA' }] } },
-    });
+    mockBackend(ADOBE_CUSTOMER, { products: [{ id: 'PRD-1111-1111', segment: 'LGA' }] });
     mockUseMPTContext.mockReturnValue({
       auth: { account: { type: 'Vendor' } },
       data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },

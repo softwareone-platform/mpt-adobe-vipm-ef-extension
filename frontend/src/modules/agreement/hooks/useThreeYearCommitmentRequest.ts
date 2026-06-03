@@ -1,5 +1,8 @@
 import { useCallback, useState } from 'react';
 
+import { http } from '@mpt-extension/sdk';
+
+import type { AdobeCustomerData } from '../model';
 import type { ThreeYearCommitmentRequestInput } from '../ThreeYearCommitment/model';
 import type { Status } from './useAgreementSync';
 
@@ -13,28 +16,49 @@ const INITIAL_REQUEST_STATE: RequestState = {
   status: 'idle',
 };
 
-// Simulates the backend latency before the real endpoint exists.
-const MOCK_LATENCY_MS = 500;
+function toBackendPayload(input: ThreeYearCommitmentRequestInput) {
+  const benefit = input.benefits[0];
+  const isRecommitment = benefit.recommitmentRequest != null;
+  const quantities =
+    (isRecommitment ? benefit.recommitmentRequest : benefit.commitmentRequest)?.minimumQuantities ??
+    [];
 
-export function useThreeYearCommitmentRequest() {
+  const payload: { licenses?: number; consumables?: number; isRecommitment: boolean } = {
+    isRecommitment,
+  };
+  const licenses = quantities.find((q) => q.offerType === 'LICENSE')?.quantity;
+  const consumables = quantities.find((q) => q.offerType === 'CONSUMABLES')?.quantity;
+  if (licenses != null) payload.licenses = licenses;
+  if (consumables != null) payload.consumables = consumables;
+
+  return payload;
+}
+
+export function useThreeYearCommitmentRequest(agreementId: string) {
   const [state, setState] = useState<RequestState>(INITIAL_REQUEST_STATE);
 
-  const submitRequest = useCallback(async (input: ThreeYearCommitmentRequestInput) => {
-    setState({ error: '', status: 'loading' });
+  const submitRequest = useCallback(
+    async (input: ThreeYearCommitmentRequestInput): Promise<AdobeCustomerData | false> => {
+      setState({ error: '', status: 'loading' });
 
-    try {
-      await new Promise<void>((resolve) => setTimeout(resolve, MOCK_LATENCY_MS));
-      void input;
-
-      setState({ error: '', status: 'success' });
-      return true;
-    } catch (submitError) {
-      const error =
-        submitError instanceof Error ? submitError.message : 'Commitment request failed.';
-      setState({ error, status: 'error' });
-      return false;
-    }
-  }, []);
+      try {
+        const encodedId = encodeURIComponent(agreementId);
+        const response = await http.post(
+          `/api/v2/agreements/${encodedId}/3yc-request`,
+          toBackendPayload(input),
+        );
+        const customerData = (response.data as { data: AdobeCustomerData }).data;
+        setState({ error: '', status: 'success' });
+        return customerData;
+      } catch (submitError) {
+        const error =
+          submitError instanceof Error ? submitError.message : 'Commitment request failed.';
+        setState({ error, status: 'error' });
+        return false;
+      }
+    },
+    [agreementId],
+  );
 
   const reset = useCallback(() => setState(INITIAL_REQUEST_STATE), []);
 

@@ -1,5 +1,6 @@
 from mpt_extension_sdk import ExtensionApp
 
+from mpt_adobe_vipm_ef.routers.api import customer  # noqa: F401  (registers agreement routes)
 from mpt_adobe_vipm_ef.routers.api.agreements import agreements_router
 from mpt_adobe_vipm_ef.routers.api.settings import settings_router
 from mpt_adobe_vipm_ef.routers.events.order import orders_router
