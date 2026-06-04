@@ -1,3 +1,4 @@
+import pytest
 from mpt_extension_sdk.routing import (
     APIRouteDefinition,
     EventRouteDefinition,
@@ -14,10 +15,17 @@ def test_app_registers_event_routes():
     assert any(isinstance(route, PlugRouteDefinition) for route in result)
 
 
-def test_app_registers_sync_route():
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v2/agreements/{agreement_id}/sync",
+        "/api/v2/settings",
+    ],
+)
+def test_app_registers_api_route(path):
     result = {route.path: route for route in ext_app.routes}
 
-    assert isinstance(result["/api/v2/agreements/{agreement_id}/sync"], APIRouteDefinition)
+    assert isinstance(result[path], APIRouteDefinition)
 
 
 def test_app_generates_agreement_plug_metadata():
