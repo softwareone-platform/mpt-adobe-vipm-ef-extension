@@ -1,12 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
+import { http } from '@mpt-extension/sdk';
 import { useMPTContext } from '@mpt-extension/sdk-react';
 
 import App from './App';
 
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTContext: jest.fn(),
+}), { virtual: true });
+
+jest.mock('@mpt-extension/sdk', () => ({
+  http: {
+    get: jest.fn().mockResolvedValue({ data: { data: { products: [] } } }),
+  },
 }), { virtual: true });
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => {
@@ -61,17 +68,30 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/icon', () => {
 });
 
 const mockUseMPTContext = jest.mocked(useMPTContext);
+const mockGet = jest.mocked(http.get);
 
 const NAV_LABELS = ['Sync account', '3-year commitment', 'Linked membership', 'Global customer'];
+
+// Renders App and flushes the async useSettings fetch so its state update is wrapped in act().
+async function renderApp() {
+  render(<App />);
+  await act(async () => {});
+}
 
 describe('agreement plug app', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseMPTContext.mockReturnValue({ data: { agreement: { id: 'AGR-1234-5678-9012' } } });
+    mockGet.mockResolvedValue({
+      data: { data: { products: [{ id: 'PRD-1111-1111', segment: 'COM' }] } },
+    });
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Vendor' } },
+      data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
+    });
   });
 
-  it('renders the manage-account navigation', () => {
-    render(<App />);
+  it('renders the manage-account navigation', async () => {
+    await renderApp();
 
     expect(screen.getByText('Manage account')).toBeInTheDocument();
     for (const label of NAV_LABELS) {
@@ -79,8 +99,8 @@ describe('agreement plug app', () => {
     }
   });
 
-  it('opens on the 3-year commitment section by default', () => {
-    render(<App />);
+  it('opens on the 3-year commitment section by default', async () => {
+    await renderApp();
 
     expect(screen.getByRole('link', { name: '3-year commitment' })).toHaveAttribute(
       'aria-current',
@@ -93,8 +113,8 @@ describe('agreement plug app', () => {
     expect(screen.getByText('Recommitment request')).toBeInTheDocument();
   });
 
-  it('switches the active section when a nav item is clicked', () => {
-    render(<App />);
+  it('switches the active section when a nav item is clicked', async () => {
+    await renderApp();
 
     expect(screen.getByText('Current commitment')).toBeInTheDocument();
 
@@ -111,8 +131,8 @@ describe('agreement plug app', () => {
     expect(screen.queryByText('Current commitment')).not.toBeInTheDocument();
   });
 
-  it('renders commitment values pulled from the agreement parameters', () => {
-    render(<App />);
+  it('renders commitment values pulled from the agreement parameters', async () => {
+    await renderApp();
 
     // Licenses/consumables values from the fulfillment parameters.
     expect(screen.getAllByText('100').length).toBeGreaterThan(0);
@@ -122,17 +142,56 @@ describe('agreement plug app', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('enables Request commitment when an agreement id is present', () => {
-    render(<App />);
+  it('enables Request commitment when an agreement id is present', async () => {
+    await renderApp();
 
     expect(screen.getByRole('button', { name: 'Request commitment' })).toBeEnabled();
   });
 
-  it('disables Request commitment when the agreement context is missing', () => {
-    mockUseMPTContext.mockReturnValue({});
+  it('disables Request commitment when the agreement id is missing', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Vendor' } },
+      data: { agreement: { product: { id: 'PRD-1111-1111' } } },
+    });
 
-    render(<App />);
+    await renderApp();
 
     expect(screen.getByRole('button', { name: 'Request commitment' })).toBeDisabled();
+  });
+
+  it('hides Request commitment for a client account', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Client' } },
+      data: { agreement: { id: 'AGR-1234-5678-9012' } },
+    });
+
+    await renderApp();
+
+    expect(screen.queryByRole('button', { name: 'Request commitment' })).not.toBeInTheDocument();
+  });
+
+  it('shows Request commitment for an operations account', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Operations' } },
+      data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
+    });
+
+    await renderApp();
+
+    expect(screen.getByRole('button', { name: 'Request commitment' })).toBeInTheDocument();
+  });
+
+  it('hides Request commitment when the product segment is LGA', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: { products: [{ id: 'PRD-1111-1111', segment: 'LGA' }] } },
+    });
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Vendor' } },
+      data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
+    });
+
+    await renderApp();
+
+    expect(screen.queryByRole('button', { name: 'Request commitment' })).not.toBeInTheDocument();
   });
 });

@@ -8,11 +8,16 @@ import { Switcher } from '@softwareone-platform/sdk-react-ui-v0/switcher';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { BoldText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
+import { useMPTContext } from '@mpt-extension/sdk-react';
+
+import { canRequestThreeYearCommitment } from '../../../utils/security';
 import type {
+  AccountType,
   MinimumQuantity,
   ThreeYearCommitmentRequestInput,
 } from '../model';
 import type { Status } from '../../hooks/useAgreementSync';
+import { useSettings } from '../../hooks/useSettings';
 import { toIntOrNull } from '../../../utils/coerce';
 
 import './RequestCommitmentModal.scss';
@@ -85,6 +90,17 @@ export function RequestCommitmentModal({
   onSubmit,
   status,
 }: RequestCommitmentModalProps) {
+  const settings = useSettings();
+  const context = useMPTContext<{
+    auth?: { account?: { type?: AccountType } };
+    data?: { agreement?: { product?: { id?: string } } };
+  }>();
+  const canRequest = canRequestThreeYearCommitment(
+    context.auth?.account?.type,
+    settings?.products,
+    context.data?.agreement?.product?.id,
+  );
+
   const [localError, setLocalError] = useState('');
   const [requestType, setRequestType] = useState<'commitment' | 'recommitment'>('commitment');
   const [discountLevel, setDiscountLevel] = useState('');
@@ -157,7 +173,7 @@ export function RequestCommitmentModal({
           </Button>
         </>
       }
-      isOpen={isOpen}
+      isOpen={isOpen && canRequest}
       onClose={onClose}
       title="Request 3-year commitment"
       width={520}
