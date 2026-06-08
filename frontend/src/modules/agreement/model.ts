@@ -34,9 +34,43 @@ export interface Agreement {
   product?: Product;
 }
 
-export interface AdobeCustomer {
+export interface AdobeMinimumQuantity {
+  offerType: 'LICENSE' | 'CONSUMABLES';
+  quantity: number;
+}
+
+export interface AdobeCommitmentDetail {
+  startDate?: string;
+  endDate?: string;
+  status: string;
+  minimumQuantities: AdobeMinimumQuantity[];
+}
+
+export interface AdobeThreeYearBenefit {
+  type: 'THREE_YEAR_COMMIT';
+  commitment?: AdobeCommitmentDetail | null;
+  commitmentRequest?: AdobeCommitmentDetail | null;
+  recommitmentRequest?: AdobeCommitmentDetail | null;
+}
+
+export interface AdobeCustomerData {
+  externalReferenceId?: string;
+  customerId?: string;
   status?: string;
-  error?: string | null;
+  companyProfile?: {
+    companyName?: string;
+    preferredLanguage?: string;
+    marketSegment?: string;
+  };
+  benefits?: AdobeThreeYearBenefit[];
+  cotermDate?: string;
+  globalSalesEnabled?: boolean;
+}
+
+export interface AdobeCustomer {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+  data: AdobeCustomerData | null;
 }
 
 export enum ProductSegments {
@@ -55,4 +89,30 @@ export function readParameter(
   externalId: string,
 ): unknown {
   return parameters?.find((parameter) => parameter.externalId === externalId)?.value;
+}
+
+/**
+ * Locate the three-year commitment benefit within an Adobe customer payload.
+ *
+ * The 3YC information the UI displays (current commitment, commitment request
+ * and recommitment request) all lives on this single benefit, so callers fetch
+ * it once and read the relevant detail off it.
+ */
+export function findThreeYearBenefit(
+  data: AdobeCustomerData | null | undefined,
+): AdobeThreeYearBenefit | undefined {
+  return data?.benefits?.find((benefit) => benefit.type === 'THREE_YEAR_COMMIT');
+}
+
+/**
+ * Read the minimum quantity for an offer type from a commitment detail.
+ *
+ * Returns ``null`` when the detail is absent or has no quantity for the offer
+ * type, which the UI renders as an em dash.
+ */
+export function readMinimumQuantity(
+  detail: AdobeCommitmentDetail | null | undefined,
+  offerType: AdobeMinimumQuantity['offerType'],
+): number | null {
+  return detail?.minimumQuantities?.find((q) => q.offerType === offerType)?.quantity ?? null;
 }

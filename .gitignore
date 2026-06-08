@@ -78,5 +78,5 @@ npm-debug.log*
 .sonarlint/
 
 # Adobe
-adobe_authorizations.json
-adobe_credentials.json
+backend/adobe_authorizations.json
+backend/adobe_credentials.json

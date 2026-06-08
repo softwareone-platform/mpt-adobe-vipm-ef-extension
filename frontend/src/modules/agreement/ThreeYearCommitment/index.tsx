@@ -7,73 +7,63 @@ import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notifi
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
 import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
-import { useAgreement } from "../hooks/useAgreement";
 import { useThreeYearCommitmentRequest } from "../hooks/useThreeYearCommitmentRequest";
-import { AgreementParameter, readParameter } from "../model";
-import { AccountType } from "./model";
+import {
+  AdobeCommitmentDetail,
+  findThreeYearBenefit,
+  readMinimumQuantity,
+} from "../model";
+import { AccountType, ThreeYearCommitmentRequestInput } from "./model";
 import { canRequestThreeYearCommitment } from "../../utils/security";
-import { toNumberOrNull, toStringOrNull } from "../../utils/coerce";
 import { RequestCommitmentModal } from "./RequestCommitmentModal/RequestCommitmentModal";
 import { useMPTContext } from '@mpt-extension/sdk-react';
 import { useSettings } from "../hooks/useSettings";
 
 import "./index.scss";
 
-interface CommitmentField {
-  // The agreement fulfillment parameter this field reads from. When omitted,
-  // there is no matching parameter yet and the field renders an em dash.
-  externalId?: string;
-  label: string;
+function toContent(value: string | number | null | undefined): string | undefined {
+  return value != null && value !== '' ? String(value) : undefined;
 }
 
-const CURRENT_COMMITMENT_FIELDS: CommitmentField[] = [
-  { externalId: '3YCEnrollStatus', label: 'Status' },
-  { externalId: '3YCMinLicenses', label: 'Minimum licenses' },
-  { externalId: '3YCMinConsumables', label: 'Minimum consumables' },
-  { externalId: '3YCStartDate', label: 'Start date' },
-  { externalId: '3YCEndDate', label: 'End date' },
-];
-
-const COMMITMENT_REQUEST_FIELDS: CommitmentField[] = [
-  { externalId: '3YCCommitmentRequestStatus', label: 'Status' },
-  { externalId: '3YCCommitmentRequestLicenses', label: 'Minimum licenses' },
-  { externalId: '3YCCommitmentRequestConsumables', label: 'Minimum consumables' },
-  { externalId: '3YCCommitmentRequestStartDate', label: 'Start date' },
-  { externalId: '3YCCommitmentRequestEndDate', label: 'End date' },
-];
-
-const RECOMMITMENT_REQUEST_FIELDS: CommitmentField[] = [
-  { externalId: '3YCRecommitmentRequestStatus', label: 'Status' },
-  { externalId: '3YCRecommitmentRequestLicenses', label: 'Minimum licenses' },
-  { externalId: '3YCRecommitmentRequestConsumables', label: 'Minimum consumables' },
-];
-
+/**
+ * Render a commitment section from an Adobe commitment detail.
+ *
+ * The detail comes from the customer payload returned by the backend (which in
+ * turn proxies Adobe), so the displayed status, quantities and dates always
+ * reflect live Adobe data. ``showDates`` is disabled for the recommitment
+ * request, which has no start/end dates to show.
+ */
 function CommitmentGroup({
   title,
-  fields,
-  parameters,
+  detail,
+  showDates = true,
 }: {
   title: string;
-  fields: CommitmentField[];
-  parameters?: AgreementParameter[];
+  detail?: AdobeCommitmentDetail | null;
+  showDates?: boolean;
 }) {
-  return (
-    <DetailsGroup title={title}>
-      {fields.map((field) => {
-        const value = field.externalId
-          ? readParameter(parameters, field.externalId)
-          : undefined;
+  const sections = [
+    <DetailsSection key="status" label="Status" content={toContent(detail?.status)} />,
+    <DetailsSection
+      key="licenses"
+      label="Minimum licenses"
+      content={toContent(readMinimumQuantity(detail, 'LICENSE'))}
+    />,
+    <DetailsSection
+      key="consumables"
+      label="Minimum consumables"
+      content={toContent(readMinimumQuantity(detail, 'CONSUMABLES'))}
+    />,
+  ];
 
-        return (
-          <DetailsSection
-            key={field.label}
-            label={field.label}
-            content={value != null ? String(value) : undefined}
-          />
-        );
-      })}
-    </DetailsGroup>
-  );
+  if (showDates) {
+    sections.push(
+      <DetailsSection key="startDate" label="Start date" content={toContent(detail?.startDate)} />,
+      <DetailsSection key="endDate" label="End date" content={toContent(detail?.endDate)} />,
+    );
+  }
+
+  return <DetailsGroup title={title}>{sections}</DetailsGroup>;
 }
 
 export function ThreeYearCommitment() {
@@ -85,18 +75,19 @@ export function ThreeYearCommitment() {
   const accountType = context.auth?.account?.type;
 
   const agreementId = useAgreementId();
-  const adobeCustomer = useAdobeCustomer();
-  const agreement = useAgreement();
+  const adobeCustomer = useAdobeCustomer(agreementId);
   const agreementProductId = context.data?.agreement?.product?.id;
-  const { error, status, submitRequest, reset } = useThreeYearCommitmentRequest();
+  const { error, status, submitRequest, reset } = useThreeYearCommitmentRequest(agreementId);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fulfillment = agreement?.parameters?.fulfillment;
-  const currentEnrollStatus = toStringOrNull(readParameter(fulfillment, '3YCEnrollStatus'));
-  const currentMinimumLicenses = toNumberOrNull(readParameter(fulfillment, '3YCMinLicenses'));
-  const currentMinimumConsumables = toNumberOrNull(
-    readParameter(fulfillment, '3YCMinConsumables'),
-  );
+  const benefit = findThreeYearBenefit(adobeCustomer.data);
+  const currentCommitment = benefit?.commitment;
+  const commitmentRequest = benefit?.commitmentRequest;
+  const recommitmentRequest = benefit?.recommitmentRequest;
+
+  const currentEnrollStatus = currentCommitment?.status ?? null;
+  const currentMinimumLicenses = readMinimumQuantity(currentCommitment, 'LICENSE');
+  const currentMinimumConsumables = readMinimumQuantity(currentCommitment, 'CONSUMABLES');
 
   const products = settings?.products;
   const canRequestCommitment = canRequestThreeYearCommitment(
@@ -108,6 +99,17 @@ export function ThreeYearCommitment() {
   function closeModal() {
     setIsModalOpen(false);
     reset();
+  }
+
+  // The modal only needs to know whether the request succeeded; on success we
+  // refresh the displayed commitment with the customer payload Adobe returned.
+  async function handleSubmit(input: ThreeYearCommitmentRequestInput): Promise<boolean> {
+    const result = await submitRequest(input);
+    if (result) {
+      adobeCustomer.update(result);
+      return true;
+    }
+    return false;
   }
 
   return (
@@ -134,20 +136,12 @@ export function ThreeYearCommitment() {
             </InlineNotification>
           )}
           <div className="three-year-commitment__groups">
-            <CommitmentGroup
-              title="Current commitment"
-              fields={CURRENT_COMMITMENT_FIELDS}
-              parameters={agreement?.parameters?.fulfillment}
-            />
-            <CommitmentGroup
-              title="Commitment request"
-              fields={COMMITMENT_REQUEST_FIELDS}
-              parameters={agreement?.parameters?.fulfillment}
-            />
+            <CommitmentGroup title="Current commitment" detail={currentCommitment} />
+            <CommitmentGroup title="Commitment request" detail={commitmentRequest} />
             <CommitmentGroup
               title="Recommitment request"
-              fields={RECOMMITMENT_REQUEST_FIELDS}
-              parameters={agreement?.parameters?.fulfillment}
+              detail={recommitmentRequest}
+              showDates={false}
             />
           </div>
         </div>
@@ -180,7 +174,7 @@ export function ThreeYearCommitment() {
         error={error}
         isOpen={isModalOpen}
         onClose={closeModal}
-        onSubmit={submitRequest}
+        onSubmit={handleSubmit}
         status={status}
       />
     </>
