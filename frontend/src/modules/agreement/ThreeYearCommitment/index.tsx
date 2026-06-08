@@ -10,8 +10,12 @@ import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
 import { useAgreement } from "../hooks/useAgreement";
 import { useThreeYearCommitmentRequest } from "../hooks/useThreeYearCommitmentRequest";
 import { AgreementParameter, readParameter } from "../model";
+import { AccountType } from "./model";
+import { canRequestThreeYearCommitment } from "../../utils/security";
 import { toNumberOrNull, toStringOrNull } from "../../utils/coerce";
 import { RequestCommitmentModal } from "./RequestCommitmentModal/RequestCommitmentModal";
+import { useMPTContext } from '@mpt-extension/sdk-react';
+import { useSettings } from "../hooks/useSettings";
 
 import "./index.scss";
 
@@ -73,9 +77,17 @@ function CommitmentGroup({
 }
 
 export function ThreeYearCommitment() {
+  const settings = useSettings();
+  const context = useMPTContext<{
+    auth?: { account?: { type?: AccountType } };
+    data?: { agreement?: { product?: { id?: string } } };
+  }>();
+  const accountType = context.auth?.account?.type;
+
   const agreementId = useAgreementId();
   const adobeCustomer = useAdobeCustomer();
   const agreement = useAgreement();
+  const agreementProductId = context.data?.agreement?.product?.id;
   const { error, status, submitRequest, reset } = useThreeYearCommitmentRequest();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -84,6 +96,13 @@ export function ThreeYearCommitment() {
   const currentMinimumLicenses = toNumberOrNull(readParameter(fulfillment, '3YCMinLicenses'));
   const currentMinimumConsumables = toNumberOrNull(
     readParameter(fulfillment, '3YCMinConsumables'),
+  );
+
+  const products = settings?.products;
+  const canRequestCommitment = canRequestThreeYearCommitment(
+    accountType,
+    products,
+    agreementProductId,
   );
 
   function closeModal() {
@@ -133,22 +152,24 @@ export function ThreeYearCommitment() {
           </div>
         </div>
 
-        <aside className="three-year-commitment__aside">
-          <RegularText as="p" size={2} color="grey-5">
-            To request a commitment or recommitment, click{" "}
-            <BoldText as="span" size={2}>
+        {canRequestCommitment && (
+          <aside className="three-year-commitment__aside">
+            <RegularText as="p" size={2} color="grey-5">
+              To request a commitment or recommitment, click{" "}
+              <BoldText as="span" size={2}>
+                Request commitment
+              </BoldText>
+              .
+            </RegularText>
+            <Button
+              isDisabled={!agreementId}
+              type="secondary"
+              onClick={() => setIsModalOpen(true)}
+            >
               Request commitment
-            </BoldText>
-            .
-          </RegularText>
-          <Button
-            isDisabled={!agreementId}
-            type="secondary"
-            onClick={() => setIsModalOpen(true)}
-          >
-            Request commitment
-          </Button>
-        </aside>
+            </Button>
+          </aside>
+        )}
       </div>
 
       <RequestCommitmentModal

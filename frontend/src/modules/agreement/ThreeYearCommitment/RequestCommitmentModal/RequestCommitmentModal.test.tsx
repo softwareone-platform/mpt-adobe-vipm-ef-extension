@@ -4,6 +4,21 @@ import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import { RequestCommitmentModal } from './RequestCommitmentModal';
 
+let mockAccountType: string | undefined;
+let mockProductId: string | undefined;
+let mockProducts: { id: string; segment: string }[] | undefined;
+
+jest.mock('@mpt-extension/sdk-react', () => ({
+  useMPTContext: () => ({
+    auth: { account: { type: mockAccountType } },
+    data: { agreement: { product: { id: mockProductId } } },
+  }),
+}), { virtual: true });
+
+jest.mock('../../hooks/useSettings', () => ({
+  useSettings: () => ({ products: mockProducts }),
+}));
+
 // Minimal prop shapes for the mocked SDK components. Only the props the modal
 // actually passes are typed; everything is erased at runtime.
 interface MockOption {
@@ -150,6 +165,12 @@ const clickSend = (utils: ReturnType<typeof setup>) =>
   fireEvent.click(utils.getByText('Send invitation'));
 
 describe('RequestCommitmentModal', () => {
+  beforeEach(() => {
+    mockAccountType = 'Operations';
+    mockProductId = 'PRD-1';
+    mockProducts = [{ id: 'PRD-1', segment: 'COM' }];
+  });
+
   it('renders the title when open', () => {
     const utils = setup();
     expect(utils.getByText('Request 3-year commitment')).toBeTruthy();
@@ -157,6 +178,24 @@ describe('RequestCommitmentModal', () => {
 
   it('renders nothing when closed', () => {
     const utils = setup({ isOpen: false });
+    expect(utils.queryByTestId('modal')).toBeNull();
+  });
+
+  it('renders nothing when the account type cannot request even if open', () => {
+    mockAccountType = 'Client';
+    const utils = setup();
+    expect(utils.queryByTestId('modal')).toBeNull();
+  });
+
+  it('renders nothing when the agreement product is not in settings', () => {
+    mockProductId = 'PRD-unknown';
+    const utils = setup();
+    expect(utils.queryByTestId('modal')).toBeNull();
+  });
+
+  it('renders nothing for an LGA product', () => {
+    mockProducts = [{ id: 'PRD-1', segment: 'LGA' }];
+    const utils = setup();
     expect(utils.queryByTestId('modal')).toBeNull();
   });
 

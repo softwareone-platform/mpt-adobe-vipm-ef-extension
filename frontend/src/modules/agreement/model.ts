@@ -3,6 +3,10 @@ export interface Reference {
   name?: string;
 }
 
+export interface Product {
+  id: string;
+}
+
 export interface AgreementContext {
   data?: {
     agreement?: Reference;
@@ -27,11 +31,19 @@ export interface Agreement {
   parameters?: {
     fulfillment?: AgreementParameter[];
   };
+  product?: Product;
 }
 
 export interface AdobeCustomer {
   status?: string;
   error?: string | null;
+}
+
+export enum ProductSegments {
+  COM = 'COM',
+  EDU = 'EDU',
+  GOV = 'GOV',
+  LGA = 'LGA',
 }
 
 export function resolveAgreementId(context?: AgreementContext): string {

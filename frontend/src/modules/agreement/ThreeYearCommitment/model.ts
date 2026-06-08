@@ -7,6 +7,8 @@ export type RequestStatus =
 
 export type OfferType = 'LICENSE' | 'CONSUMABLES';
 
+export type AccountType = 'Client' | 'Operations' | 'Vendor';
+
 export interface MinimumQuantity {
   offerType: OfferType;
   quantity: number;

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from mpt_extension_sdk.routing import (
     APIRouteDefinition,
@@ -6,6 +8,7 @@ from mpt_extension_sdk.routing import (
 )
 
 from mpt_adobe_vipm_ef.app import ext_app
+from mpt_adobe_vipm_ef.settings import get_settings
 
 
 def test_app_registers_event_routes():
@@ -28,7 +31,13 @@ def test_app_registers_api_route(path):
     assert isinstance(result[path], APIRouteDefinition)
 
 
-def test_app_generates_agreement_plug_metadata():
+def test_app_generates_agreement_plug_metadata(monkeypatch):
+    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+    monkeypatch.setenv(
+        "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
+    )
+    get_settings.cache_clear()
+
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
@@ -39,6 +48,6 @@ def test_app_generates_agreement_plug_metadata():
         "description": "Synchronize the current agreement with Marketplace data.",
         "icon": None,
         "socket": "portal.commerce.agreements.agreement",
-        "condition": None,
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
         "href": "/static/agreement/index.js",
     }
