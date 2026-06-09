@@ -1,0 +1,34 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.request-commitment-modal {
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    padding: $var-spacing-3;
+    border-bottom: 2px solid;
+    border-image: linear-gradient(259deg, #00c9cd 16.32%, #472aff 59.03%, #392d9c 99.99%) 1;
+  }
+
+  &__content {
+    padding: $var-spacing-3;
+    overflow: auto;
+    flex-grow: 1;
+  }
+
+  &__actions {
+    padding: $var-spacing-3;
+    border-top: 1px solid var(--gray-3);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  &__custom-field {
+    margin-top: $var-spacing-3;
+  }
+
+  &__hint {
+    display: block;
+    margin-top: $var-spacing-2;
+  }
+}

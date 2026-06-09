@@ -20,4 +20,12 @@ def agreement_plugs() -> list[Plug]:
             href="/static/agreement/index.js",
             condition=condition,
         ),
+        Plug(
+            id="request-commitment-action",
+            name="Request 3-year commitment",
+            description="Request or update an Adobe 3-year commitment for the agreement.",
+            socket="portal.commerce.agreements.agreement.modal",
+            href="/static/request-commitment-action/index.js",
+            condition=condition,
+        ),
     ]

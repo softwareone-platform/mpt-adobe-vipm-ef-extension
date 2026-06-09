@@ -2,12 +2,15 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { http } from '@mpt-extension/sdk';
-import { useMPTContext } from '@mpt-extension/sdk-react';
+import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 
 import App from './App';
 
+const mockOpen = jest.fn();
+
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTContext: jest.fn(),
+  useMPTModal: jest.fn(),
 }), { virtual: true });
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -68,6 +71,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/icon', () => {
 });
 
 const mockUseMPTContext = jest.mocked(useMPTContext);
+const mockUseMPTModal = jest.mocked(useMPTModal);
 const mockGet = jest.mocked(http.get);
 
 const NAV_LABELS = ['Sync account', '3-year commitment', 'Linked membership', 'Global customer'];
@@ -121,6 +125,7 @@ describe('agreement plug app', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockBackend();
+    mockUseMPTModal.mockReturnValue({ open: mockOpen, close: jest.fn() });
     mockUseMPTContext.mockReturnValue({
       auth: { account: { type: 'Vendor' } },
       data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
@@ -185,6 +190,17 @@ describe('agreement plug app', () => {
     await renderApp();
 
     expect(screen.getByRole('button', { name: 'Request commitment' })).toBeEnabled();
+  });
+
+  it('opens the request-commitment modal plug when the button is clicked', async () => {
+    await renderApp();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request commitment' }));
+
+    expect(mockOpen).toHaveBeenCalledWith(
+      'request-commitment-action',
+      expect.objectContaining({ onClose: expect.any(Function) }),
+    );
   });
 
   it('disables Request commitment when the agreement id is missing', async () => {

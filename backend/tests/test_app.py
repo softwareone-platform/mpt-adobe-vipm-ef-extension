@@ -41,7 +41,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
-    assert len(result.plugs) == 1
+    assert len(result.plugs) == 2
     assert result.plugs[0].model_dump() == {
         "id": "agreement-adobe",
         "name": "Adobe",
@@ -50,4 +50,13 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):
         "socket": "portal.commerce.agreements.agreement",
         "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
         "href": "/static/agreement/index.js",
+    }
+    assert result.plugs[1].model_dump() == {
+        "id": "request-commitment-action",
+        "name": "Request 3-year commitment",
+        "description": "Request or update an Adobe 3-year commitment for the agreement.",
+        "icon": None,
+        "socket": "portal.commerce.agreements.agreement.modal",
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-commitment-action/index.js",
     }

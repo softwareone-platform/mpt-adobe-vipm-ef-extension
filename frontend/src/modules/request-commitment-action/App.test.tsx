@@ -2,35 +2,55 @@ import { ChangeEvent, ReactNode } from 'react';
 
 import { fireEvent, render, waitFor } from '@testing-library/react';
 
-import { RequestCommitmentModal } from './RequestCommitmentModal';
+import App from './App';
+import type { AdobeCustomerData } from '../agreement/model';
+import type { Status } from '../agreement/hooks/useAgreementSync';
 
-let mockAccountType: string | undefined;
-let mockProductId: string | undefined;
-let mockProducts: { id: string; segment: string }[] | undefined;
+const mockClose = jest.fn();
+let mockCustomerData: AdobeCustomerData | null = null;
+let mockStatus: Status = 'idle';
+let mockError = '';
+let mockSubmit: jest.Mock;
 
 jest.mock('@mpt-extension/sdk-react', () => ({
+  useMPTModal: () => ({ open: jest.fn(), close: mockClose }),
   useMPTContext: () => ({
-    auth: { account: { type: mockAccountType } },
-    data: { agreement: { product: { id: mockProductId } } },
+    auth: { account: { type: 'Operations' } },
+    data: { agreement: { product: { id: 'PRD-1' } } },
   }),
 }), { virtual: true });
 
-jest.mock('../../hooks/useSettings', () => ({
-  useSettings: () => ({ products: mockProducts }),
+jest.mock('../agreement/hooks/useSettings', () => ({
+  useSettings: () => ({ products: [{ id: 'PRD-1', segment: 'COM' }] }),
 }));
 
-// Minimal prop shapes for the mocked SDK components. Only the props the modal
-// actually passes are typed; everything is erased at runtime.
+jest.mock('../agreement/hooks/useAgreementId', () => ({
+  useAgreementId: () => 'AGR-1234-5678-9012',
+}));
+
+jest.mock('../agreement/hooks/useAdobeCustomer', () => ({
+  useAdobeCustomer: () => ({
+    status: 'success',
+    error: null,
+    data: mockCustomerData,
+    update: jest.fn(),
+    refresh: jest.fn(),
+  }),
+}));
+
+jest.mock('../agreement/hooks/useThreeYearCommitmentRequest', () => ({
+  useThreeYearCommitmentRequest: () => ({
+    error: mockError,
+    status: mockStatus,
+    submitRequest: mockSubmit,
+    reset: jest.fn(),
+  }),
+}));
+
 interface MockOption {
   label: string;
   value: string;
   disabled?: boolean;
-}
-interface MockModalProps {
-  isOpen: boolean;
-  title: ReactNode;
-  children: ReactNode;
-  actions: ReactNode;
 }
 interface MockButtonProps {
   children: ReactNode;
@@ -66,17 +86,6 @@ interface MockNotificationProps {
 interface MockTextProps {
   children: ReactNode;
 }
-
-jest.mock('@softwareone-platform/sdk-react-ui-v0/modal', () => ({
-  Modal: ({ isOpen, title, children, actions }: MockModalProps) =>
-    isOpen ? (
-      <div data-testid="modal">
-        <div>{title}</div>
-        {children}
-        <div>{actions}</div>
-      </div>
-    ) : null,
-}));
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => ({
   Button: ({ children, onClick, isDisabled, isBusy }: MockButtonProps) => (
@@ -135,24 +144,26 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => ({
   RegularText: ({ children }: MockTextProps) => <span>{children}</span>,
 }));
 
-function setup(overrides: Partial<Parameters<typeof RequestCommitmentModal>[0]> = {}) {
-  const onSubmit = jest.fn().mockResolvedValue(true);
-  const onClose = jest.fn();
-  const utils = render(
-    <RequestCommitmentModal
-      currentEnrollStatus={null}
-      currentMinimumConsumables={null}
-      currentMinimumLicenses={null}
-      disableCommitmentOption={false}
-      error=""
-      isOpen
-      onClose={onClose}
-      onSubmit={onSubmit}
-      status="idle"
-      {...overrides}
-    />,
-  );
-  return { ...utils, onSubmit, onClose };
+function committedCustomer(minimumLicenses?: number): AdobeCustomerData {
+  return {
+    benefits: [
+      {
+        type: 'THREE_YEAR_COMMIT',
+        commitment: {
+          status: 'COMMITTED',
+          minimumQuantities:
+            minimumLicenses != null
+              ? [{ offerType: 'LICENSE', quantity: minimumLicenses }]
+              : [],
+        },
+      },
+    ],
+  };
+}
+
+function setup() {
+  const utils = render(<App />);
+  return utils;
 }
 
 const selectLicenses = (utils: ReturnType<typeof setup>, value: string) =>
@@ -161,42 +172,24 @@ const selectLicenses = (utils: ReturnType<typeof setup>, value: string) =>
 const selectConsumables = (utils: ReturnType<typeof setup>, value: string) =>
   fireEvent.change(utils.getByLabelText('Discount tier'), { target: { value } });
 
+const setRequestType = (utils: ReturnType<typeof setup>, value: string) =>
+  fireEvent.change(utils.getByTestId('switcher-request-type'), { target: { value } });
+
 const clickSend = (utils: ReturnType<typeof setup>) =>
   fireEvent.click(utils.getByText('Send invitation'));
 
-describe('RequestCommitmentModal', () => {
+describe('request-commitment-action App', () => {
   beforeEach(() => {
-    mockAccountType = 'Operations';
-    mockProductId = 'PRD-1';
-    mockProducts = [{ id: 'PRD-1', segment: 'COM' }];
+    mockClose.mockReset();
+    mockSubmit = jest.fn().mockResolvedValue({ customerId: 'P1' } as AdobeCustomerData);
+    mockCustomerData = null;
+    mockStatus = 'idle';
+    mockError = '';
   });
 
-  it('renders the title when open', () => {
+  it('renders the title', () => {
     const utils = setup();
     expect(utils.getByText('Request 3-year commitment')).toBeTruthy();
-  });
-
-  it('renders nothing when closed', () => {
-    const utils = setup({ isOpen: false });
-    expect(utils.queryByTestId('modal')).toBeNull();
-  });
-
-  it('renders nothing when the account type cannot request even if open', () => {
-    mockAccountType = 'Client';
-    const utils = setup();
-    expect(utils.queryByTestId('modal')).toBeNull();
-  });
-
-  it('renders nothing when the agreement product is not in settings', () => {
-    mockProductId = 'PRD-unknown';
-    const utils = setup();
-    expect(utils.queryByTestId('modal')).toBeNull();
-  });
-
-  it('renders nothing for an LGA product', () => {
-    mockProducts = [{ id: 'PRD-1', segment: 'LGA' }];
-    const utils = setup();
-    expect(utils.queryByTestId('modal')).toBeNull();
   });
 
   it('blocks submission and shows an error when no quantity is selected', () => {
@@ -205,17 +198,17 @@ describe('RequestCommitmentModal', () => {
     clickSend(utils);
 
     expect(utils.getByText('At least one quantity is required.')).toBeTruthy();
-    expect(utils.onSubmit).not.toHaveBeenCalled();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
-  it('submits a commitment payload and closes on success', async () => {
+  it('submits a commitment payload and closes with the returned customer', async () => {
     const utils = setup();
 
     selectLicenses(utils, '10');
     clickSend(utils);
 
     await waitFor(() =>
-      expect(utils.onSubmit).toHaveBeenCalledWith({
+      expect(mockSubmit).toHaveBeenCalledWith({
         benefits: [
           {
             type: 'THREE_YEAR_COMMIT',
@@ -226,20 +219,18 @@ describe('RequestCommitmentModal', () => {
         ],
       }),
     );
-    await waitFor(() => expect(utils.onClose).toHaveBeenCalled());
+    await waitFor(() => expect(mockClose).toHaveBeenCalledWith({ customer: { customerId: 'P1' } }));
   });
 
   it('submits a recommitment payload when recommitment is selected', async () => {
     const utils = setup();
 
-    fireEvent.change(utils.getByTestId('switcher-request-type'), {
-      target: { value: 'recommitment' },
-    });
+    setRequestType(utils, 'recommitment');
     selectConsumables(utils, '1000');
     clickSend(utils);
 
     await waitFor(() =>
-      expect(utils.onSubmit).toHaveBeenCalledWith({
+      expect(mockSubmit).toHaveBeenCalledWith({
         benefits: [
           {
             type: 'THREE_YEAR_COMMIT',
@@ -260,7 +251,7 @@ describe('RequestCommitmentModal', () => {
     clickSend(utils);
 
     await waitFor(() =>
-      expect(utils.onSubmit).toHaveBeenCalledWith({
+      expect(mockSubmit).toHaveBeenCalledWith({
         benefits: [
           {
             type: 'THREE_YEAR_COMMIT',
@@ -277,53 +268,60 @@ describe('RequestCommitmentModal', () => {
   });
 
   it('rejects a commitment when the customer is already committed', () => {
-    const utils = setup({ currentEnrollStatus: 'COMMITTED' });
+    mockCustomerData = committedCustomer();
+    const utils = setup();
 
+    setRequestType(utils, 'commitment');
     selectLicenses(utils, '10');
     clickSend(utils);
 
     expect(
       utils.getByText('The customer is already committed. Select recommitment instead.'),
     ).toBeTruthy();
-    expect(utils.onSubmit).not.toHaveBeenCalled();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
   it('rejects a quantity that is not above the current minimum', () => {
-    const utils = setup({ currentMinimumLicenses: 50 });
+    mockCustomerData = committedCustomer(50);
+    const utils = setup();
 
+    setRequestType(utils, 'recommitment');
     selectLicenses(utils, '10');
     clickSend(utils);
 
     expect(
       utils.getByText('Licenses must be greater than the current minimum (50).'),
     ).toBeTruthy();
-    expect(utils.onSubmit).not.toHaveBeenCalled();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
-  it('keeps the modal open when submission fails', async () => {
+  it('does not close when submission fails', async () => {
+    mockSubmit = jest.fn().mockResolvedValue(false);
     const utils = setup();
-    utils.onSubmit.mockResolvedValue(false);
 
     selectLicenses(utils, '10');
     clickSend(utils);
 
-    await waitFor(() => expect(utils.onSubmit).toHaveBeenCalled());
-    expect(utils.onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalled());
+    expect(mockClose).not.toHaveBeenCalled();
   });
 
   it('shows the backend error when status is error', () => {
-    const utils = setup({ status: 'error', error: 'Adobe rejected the request.' });
+    mockStatus = 'error';
+    mockError = 'Adobe rejected the request.';
+    const utils = setup();
     expect(utils.getByText('Adobe rejected the request.')).toBeTruthy();
   });
 
   it('shows a success notification when status is success', () => {
-    const utils = setup({ status: 'success' });
+    mockStatus = 'success';
+    const utils = setup();
     expect(utils.getByText('The 3YC request has been submitted to Adobe.')).toBeTruthy();
   });
 
-  it('closes when the Close button is clicked', () => {
+  it('closes without data when Close is clicked', () => {
     const utils = setup();
     fireEvent.click(utils.getByText('Close'));
-    expect(utils.onClose).toHaveBeenCalled();
+    expect(mockClose).toHaveBeenCalledWith();
   });
 });

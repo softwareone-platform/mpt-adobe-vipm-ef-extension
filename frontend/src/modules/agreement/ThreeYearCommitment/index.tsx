@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { BoldText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { useAgreementId } from "../hooks/useAgreementId";
@@ -7,16 +5,14 @@ import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notifi
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
 import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
-import { useThreeYearCommitmentRequest } from "../hooks/useThreeYearCommitmentRequest";
 import {
   AdobeCommitmentDetail,
   findThreeYearBenefit,
   readMinimumQuantity,
 } from "../model";
-import { AccountType, ThreeYearCommitmentRequestInput } from "./model";
+import { AccountType } from "./model";
 import { canRequestThreeYearCommitment } from "../../utils/security";
-import { RequestCommitmentModal } from "./RequestCommitmentModal/RequestCommitmentModal";
-import { useMPTContext } from '@mpt-extension/sdk-react';
+import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { useSettings } from "../hooks/useSettings";
 
 import "./index.scss";
@@ -74,20 +70,15 @@ export function ThreeYearCommitment() {
   }>();
   const accountType = context.auth?.account?.type;
 
+  const { open } = useMPTModal();
   const agreementId = useAgreementId();
   const adobeCustomer = useAdobeCustomer(agreementId);
   const agreementProductId = context.data?.agreement?.product?.id;
-  const { error, status, submitRequest, reset } = useThreeYearCommitmentRequest(agreementId);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const benefit = findThreeYearBenefit(adobeCustomer.data);
   const currentCommitment = benefit?.commitment;
   const commitmentRequest = benefit?.commitmentRequest;
   const recommitmentRequest = benefit?.recommitmentRequest;
-
-  const currentEnrollStatus = currentCommitment?.status ?? null;
-  const currentMinimumLicenses = readMinimumQuantity(currentCommitment, 'LICENSE');
-  const currentMinimumConsumables = readMinimumQuantity(currentCommitment, 'CONSUMABLES');
 
   const products = settings?.products;
   const canRequestCommitment = canRequestThreeYearCommitment(
@@ -96,87 +87,64 @@ export function ThreeYearCommitment() {
     agreementProductId,
   );
 
-  function closeModal() {
-    setIsModalOpen(false);
-    reset();
-  }
-
-  // The modal only needs to know whether the request succeeded; on success we
-  // refresh the displayed commitment with the customer payload Adobe returned.
-  async function handleSubmit(input: ThreeYearCommitmentRequestInput): Promise<boolean> {
-    const result = await submitRequest(input);
-    if (result) {
-      adobeCustomer.update(result);
-      return true;
-    }
-    return false;
-  }
-
   return (
-    <>
-      <div className="three-year-commitment__split">
-        <div className="three-year-commitment__main">
-          <header className="extension__content-header">
-            <BoldText as="h2" size={4} className="extension__content-title">
-              3-year commitment
-            </BoldText>
-            <RegularText as="p" size={2} color="grey-5">
-              The details of this customer&apos;s current commitment and requests are below.
-            </RegularText>
-          </header>
+    <div className="three-year-commitment__split">
+      <div className="three-year-commitment__main">
+        <header className="extension__content-header">
+          <BoldText as="h2" size={4} className="extension__content-title">
+            3-year commitment
+          </BoldText>
+          <RegularText as="p" size={2} color="grey-5">
+            The details of this customer&apos;s current commitment and requests are below.
+          </RegularText>
+        </header>
 
-          {adobeCustomer.status === 'loading' && (
-            <InlineNotification status="info" isStandalone>
-              Loading Adobe customer details…
-            </InlineNotification>
-          )}
-          {adobeCustomer.status === 'error' && (
-            <InlineNotification status="error" isStandalone>
-              {adobeCustomer.error}
-            </InlineNotification>
-          )}
-          <div className="three-year-commitment__groups">
-            <CommitmentGroup title="Current commitment" detail={currentCommitment} />
-            <CommitmentGroup title="Commitment request" detail={commitmentRequest} />
-            <CommitmentGroup
-              title="Recommitment request"
-              detail={recommitmentRequest}
-              showDates={false}
-            />
-          </div>
-        </div>
-
-        {canRequestCommitment && (
-          <aside className="three-year-commitment__aside">
-            <RegularText as="p" size={2} color="grey-5">
-              To request a commitment or recommitment, click{" "}
-              <BoldText as="span" size={2}>
-                Request commitment
-              </BoldText>
-              .
-            </RegularText>
-            <Button
-              isDisabled={!agreementId}
-              type="secondary"
-              onClick={() => setIsModalOpen(true)}
-            >
-              Request commitment
-            </Button>
-          </aside>
+        {adobeCustomer.status === 'loading' && (
+          <InlineNotification status="info" isStandalone>
+            Loading Adobe customer details…
+          </InlineNotification>
         )}
+        {adobeCustomer.status === 'error' && (
+          <InlineNotification status="error" isStandalone>
+            {adobeCustomer.error}
+          </InlineNotification>
+        )}
+        <div className="three-year-commitment__groups">
+          <CommitmentGroup title="Current commitment" detail={currentCommitment} />
+          <CommitmentGroup title="Commitment request" detail={commitmentRequest} />
+          <CommitmentGroup
+            title="Recommitment request"
+            detail={recommitmentRequest}
+            showDates={false}
+          />
+        </div>
       </div>
 
-      <RequestCommitmentModal
-        currentEnrollStatus={currentEnrollStatus}
-        currentMinimumConsumables={currentMinimumConsumables}
-        currentMinimumLicenses={currentMinimumLicenses}
-        disableCommitmentOption={currentEnrollStatus === 'COMMITTED'}
-        error={error}
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onSubmit={handleSubmit}
-        status={status}
-      />
-    </>
+      {canRequestCommitment && (
+        <aside className="three-year-commitment__aside">
+          <RegularText as="p" size={2} color="grey-5">
+            To request a commitment or recommitment, click{" "}
+            <BoldText as="span" size={2}>
+              Request commitment
+            </BoldText>
+            .
+          </RegularText>
+          <Button
+            isDisabled={!agreementId}
+            type="secondary"
+            onClick={() =>
+              open('request-commitment-action', {
+                context,
+                onClose: (data?: { customer?: typeof adobeCustomer.data }) => {
+                  if (data?.customer) adobeCustomer.update(data.customer);
+                },
+              })
+            }
+          >
+            Request commitment
+          </Button>
+        </aside>
+      )}
+    </div>
   );
 }
