@@ -16,6 +16,18 @@ def test_agreement_plug_metadata(monkeypatch):
     assert plug.href == "/static/agreement/index.js"
 
 
+def test_request_commitment_modal_plug_metadata(monkeypatch):
+    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
+    get_settings.cache_clear()
+
+    plug = agreement_plugs()[1]  # act
+
+    assert plug.id == "request-commitment-action"
+    assert plug.socket == "portal.commerce.agreements.agreement.modal"
+    assert plug.href == "/static/request-commitment-action/index.js"
+
+
 def test_plug_condition_lists_products(monkeypatch):
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
     monkeypatch.setenv(
