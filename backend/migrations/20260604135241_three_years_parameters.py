@@ -19,7 +19,7 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
         return [
             {
                 "externalId": "3YC",
-                "displayOrder": 100,
+                "displayOrder": 500,
                 "context": "Purchase",
                 "scope": "Order",
                 "phase": "Order",
@@ -101,6 +101,46 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 },
                 "type": "SingleLineText",
             },
+            {
+                "externalId": "Minimum committed licenses",
+                "displayOrder": 600,
+                "scope": "Agreement",
+                "phase": "Fulfillment",
+                "multiple": False,
+                "description": "Defines the minimum license quantity for 3YC enrollment."
+                "Value determines Adobe commitment level (12/13/14). Quantities may "
+                "be adjusted annually but cannot drop below this value during the active "
+                "commitment. Invalid values will result in Querying.",
+                "type": "SingleLineText",
+                "constraints": {"hidden": False, "required": False, "readonly": False},
+                "name": "3YCLicenses",
+                "options": {
+                    "placeholderText": "e.g. 10",
+                    "hintText": "Enter the minimum number of licenses you commit to maintain "
+                    "throughout the full 3-year term. You can adjust quantities annually, "
+                    "but they can't drop below this number.",
+                },
+            },
+            {
+                "externalId": "Minimum committed consumables",
+                "displayOrder": 700,
+                "scope": "Agreement",
+                "phase": "Fulfillment",
+                "multiple": False,
+                "description": "Defines the minimum consumable commitment for 3YC enrollment."
+                "Maps to Adobe consumable tiers (A-G). Quantities may be adjusted annually "
+                "but cannot drop below this value during the active commitment. "
+                "Invalid values will result in Querying.",
+                "type": "SingleLineText",
+                "constraints": {"hidden": False, "required": False, "readonly": False},
+                "name": "3YCConsumables",
+                "options": {
+                    "placeholderText": "e.g. 10",
+                    "hintText": "Enter the minimum number of consumable transactions you commit "
+                    "to maintain throughout the 3-year term. You can adjust quantities "
+                    "annually, but they can't drop below this number.",
+                },
+            },
         ]
 
     @override
@@ -144,14 +184,12 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 )
                 continue
 
-            base_param = {**param_def, "group": group}
+            base_param = param_def
+            if param_def.get("phase") == "Order":
+                base_param = {**param_def, "group": group}
 
             params_service.create({**base_param})
-            logger.info(
-                "Product %s: created parameter %s",
-                product_id,
-                external_id,
-            )
+            logger.info("Product %s: created parameter %s", product_id, external_id)
 
     def _active_external_ids_by_scope(self, params_service: Any, scope: str) -> set[str]:
         result = set()
