@@ -160,3 +160,17 @@ export function findLinkedMembership(
 ): AdobeLinkedMembership | undefined {
   return data?.linkedMembership ?? undefined;
 }
+
+/**
+ * Whether global sales (the "Global customer" status) is enabled for the
+ * customer.
+ *
+ * Adobe reports this on the ``globalSalesEnabled`` flag of the customer payload.
+ * Once enabled it cannot be turned off, so the UI gates the update action on
+ * this signal.
+ */
+export function isGlobalSalesEnabled(
+  data: AdobeCustomerData | null | undefined,
+): boolean {
+  return data?.globalSalesEnabled === true;
+}

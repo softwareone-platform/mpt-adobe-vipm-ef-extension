@@ -31,7 +31,7 @@ def test_app_registers_api_route(path):
     assert isinstance(result[path], APIRouteDefinition)
 
 
-def test_app_generates_agreement_plug_metadata(monkeypatch):
+def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
     monkeypatch.setenv(
         "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
@@ -41,7 +41,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
-    assert len(result.plugs) == 3
+    assert len(result.plugs) == 4
     assert result.plugs[0].model_dump() == {
         "id": "agreement-adobe",
         "name": "Adobe",
@@ -68,4 +68,13 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):
         "socket": "portal.commerce.agreements.agreement.modal",
         "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
         "href": "/static/request-linked-membership-action/index.js",
+    }
+    assert result.plugs[3].model_dump() == {
+        "id": "request-global-customer-action",
+        "name": "Update global customer",
+        "description": "Enable global sales for the agreement's Adobe customer.",
+        "icon": None,
+        "socket": "portal.commerce.agreements.agreement.modal",
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-global-customer-action/index.js",
     }
