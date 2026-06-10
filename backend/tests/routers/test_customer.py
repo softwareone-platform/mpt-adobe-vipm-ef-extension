@@ -10,6 +10,7 @@ from mpt_extension_sdk.api.errors import (
 )
 from pydantic import ValidationError as PydanticValidationError
 
+from adobe.enums import LinkedMembershipType
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.routers.api.customer import (
     LinkedMembershipRequestBody,
@@ -167,6 +168,25 @@ def test_linked_membership_request_body_rejects_empty_name():
 def test_linked_membership_request_body_rejects_name_exceeding_max_length():
     with pytest.raises(PydanticValidationError):
         LinkedMembershipRequestBody(name="x" * (_LINKED_MEMBERSHIP_NAME_MAX_LEN + 1))
+
+
+def test_linked_membership_request_body_defaults_to_standard_type():
+    body = LinkedMembershipRequestBody(name="My Group")  # act
+
+    assert body.membership_type is LinkedMembershipType.STANDARD
+
+
+def test_linked_membership_request_body_accepts_type_alias():
+    body = LinkedMembershipRequestBody.model_validate(  # act
+        {"name": "My Group", "type": "CONSORTIUM"}
+    )
+
+    assert body.membership_type is LinkedMembershipType.CONSORTIUM
+
+
+def test_linked_membership_request_body_rejects_invalid_type():
+    with pytest.raises(PydanticValidationError):
+        LinkedMembershipRequestBody.model_validate({"name": "My Group", "type": "INVALID"})
 
 
 @pytest.mark.parametrize(
@@ -420,6 +440,19 @@ async def test_request_linked_membership_returns_accepted_payload(
     result = await request_linked_membership(_AGREEMENT_ID, mock_ctx, body)  # act
 
     assert result.payload == result_data
+
+
+async def test_request_linked_membership_passes_name_and_membership_type(
+    mocker, mock_ctx, resolve_ids, mock_adobe_client
+):
+    to_thread = mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value={}))
+    body = LinkedMembershipRequestBody.model_validate({"name": "My Group", "type": "CONSORTIUM"})
+
+    await request_linked_membership(_AGREEMENT_ID, mock_ctx, body)  # act
+
+    positional = to_thread.call_args.args
+    assert positional[3] == "My Group"
+    assert positional[4] is LinkedMembershipType.CONSORTIUM
 
 
 @pytest.mark.parametrize(

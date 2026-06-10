@@ -173,6 +173,67 @@ describe('agreement plug app', () => {
     expect(screen.queryByText('Current commitment')).not.toBeInTheDocument();
   });
 
+  it('shows the Create linked membership button for an operations account on a supported product', async () => {
+    await renderApp();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    // The section mounts on navigation and refetches settings; flush that fetch
+    // so the gating (which depends on the product allowlist) can resolve.
+    await act(async () => {});
+
+    expect(screen.getByRole('button', { name: 'Create linked membership' })).toBeInTheDocument();
+  });
+
+  it('hides the Create linked membership button for a client account', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Client' } },
+      data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
+    });
+
+    await renderApp();
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    await act(async () => {});
+
+    expect(
+      screen.queryByRole('button', { name: 'Create linked membership' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the Create linked membership button when the product segment is LGA', async () => {
+    // Unlike 3YC, linked membership is available for the LGA segment.
+    mockBackend(ADOBE_CUSTOMER, { products: [{ id: 'PRD-1111-1111', segment: 'LGA' }] });
+
+    await renderApp();
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    await act(async () => {});
+
+    expect(
+      screen.getByRole('button', { name: 'Create linked membership' }),
+    ).toBeInTheDocument();
+  });
+
+  it('disables the Create linked membership button when the customer has a 3-year commitment', async () => {
+    // ADOBE_CUSTOMER carries a COMMITTED 3YC commitment.
+    await renderApp();
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    await act(async () => {});
+
+    expect(screen.getByRole('button', { name: 'Create linked membership' })).toBeDisabled();
+    expect(
+      screen.getByText('This customer has a 3-year commitment and cannot create a linked membership.'),
+    ).toBeInTheDocument();
+  });
+
+  it('enables the Create linked membership button when the customer has no 3-year commitment', async () => {
+    mockBackend({ customerId: 'P1', status: '1000', benefits: [] });
+
+    await renderApp();
+    fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    await act(async () => {});
+
+    expect(screen.getByRole('button', { name: 'Create linked membership' })).toBeEnabled();
+  });
+
   it('renders commitment values pulled from the Adobe customer payload', async () => {
     await renderApp();
 
