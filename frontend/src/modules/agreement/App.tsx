@@ -4,6 +4,7 @@ import { MemoryRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom
 
 import { ThreeYearCommitment } from './ThreeYearCommitment';
 import { LinkedMembership } from './LinkedMembership';
+import { GlobalCustomer } from './GlobalCustomer';
 
 const DEFAULT_PATH = '/3-year-commitment';
 
@@ -67,10 +68,7 @@ export default function App() {
             <Route path="/3-year-commitment" element={<ThreeYearCommitment />} />
             <Route path="/sync-account" element={<SectionPlaceholder title="Sync account" />} />
             <Route path="/linked-membership" element={<LinkedMembership />} />
-            <Route
-              path="/global-customer"
-              element={<SectionPlaceholder title="Global customer" />}
-            />
+            <Route path="/global-customer" element={<GlobalCustomer />} />
             <Route path="*" element={<Navigate to={DEFAULT_PATH} replace />} />
           </Routes>
         </section>

@@ -36,4 +36,12 @@ def agreement_plugs() -> list[Plug]:
             href="/static/request-linked-membership-action/index.js",
             condition=condition,
         ),
+        Plug(
+            id="request-global-customer-action",
+            name="Update global customer",
+            description="Enable global sales for the agreement's Adobe customer.",
+            socket="portal.commerce.agreements.agreement.modal",
+            href="/static/request-global-customer-action/index.js",
+            condition=condition,
+        ),
     ]

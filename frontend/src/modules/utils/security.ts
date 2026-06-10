@@ -39,3 +39,11 @@ export function canRequestLinkedMembership(
 ): boolean {
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
+
+export function canRequestGlobalCustomer(
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  return canRequestAdobeAction(accountType, products, agreementProductId);
+}

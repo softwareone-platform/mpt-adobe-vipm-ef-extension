@@ -70,6 +70,22 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/icon', () => {
   };
 });
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/status-indicator', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+
+  return {
+    StatusIndicator: ({
+      isActive,
+      yesLabel = 'Yes',
+      noLabel = 'No',
+    }: {
+      isActive?: boolean;
+      yesLabel?: string;
+      noLabel?: string;
+    }) => React.createElement('span', null, isActive ? yesLabel : noLabel),
+  };
+});
+
 const mockUseMPTContext = jest.mocked(useMPTContext);
 const mockUseMPTModal = jest.mocked(useMPTModal);
 const mockGet = jest.mocked(http.get);
@@ -307,5 +323,82 @@ describe('agreement plug app', () => {
     await renderApp();
 
     expect(screen.queryByRole('button', { name: 'Request commitment' })).not.toBeInTheDocument();
+  });
+
+  describe('global customer section', () => {
+    async function openGlobalCustomer() {
+      await renderApp();
+      fireEvent.click(screen.getByRole('link', { name: 'Global customer' }));
+      // The section mounts on navigation and refetches settings/customer; flush
+      // those fetches so the gating and status can resolve.
+      await act(async () => {});
+    }
+
+    it('renders the global customer status from the Adobe payload', async () => {
+      // ADOBE_CUSTOMER has no globalSalesEnabled flag, so the status is Disabled.
+      await openGlobalCustomer();
+
+      expect(screen.getByText('Current global customer status')).toBeInTheDocument();
+      expect(screen.getByText('Disabled')).toBeInTheDocument();
+    });
+
+    it('renders an Enabled status when global sales is enabled', async () => {
+      mockBackend({ ...ADOBE_CUSTOMER, globalSalesEnabled: true });
+
+      await openGlobalCustomer();
+
+      expect(screen.getByText('Enabled')).toBeInTheDocument();
+    });
+
+    it('shows the Update global customer button for a vendor account on a supported product', async () => {
+      await openGlobalCustomer();
+
+      expect(
+        screen.getByRole('button', { name: 'Update global customer' }),
+      ).toBeInTheDocument();
+    });
+
+    it('hides the Update global customer button for a client account', async () => {
+      mockUseMPTContext.mockReturnValue({
+        auth: { account: { type: 'Client' } },
+        data: { agreement: { id: 'AGR-1234-5678-9012', product: { id: 'PRD-1111-1111' } } },
+      });
+
+      await openGlobalCustomer();
+
+      expect(
+        screen.queryByRole('button', { name: 'Update global customer' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('enables the Update global customer button when global sales is disabled', async () => {
+      await openGlobalCustomer();
+
+      expect(screen.getByRole('button', { name: 'Update global customer' })).toBeEnabled();
+    });
+
+    it('disables the Update global customer button when global sales is already enabled', async () => {
+      mockBackend({ ...ADOBE_CUSTOMER, globalSalesEnabled: true });
+
+      await openGlobalCustomer();
+
+      expect(screen.getByRole('button', { name: 'Update global customer' })).toBeDisabled();
+      expect(
+        screen.getByText(
+          'This customer is already enabled as a global customer and cannot be changed.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('opens the request-global-customer modal plug when the button is clicked', async () => {
+      await openGlobalCustomer();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Update global customer' }));
+
+      expect(mockOpen).toHaveBeenCalledWith(
+        'request-global-customer-action',
+        expect.objectContaining({ onClose: expect.any(Function) }),
+      );
+    });
   });
 });

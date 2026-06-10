@@ -1,5 +1,9 @@
 import { ProductSegment } from '../agreement/hooks/useSettings';
-import { canRequestLinkedMembership, canRequestThreeYearCommitment } from './security';
+import {
+  canRequestGlobalCustomer,
+  canRequestLinkedMembership,
+  canRequestThreeYearCommitment,
+} from './security';
 
 const products: ProductSegment[] = [
   { id: 'PRD-1111-1111', segment: 'COM' },
@@ -67,5 +71,35 @@ describe('canRequestLinkedMembership', () => {
 
   it('returns false when the product id is undefined', () => {
     expect(canRequestLinkedMembership('Operations', products, undefined)).toBe(false);
+  });
+});
+
+describe('canRequestGlobalCustomer', () => {
+  it('returns true for an operations account with a matching product', () => {
+    expect(canRequestGlobalCustomer('Operations', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true for a vendor account with a matching product', () => {
+    expect(canRequestGlobalCustomer('Vendor', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true when the product segment is LGA, like the linked membership button', () => {
+    expect(canRequestGlobalCustomer('Operations', products, 'PRD-2222-2222')).toBe(true);
+  });
+
+  it('returns false for a client account', () => {
+    expect(canRequestGlobalCustomer('Client', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canRequestGlobalCustomer('Operations', products, 'PRD-9999-9999')).toBe(false);
+  });
+
+  it('returns false when products are not provided', () => {
+    expect(canRequestGlobalCustomer('Operations', undefined, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product id is undefined', () => {
+    expect(canRequestGlobalCustomer('Operations', products, undefined)).toBe(false);
   });
 });

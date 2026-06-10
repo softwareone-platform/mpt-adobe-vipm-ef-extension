@@ -3,6 +3,7 @@ import {
   ProductSegments,
   findLinkedMembership,
   hasThreeYearCommitment,
+  isGlobalSalesEnabled,
   readParameter,
   resolveAgreementId,
 } from './model';
@@ -100,6 +101,19 @@ describe('hasThreeYearCommitment', () => {
     expect(hasThreeYearCommitment({ benefits: [] })).toBe(false);
     expect(hasThreeYearCommitment({})).toBe(false);
     expect(hasThreeYearCommitment(null)).toBe(false);
+  });
+});
+
+describe('isGlobalSalesEnabled', () => {
+  it('returns true when the customer has global sales enabled', () => {
+    expect(isGlobalSalesEnabled({ globalSalesEnabled: true })).toBe(true);
+  });
+
+  it('returns false when the flag is false, absent, or there is no customer data', () => {
+    expect(isGlobalSalesEnabled({ globalSalesEnabled: false })).toBe(false);
+    expect(isGlobalSalesEnabled({})).toBe(false);
+    expect(isGlobalSalesEnabled(null)).toBe(false);
+    expect(isGlobalSalesEnabled(undefined)).toBe(false);
   });
 });
 
