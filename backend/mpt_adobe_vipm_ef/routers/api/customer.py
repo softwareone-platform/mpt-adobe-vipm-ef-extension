@@ -7,18 +7,19 @@ from http import HTTPStatus
 from typing import Any, cast
 
 from mpt_api_client.exceptions import MPTHttpError
-from mpt_extension_sdk.api import APIResponse
-from mpt_extension_sdk.api.context import APIContext
-from mpt_extension_sdk.api.errors import (
+from mpt_extension_sdk.api import (
+    APIContext,
+    APIResponse,
+    ErrorDetail,
     ForbiddenError,
     NotFoundError,
     UpstreamServiceError,
     ValidationError,
 )
-from mpt_extension_sdk.api.models.errors import ErrorDetail
 from mpt_extension_sdk.schemas import BaseSchema
 from pydantic import Field
 
+from adobe.enums import LinkedMembershipType
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.routers.api.agreements import agreements_router
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
@@ -126,6 +127,11 @@ class LinkedMembershipRequestBody(BaseSchema):
     """Body schema for the linked membership request endpoint."""
 
     name: str = Field(min_length=_MIN_LENGTH, max_length=_MAX_LENGTH)
+    membership_type: LinkedMembershipType = Field(
+        default=LinkedMembershipType.STANDARD,
+        serialization_alias="type",
+        validation_alias="type",
+    )
 
 
 def _resolve_authorization_id(agreement: Any) -> str | None:
@@ -341,6 +347,11 @@ async def request_linked_membership(
     body: LinkedMembershipRequestBody,
 ) -> APIResponse:
     """Submit a linked membership request to Adobe for the agreement's customer."""
+    logger.info(
+        "POST linked membership request for agreement %s (type=%s)",
+        agreement_id,
+        body.membership_type,
+    )
     authorization_id = await _require_authorization_id(ctx, agreement_id)
     customer_id = await _require_customer_id(ctx, agreement_id)
 
@@ -350,6 +361,7 @@ async def request_linked_membership(
             authorization_id,
             customer_id,
             body.name,
+            body.membership_type,
         )
     except AdobeAPIError as error:
         logger.warning("Adobe rejected the linked membership request: %s", error)

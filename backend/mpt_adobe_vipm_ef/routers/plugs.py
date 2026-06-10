@@ -28,4 +28,12 @@ def agreement_plugs() -> list[Plug]:
             href="/static/request-commitment-action/index.js",
             condition=condition,
         ),
+        Plug(
+            id="request-linked-membership-action",
+            name="Create linked membership",
+            description="Create an Adobe linked membership for the agreement's customer.",
+            socket="portal.commerce.agreements.agreement.modal",
+            href="/static/request-linked-membership-action/index.js",
+            condition=condition,
+        ),
     ]

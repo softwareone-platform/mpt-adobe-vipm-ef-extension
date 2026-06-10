@@ -1,0 +1,44 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.request-linked-membership-modal {
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    padding: $var-spacing-3;
+    border-bottom: 2px solid;
+    border-image: linear-gradient(259deg, #00c9cd 16.32%, #472aff 59.03%, #392d9c 99.99%) 1;
+  }
+
+  &__content {
+    padding: $var-spacing-3;
+    overflow: auto;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: $var-spacing-3;
+  }
+
+  &__actions {
+    padding: $var-spacing-3;
+    border-top: 1px solid var(--gray-3);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  &__option {
+    border: 1px solid $var-gray-2;
+    border-radius: $var-spacing-1;
+    padding: $var-spacing-2 $var-spacing-3;
+  }
+
+  &__option-label {
+    display: flex;
+    flex-direction: column;
+    gap: $var-spacing-1;
+  }
+
+  &__name-field {
+    margin-top: $var-spacing-2;
+  }
+}

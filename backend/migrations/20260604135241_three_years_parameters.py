@@ -102,7 +102,7 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 "type": "SingleLineText",
             },
             {
-                "externalId": "Minimum committed licenses",
+                "externalId": "3YCLicenses",
                 "displayOrder": 600,
                 "scope": "Agreement",
                 "phase": "Fulfillment",
@@ -113,7 +113,7 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 "commitment. Invalid values will result in Querying.",
                 "type": "SingleLineText",
                 "constraints": {"hidden": False, "required": False, "readonly": False},
-                "name": "3YCLicenses",
+                "name": "Minimum committed licenses",
                 "options": {
                     "placeholderText": "e.g. 10",
                     "hintText": "Enter the minimum number of licenses you commit to maintain "
@@ -122,7 +122,7 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 },
             },
             {
-                "externalId": "Minimum committed consumables",
+                "externalId": "3YCConsumables",
                 "displayOrder": 700,
                 "scope": "Agreement",
                 "phase": "Fulfillment",
@@ -133,7 +133,7 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 "Invalid values will result in Querying.",
                 "type": "SingleLineText",
                 "constraints": {"hidden": False, "required": False, "readonly": False},
-                "name": "3YCConsumables",
+                "name": "Minimum committed consumables",
                 "options": {
                     "placeholderText": "e.g. 10",
                     "hintText": "Enter the minimum number of consumable transactions you commit "

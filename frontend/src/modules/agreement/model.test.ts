@@ -1,4 +1,11 @@
-import { AgreementParameter, ProductSegments, readParameter, resolveAgreementId } from './model';
+import {
+  AgreementParameter,
+  ProductSegments,
+  findLinkedMembership,
+  hasThreeYearCommitment,
+  readParameter,
+  resolveAgreementId,
+} from './model';
 
 describe('agreement model helpers', () => {
   it('resolves agreement id from the Marketplace context agreement', () => {
@@ -48,6 +55,51 @@ describe('readParameter', () => {
 
   it('returns undefined when parameters are not provided', () => {
     expect(readParameter(undefined, '3YCEnrollStatus')).toBeUndefined();
+  });
+});
+
+describe('findLinkedMembership', () => {
+  it('returns the linked membership from the customer payload', () => {
+    const membership = { linkedMembershipId: 'LM-1', name: 'My Group', type: 'STANDARD' };
+
+    expect(findLinkedMembership({ linkedMembership: membership })).toBe(membership);
+  });
+
+  it('returns undefined when the customer has no linked membership', () => {
+    expect(findLinkedMembership({ linkedMembership: null })).toBeUndefined();
+    expect(findLinkedMembership({})).toBeUndefined();
+  });
+
+  it('returns undefined when the customer data is null', () => {
+    expect(findLinkedMembership(null)).toBeUndefined();
+  });
+});
+
+describe('hasThreeYearCommitment', () => {
+  it('returns true when the current commitment is COMMITTED', () => {
+    expect(
+      hasThreeYearCommitment({
+        benefits: [
+          { type: 'THREE_YEAR_COMMIT', commitment: { status: 'COMMITTED', minimumQuantities: [] } },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false for a non-committed commitment status', () => {
+    expect(
+      hasThreeYearCommitment({
+        benefits: [
+          { type: 'THREE_YEAR_COMMIT', commitment: { status: 'REQUESTED', minimumQuantities: [] } },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it('returns false when there is no three-year benefit or customer data', () => {
+    expect(hasThreeYearCommitment({ benefits: [] })).toBe(false);
+    expect(hasThreeYearCommitment({})).toBe(false);
+    expect(hasThreeYearCommitment(null)).toBe(false);
   });
 });
 
