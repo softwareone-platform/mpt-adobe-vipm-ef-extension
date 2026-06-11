@@ -1,0 +1,57 @@
+# Global values shared with the sub-chart(s).
+#
+# These placeholders ("default" / base64 "ZGVmYXVsdA==") are overridden at deploy
+# time by the platform deployment system. Each global maps to one environment
+# variable consumed by the `mpt-ext` runtime (mpt-extension-sdk 6.3.1):
+#
+#   ConfigMap (non-sensitive)            Global value
+#   -----------------------------------  -----------------------------
+#   SDK_EXTENSION_URL                    SdkExtensionUrl        (required)
+#   SDK_EXTENSION_ID                     SdkExtensionId         (required)
+#   MPT_API_BASE_URL                     MpApiBaseUrl           (required)
+#   MPT_PRODUCTS_IDS                     MpProductsIds          (required)
+#   EXT_ADOBE_API_BASE_URL               AdobeApiEndpoint       (required)
+#   EXT_ADOBE_AUTH_ENDPOINT_URL          AdobeAuthEndpoint      (required)
+#   EXT_PRODUCT_SEGMENTS                 ProductSegments
+#   SDK_OBSERVABILITY_ENABLED            ObservabilityEnabled
+#   SDK_OTEL_SERVICE_NAME                OtelServiceName
+#   LOG_LEVEL                            LogLevel
+#
+#   Secret (sensitive, base64)           Global value
+#   -----------------------------------  -----------------------------
+#   SDK_EXTENSION_API_KEY                SdkExtensionApiKey     (required)
+#   SDK_APPLICATIONINSIGHTS_CONNECTION_STRING  AppInsightsConnectionString
+#
+#   Mounted secret files (base64 JSON)   Global value
+#   -----------------------------------  -----------------------------
+#   adobe_credentials.json               CredentialsJson
+#   adobe_authorizations.json            AuthorizationsJson
+global:
+  # --- SDK runtime registration / OpenZiti (required) ---
+  SdkExtensionUrl: default
+  SdkExtensionId: default
+  SdkExtensionApiKey: ZGVmYXVsdA==
+  MpApiBaseUrl: default
+
+  # --- Extension configuration ---
+  MpProductsIds: default
+  AdobeApiEndpoint: default
+  AdobeAuthEndpoint: default
+  ProductSegments: '{}'
+
+  # --- Adobe credential files (base64-encoded JSON, mounted as a secret) ---
+  CredentialsJson: ZGVmYXVsdA==
+  AuthorizationsJson: ZGVmYXVsdA==
+
+  # --- Observability ---
+  ObservabilityEnabled: "false"
+  OtelServiceName: default
+  AppInsightsConnectionString: ZGVmYXVsdA==
+  LogLevel: INFO
+
+  # --- Ziticorn runtime ---
+  ZitiWorkers: 4
+
+  # --- Image / scaling ---
+  registryUrl: ""
+  replicaCount: 1
