@@ -16,7 +16,10 @@ duplicate those tables.
 ## Notes
 
 - Adobe credentials (`EXT_ADOBE_CREDENTIALS_FILE`) and authorizations
-  (`EXT_ADOBE_AUTHORIZATIONS_FILE`) are JSON files read at startup by
-  `backend/mpt_adobe_vipm_ef/settings.py`.
+  (`EXT_ADOBE_AUTHORIZATIONS_FILE`) are JSON files read lazily by
+  `backend/mpt_adobe_vipm_ef/settings.py`: `_load_adobe_authorizations()` runs
+  through the `ExtensionSettings.adobe_authorizations` `@cached_property`, so the
+  files are read on first access (during the first Adobe API request via
+  `get_authorization()`), not during `load()`/app startup.
 - Airtable is only used when `MPT_TOOL_STORAGE_TYPE=airtable`; with the default
   `local` storage the Airtable variables can remain unset.
