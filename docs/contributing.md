@@ -22,7 +22,7 @@ Shared operational knowledge also lives there:
 The default development environment is Docker-based.
 
 - Use `make build` to build the image and sync dependencies with `uv`.
-- Use `make bash` or `make shell` when you need an interactive container session.
+- Use `make bash` when you need an interactive container session.
 
 If the repository supports a local-only workflow outside Docker, document it explicitly in [docs/local-development.md](local-development.md). Otherwise, treat Docker as the default path.
 
