@@ -29,7 +29,6 @@ Useful helper commands:
 
 ```bash
 make bash
-make shell
 make down
 ```
 

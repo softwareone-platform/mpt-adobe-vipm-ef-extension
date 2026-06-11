@@ -11,7 +11,7 @@ This file documents only repository-specific testing behavior.
 
 ## Test Scope
 
-The current test scope is limited to verifying that the app starts with no registered routes.
+The app-startup tests verify that the API, event, and plug routers are registered and that agreement plug metadata is generated (see [`backend/tests/test_app.py`](../backend/tests/test_app.py)).
 
 ## Commands
 

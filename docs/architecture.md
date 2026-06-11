@@ -1,23 +1,86 @@
 # Architecture
 
-Keep this document focused on actual architecture decisions for the repository.
+This document describes the structure, major components, boundaries, and layer
+responsibilities of `mpt-adobe-vipm-ef-extension`. For configuration, local
+setup, external systems, testing, and migrations, see the documents linked
+below.
 
-If the repository does not yet have stable architectural decisions, keep this file short and avoid speculative descriptions.
+## Purpose
 
-## What To Document Here
+`mpt-adobe-vipm-ef-extension` is a SoftwareOne Marketplace Platform (MPT)
+extension for the Adobe VIP Marketplace. It has a Python backend built on the
+MPT Extension SDK and a TypeScript frontend that provides plug UI for
+Marketplace screens.
 
-When architecture details become relevant, document:
+## Repository layout
 
-- the main runtime components
-- repository boundaries and responsibility split
-- extension entry points
-- data flow between API handlers, event listeners, pipelines, and external services
-- any persistence model and migration boundaries
-- important design decisions or tradeoffs
+```text
+backend/mpt_adobe_vipm_ef/   extension runtime (routers, flows, settings)
+backend/adobe/               Adobe VIPM API client
+backend/migrations/          migration files
+backend/tests/               backend test suite
+frontend/                    TypeScript plug UI (esbuild)
+```
 
-## Guidance
+## Backend
 
-- Keep this file minimal until there is real architecture to describe.
-- Avoid fictional or speculative architecture.
-- Put workflow details in the other topic-specific documents under `docs/`.
-- Update this file when the repository gains stable components or non-trivial design rules.
+- `mpt_adobe_vipm_ef/app.py` — the extension app; importing it registers the
+  routers below on the SDK app (`ext_app.routes`).
+- `mpt_adobe_vipm_ef/routers/` — route definitions:
+  - `api/agreements.py`, `api/customer.py`, `api/settings.py` — API routes
+  - `events/order.py` — order event router (fulfilment)
+  - `plugs.py` — plug routes that expose plug metadata to the frontend
+- `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order
+  processing.
+- `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including
+  the Adobe settings, from environment variables and credential files.
+- `mpt_adobe_vipm_ef/context.py`, `models.py` — API context and data models.
+
+## Adobe client
+
+`backend/adobe/` is the Adobe VIP Marketplace API client used by the flows:
+
+- `client.py` — the Adobe client
+- `transport.py` — HTTP transport and authentication
+- `resources/` — resource-specific operations (e.g. `customer.py`)
+- `dataclasses.py`, `enums.py`, `errors.py` — request/response types and errors
+
+## Frontend
+
+The `frontend/` package is a TypeScript plug UI bundled with esbuild into
+`backend/static/` and surfaced through the backend's plug routes. Components and
+hooks are tested with jest. See [contributing.md](contributing.md) and
+[local-development.md](local-development.md) for the build and watch commands.
+
+## External integrations
+
+Adobe VIPM API (`backend/adobe/`), the MPT API (via the SDK), and Airtable when
+`mpt-tool` Airtable storage is enabled. See
+[external-integrations.md](external-integrations.md) for purpose, auth, and
+configuration.
+
+## Boundaries
+
+- The Adobe API is reached only through `backend/adobe/`; flows depend on that
+  client, not on raw HTTP.
+- Configuration is read in `settings.py` from environment variables and the
+  Adobe credential/authorization files, not from the environment inside business
+  logic.
+- The frontend communicates with the backend through plug metadata and the API
+  routes; it does not call external systems directly.
+
+## Deployment shape
+
+The container image is built from the multi-stage `Dockerfile` (frontend assets
+are built and mounted into the backend's `static/`) and started via the SDK
+entrypoint. `compose.yaml` and `compose.local.yaml` provide the local stack. See
+[deployment.md](deployment.md) for configuration.
+
+## Related documentation
+
+- [local-development.md](local-development.md) — local setup and run
+- [contributing.md](contributing.md) — development workflow and commands
+- [testing.md](testing.md) — test strategy and execution
+- [deployment.md](deployment.md) — configuration and deployment model
+- [external-integrations.md](external-integrations.md) — external systems
+- [migrations.md](migrations.md) — migration workflow
