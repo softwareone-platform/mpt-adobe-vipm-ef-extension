@@ -2,6 +2,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS base
 
 WORKDIR /extension
 
+RUN uv venv /opt/venv
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+FROM base AS build-base
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -9,35 +16,37 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN uv venv /opt/venv
-
-ENV UV_PROJECT_ENVIRONMENT=/opt/venv
-ENV PATH=/opt/venv/bin:$PATH
-
-FROM base AS build
+FROM build-base AS build
 
 COPY backend/ .
-RUN mkdir -p static
-COPY static/ ./static/
 
 RUN uv sync --frozen --no-cache --no-dev
 
+FROM node:24-bookworm-slim AS frontend-build
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+RUN mkdir -p /static
+
 FROM build AS dev
 
+COPY --from=frontend-build /static ./static
 RUN uv sync --frozen --no-cache --dev
 
 CMD ["mpt-ext", "run"]
 
-FROM build AS prod
+FROM base AS prod
 
-RUN rm -rf tests/
-
-RUN apt-get update && apt-get purge -y --auto-remove \
-    gcc \
-    g++ \
-    git \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/venv /opt/venv
+COPY --from=build /extension/adobe ./adobe
+COPY --from=build /extension/mpt_adobe_vipm_ef ./mpt_adobe_vipm_ef
+COPY --from=build /extension/migrations ./migrations
+COPY --from=frontend-build /static ./static
 
 RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser && \
     mkdir -p /home/appuser/.cache/uv && \
