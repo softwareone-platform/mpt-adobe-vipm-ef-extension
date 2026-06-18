@@ -1,4 +1,4 @@
-import { BoldText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
+import { BoldText, MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
@@ -51,9 +51,9 @@ export function LinkedMembership() {
     <div className="linked-membership__split">
       <div className="linked-membership__main">
         <header className="extension__content-header">
-          <BoldText as="h2" size={4} className="extension__content-title">
+          <MediumText as="h2" size={4} className="extension__content-title">
             Linked membership
-          </BoldText>
+          </MediumText>
           <RegularText as="p" size={2} color="grey-5">
             The details of this customer&apos;s current linked membership are below.
           </RegularText>

@@ -58,6 +58,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => {
 
   return {
     BoldText: renderText,
+    MediumText: renderText,
     RegularText: renderText,
   };
 });
@@ -177,6 +178,7 @@ describe('agreement plug app', () => {
     expect(screen.getByText('Current commitment')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: 'Linked membership' }));
+    await act(async () => {});
 
     expect(screen.getByRole('link', { name: 'Linked membership' })).toHaveAttribute(
       'aria-current',

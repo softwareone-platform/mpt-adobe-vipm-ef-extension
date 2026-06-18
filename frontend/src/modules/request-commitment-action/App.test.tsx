@@ -140,7 +140,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/notification', () => ({
 }));
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => ({
-  BoldText: ({ children }: MockTextProps) => <span>{children}</span>,
+  MediumText: ({ children }: MockTextProps) => <span>{children}</span>,
   RegularText: ({ children }: MockTextProps) => <span>{children}</span>,
 }));
 

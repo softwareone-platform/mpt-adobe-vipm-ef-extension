@@ -5,13 +5,14 @@
   display: grid;
   gap: var(--spacing-5);
   grid-template-columns: minmax(180px, 220px) 1fr;
-  padding: var(--spacing-4) 0;
+  padding: var(--spacing-3) 0;
 }
 
 .extension__sidebar {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-2);
+  gap: 0;
+  padding-left: var(--spacing-3);
 }
 
 .extension__sidebar-heading {
@@ -19,28 +20,48 @@
   align-items: center;
   gap: var(--spacing-1);
   margin: 0;
+  height: 37px;
+  padding-left: 14px;
+}
+
+.extension__sidebar nav {
+  width: fit-content;
 }
 
 .extension__sidebar-item {
   position: relative;
   color: inherit;
-  display: block;
-  padding: var(--spacing-2) var(--spacing-3);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 37px;
+  padding: 0 36px;
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.extension__sidebar-item--active {
+.extension__sidebar-item:hover {
+  background-color: $var-gray-2;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.extension__sidebar-item--active,
+.extension__sidebar-item--active:hover {
   color: var(--brand-primary);
 }
 
 .extension__sidebar-item--active::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: var(--spacing-2);
   top: 50%;
   transform: translateY(-50%);
-  width: 4px;
-  height: 1em;
+  width: var(--spacing-1);
+  height: var(--spacing-3);
+  border-radius: 4px;
   background-color: var(--brand-primary);
 }
 
@@ -49,6 +70,8 @@
   flex-direction: column;
   gap: var(--spacing-3);
   min-width: 0;
+  border-left: 1px solid $var-gray-2;
+  padding-left: var(--spacing-5);
 }
 
 .extension__content-header {
