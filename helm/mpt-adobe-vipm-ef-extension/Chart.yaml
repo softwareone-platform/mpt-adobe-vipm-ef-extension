@@ -1,0 +1,19 @@
+apiVersion: v2
+name: mpt-adobe-vipm-ef-extension
+description: A Helm chart for the Adobe VIPM EF extension
+type: application
+
+# Cli Version: 2.4.0
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+version: 1.0.0
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application.
+appVersion: "1.0.0"
+
+dependencies:
+  - name: mpt-adobe-vipm-ef-extension-app
+    version: 1.0.0
+    repository: "file://charts/app"

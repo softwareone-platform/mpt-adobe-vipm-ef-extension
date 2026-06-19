@@ -1,0 +1,41 @@
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+cliVersion: 2.4.0
+owner: turing
+git:
+  repository: mpt-adobe-vipm-ef-extension
+image:
+  repository: /mpt-adobe-vipm-ef-extension
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+
+# Access policy labels are consumed by the platform RBAC configuration.
+# This extension has no inbound Kubernetes endpoint (it dials out over OpenZiti),
+# so these only describe ownership/audience.
+accessPolicy: public
+accessPolicyAudience: any
+# Type of app: test, product, infra
+type: product
+applicationGroup: pyra-cli
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
