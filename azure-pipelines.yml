@@ -86,7 +86,6 @@ stages:
     dependsOn:
       - prepare
       - build
-      - sbom
     jobs:
       - job: publish
         displayName: Publish
