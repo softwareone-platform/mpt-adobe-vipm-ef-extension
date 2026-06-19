@@ -9,11 +9,11 @@ resources:
     - repository: templates
       type: git
       name: MPT/ops-build-templates-aks-releases
-      ref: releases/v15
+      ref: refs/heads/releases/v15
 
 variables:
   - name: appName
-    value: mpt-adobe-vipm-ef-extension
+    value: mpt-extension-adobe
 
 stages:
   - stage: prepare
