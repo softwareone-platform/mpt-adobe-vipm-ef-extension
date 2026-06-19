@@ -79,6 +79,7 @@ stages:
           projectVersion: $(majorVersion)
           dtrackAPIKey: $(dtrackAPIKey)
           dtrackURI: $(dtrackURI)
+          workingDirectory: $(Build.SourcesDirectory)/backend
 
   - stage: publish
     displayName: Publish
