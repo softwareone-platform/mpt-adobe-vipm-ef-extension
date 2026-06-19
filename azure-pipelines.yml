@@ -9,7 +9,7 @@ resources:
     - repository: templates
       type: git
       name: MPT/ops-build-templates-aks-releases
-      ref: refs/heads/releases/v15
+      ref: releases/v15
 
 variables:
   - name: appName
@@ -76,13 +76,6 @@ stages:
         parameters:
           pythonVersion: "3.x"
           projectName: $(appName)
-          projectVersion: $(majorVersion)
-          dtrackAPIKey: $(dtrackAPIKey)
-          dtrackURI: $(dtrackURI)
-      - template: aks-tests-templates/jobs/dtrack-npm-sbom-job.yaml@templates
-        parameters:
-          workingDirectory: frontend
-          projectName: $(appName)-frontend
           projectVersion: $(majorVersion)
           dtrackAPIKey: $(dtrackAPIKey)
           dtrackURI: $(dtrackURI)
