@@ -1,5 +1,5 @@
 apiVersion: v2
-name: mpt-adobe-vipm-ef-extension-app
+name: mpt-extension-adobe-app
 description: Adobe VIPM EF extension workload (single OpenZiti process)
 type: application
 
