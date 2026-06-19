@@ -1,4 +1,4 @@
-import { BoldText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
+import { BoldText, MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { StatusIndicator } from '@softwareone-platform/sdk-react-ui-v0/status-indicator';
@@ -38,9 +38,9 @@ export function GlobalCustomer() {
     <div className="global-customer__split">
       <div className="global-customer__main">
         <header className="extension__content-header">
-          <BoldText as="h2" size={4} className="extension__content-title">
+          <MediumText as="h2" size={4} className="extension__content-title">
             Global customer
-          </BoldText>
+          </MediumText>
           <RegularText as="p" size={2} color="grey-5">
             The details of this customer&apos;s current global customer status are below.
           </RegularText>

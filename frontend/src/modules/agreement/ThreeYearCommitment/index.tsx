@@ -1,4 +1,4 @@
-import { BoldText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
+import { BoldText, MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { useAgreementId } from "../hooks/useAgreementId";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
@@ -91,13 +91,16 @@ export function ThreeYearCommitment() {
     <div className="three-year-commitment__split">
       <div className="three-year-commitment__main">
         <header className="extension__content-header">
-          <BoldText as="h2" size={4} className="extension__content-title">
+          <MediumText as="h2" size={4} className="extension__content-title">
             3-year commitment
-          </BoldText>
+          </MediumText>
+        </header>
+
+        <div className="three-year-commitment__description">
           <RegularText as="p" size={2} color="grey-5">
             The details of this customer&apos;s current commitment and requests are below.
           </RegularText>
-        </header>
+        </div>
 
         {adobeCustomer.status === 'loading' && (
           <InlineNotification status="info" isStandalone>

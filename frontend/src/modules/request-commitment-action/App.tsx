@@ -6,7 +6,7 @@ import { Select } from '@softwareone-platform/sdk-react-ui-v0/select';
 import { Input } from '@softwareone-platform/sdk-react-ui-v0/input';
 import { Switcher } from '@softwareone-platform/sdk-react-ui-v0/switcher';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
-import { BoldText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
+import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
 import { useAgreementId } from '../agreement/hooks/useAgreementId';
 import { useAdobeCustomer } from '../agreement/hooks/useAdobeCustomer';
@@ -148,9 +148,9 @@ export default function App() {
   return (
     <div className="request-commitment-modal">
       <div className="request-commitment-modal__header">
-        <BoldText as="h2" size={4}>
+        <MediumText as="h2" size={4}>
           Request 3-year commitment
-        </BoldText>
+        </MediumText>
       </div>
 
       <div className="request-commitment-modal__content">
@@ -165,8 +165,8 @@ export default function App() {
         value={requestType}
         onChange={(e) => setRequestType(e.target.value as 'commitment' | 'recommitment')}
         options={[
-          { label: 'Commitment', value: 'commitment', disabled: disableCommitmentOption },
-          { label: 'Recommitment', value: 'recommitment' },
+          { label: 'commitment', value: 'commitment', disabled: disableCommitmentOption },
+          { label: 'recommitment', value: 'recommitment' },
         ]}
       />
       <RegularText as="span" size={1} color="grey-5" className="request-commitment-modal__hint">
@@ -174,11 +174,12 @@ export default function App() {
         above will update the existing commitment. In this scenario, only increases are allowed.
       </RegularText>
 
-      <BoldText as="h3" size={3}>
+      <MediumText as="h3" size={3}>
         Licenses
-      </BoldText>
+      </MediumText>
 
       <Select
+        positions={{ position: 'bottom-start' }}
         controlLabel="Discount level"
         placeholder="Select the desired discount level."
         value={discountLevel}
@@ -211,11 +212,12 @@ export default function App() {
         Select custom under the discount level to use this option.
       </RegularText>
 
-      <BoldText as="h3" size={3}>
+      <MediumText as="h3" size={3}>
         Consumables
-      </BoldText>
+      </MediumText>
 
       <Select
+        positions={{ position: 'bottom-start' }}
         controlLabel="Discount tier"
         placeholder="Not required"
         value={discountTier}
