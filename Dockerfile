@@ -44,6 +44,7 @@ FROM base AS prod
 
 COPY --from=build /opt/venv /opt/venv
 COPY --from=build /extension/mpt_adobe_vipm_ef ./mpt_adobe_vipm_ef
+COPY --from=build /extension/adobe ./adobe
 COPY --from=build /extension/migrations ./migrations
 COPY --from=frontend-build /static ./static
 
