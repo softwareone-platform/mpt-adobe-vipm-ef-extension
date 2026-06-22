@@ -4,9 +4,9 @@
 cliVersion: 2.4.0
 owner: turing
 git:
-  repository: mpt-adobe-vipm-ef-extension
+  repository: mpt-extension-adobe
 image:
-  repository: /mpt-adobe-vipm-ef-extension
+  repository: /mpt-extension-adobe
   pullPolicy: IfNotPresent
 
 nameOverride: ""
