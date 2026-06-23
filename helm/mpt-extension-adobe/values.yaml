@@ -8,7 +8,7 @@
 #   -----------------------------------  -----------------------------
 #   SDK_EXTENSION_URL                    SdkExtensionUrl        (required)
 #   SDK_EXTENSION_ID                     SdkExtensionId         (required)
-#   MPT_API_BASE_URL                     MpApiBaseUrl           (required)
+#   MPT_API_BASE_URL                     mptPublicApiUrl        (required)
 #   MPT_PRODUCTS_IDS                     MpProductsIds          (required)
 #   EXT_ADOBE_API_BASE_URL               AdobeApiEndpoint       (required)
 #   EXT_ADOBE_AUTH_ENDPOINT_URL          AdobeAuthEndpoint      (required)
@@ -31,7 +31,7 @@ global:
   SdkExtensionUrl: default
   SdkExtensionId: default
   SdkExtensionApiKey: ZGVmYXVsdA==
-  MpApiBaseUrl: default
+  mptPublicApiUrl: default
 
   # --- Extension configuration ---
   MpProductsIds: default

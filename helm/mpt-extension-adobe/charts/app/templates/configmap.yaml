@@ -8,7 +8,7 @@ metadata:
 data:
   SDK_EXTENSION_URL: {{ .Values.global.SdkExtensionUrl | quote }}
   SDK_EXTENSION_ID: {{ .Values.global.SdkExtensionId | quote }}
-  MPT_API_BASE_URL: {{ .Values.apiUrl | quote }}
+  MPT_API_BASE_URL: {{ .Values.global.mptPublicApiUrl | quote }}
   MPT_PRODUCTS_IDS: {{ .Values.global.MpProductsIds | quote }}
   EXT_ADOBE_API_BASE_URL: {{ .Values.global.AdobeApiEndpoint | quote }}
   EXT_ADOBE_AUTH_ENDPOINT_URL: {{ .Values.global.AdobeAuthEndpoint | quote }}
