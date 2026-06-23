@@ -1,4 +1,4 @@
-import { ProductSegment } from '../agreement/hooks/useSettings';
+import { ProductSegment } from '../shared/hooks/useSettings';
 import { getProduct } from './settings';
 
 const products: ProductSegment[] = [

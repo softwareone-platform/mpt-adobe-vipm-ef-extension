@@ -41,7 +41,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
-    assert len(result.plugs) == 4
+    assert len(result.plugs) == 5
     assert result.plugs[0].model_dump() == {
         "id": "agreement-adobe",
         "name": "Adobe",
@@ -77,4 +77,13 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         "socket": "portal.commerce.agreements.agreement.modal",
         "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
         "href": "/static/request-global-customer-action/index.js",
+    }
+    assert result.plugs[4].model_dump() == {
+        "id": "request-midterm-upgrade-action",
+        "name": "Upgrade",
+        "description": "Request a mid-term upgrade for the subscription.",
+        "icon": None,
+        "socket": "portal.commerce.subscriptions.subscription.actions",
+        "condition": "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-midterm-upgrade-action/index.js",
     }
