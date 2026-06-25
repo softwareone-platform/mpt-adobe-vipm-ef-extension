@@ -113,6 +113,8 @@ export enum ProductSegments {
   LGA = 'LGA',
 }
 
+export type OrderStatus = 'New' | 'Draft' | 'Deleted' | 'Processing' | 'Querying' | 'Failed' | 'Completed' | 'Quoted';
+
 export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }

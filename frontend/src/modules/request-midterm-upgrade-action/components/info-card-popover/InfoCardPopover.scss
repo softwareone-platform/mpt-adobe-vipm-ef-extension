@@ -1,0 +1,7 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.info-card-popover {
+  &__target {
+    display: inline-flex;
+  }
+}
