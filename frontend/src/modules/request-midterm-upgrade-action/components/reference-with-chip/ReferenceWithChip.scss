@@ -1,0 +1,19 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.entity-reference-with-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: $var-spacing-2;
+  min-width: 0;
+
+  &__text {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &--with-info-card {
+    cursor: pointer;
+  }
+}
