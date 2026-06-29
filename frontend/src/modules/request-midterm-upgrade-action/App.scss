@@ -3,5 +3,12 @@
 .request-midterm-upgrade__wizard {
   display: flex;
   flex-direction: column;
+
+  [class*="wizard__step__index"] {
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
