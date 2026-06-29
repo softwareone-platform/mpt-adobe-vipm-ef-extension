@@ -1,3 +1,5 @@
+import '../utils/safe-storage';
+
 import { setup } from '@mpt-extension/sdk';
 import { createRoot } from 'react-dom/client';
 
