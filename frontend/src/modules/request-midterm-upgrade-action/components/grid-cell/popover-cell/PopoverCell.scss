@@ -1,0 +1,11 @@
+.popover-cell {
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--spacing-1) var(--spacing-2);
+
+  .info-card-popover__target {
+    display: inline;
+    color: var(--brand-primary);
+    cursor: pointer;
+  }
+}
