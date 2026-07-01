@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useState, useMemo, useEffect, useCallback } from 'react';
-import { Order } from '../../shared/midtermUpgrade';
+import { Order } from '../../shared/midterm-upgrade';
 import { StepNavigationProperties, useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { Button, Input } from '@softwareone-platform/sdk-react-ui-v0';

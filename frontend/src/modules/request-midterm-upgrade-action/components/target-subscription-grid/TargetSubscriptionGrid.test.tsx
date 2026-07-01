@@ -57,19 +57,28 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
     unitSP: '179.88',
     spxM: '104.93',
     spxY: '1,259.16',
+    terms: 'Yearly billing',
+    commitment: '1 year commitment',
     ...overrides,
   };
 }
 
+const subscriptions = [makeSubscription(), makeSubscription({ id: null, name: null })];
+const onSubscriptionsChange = jest.fn();
+
+beforeEach(() => {
+  onSubscriptionsChange.mockReset();
+});
+
 describe('TargetSubscriptionGrid', () => {
   it('renders the grid', () => {
-    const { getByTestId } = render(<TargetSubscriptionGrid />);
+    const { getByTestId } = render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(getByTestId('grid')).toBeTruthy();
   });
 
   it('feeds the grid both target subscriptions', () => {
-    render(<TargetSubscriptionGrid />);
+    render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(capturedData).toHaveLength(2);
     expect(capturedData[0]).toMatchObject({ id: 'SUB-1525-6036-0087' });
@@ -77,7 +86,7 @@ describe('TargetSubscriptionGrid', () => {
   });
 
   it('configures the expected columns', () => {
-    render(<TargetSubscriptionGrid />);
+    render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(capturedConfig.columns.map((column) => column.name)).toEqual([
       'select',
@@ -94,7 +103,7 @@ describe('TargetSubscriptionGrid', () => {
   });
 
   it('configures the expected fields and default sort', () => {
-    render(<TargetSubscriptionGrid />);
+    render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(capturedConfig.fields.map((field) => field.name)).toEqual([
       'name',
@@ -109,10 +118,23 @@ describe('TargetSubscriptionGrid', () => {
   });
 
   it('pages all rows on a single page and registers the radio plugin', () => {
-    render(<TargetSubscriptionGrid />);
+    render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(capturedConfig.paging).toEqual({ page: 1, pageSize: 2, total: 2 });
     expect(capturedConfig.plugins).toEqual([radioPlugin]);
+  });
+
+  it('propagates quantity changes to the parent instead of keeping local state', () => {
+    render(<TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    const column = capturedConfig.columns.find((c) => c.name === 'newQuantity') as unknown as {
+      cell: (item: Subscription) => ReactNode;
+    };
+    const { getByRole } = render(<>{column.cell(subscriptions[0])}</>);
+    fireEvent.change(getByRole('spinbutton'), { target: { value: '10' } });
+
+    expect(onSubscriptionsChange).toHaveBeenCalledTimes(1);
+    expect(onSubscriptionsChange.mock.calls[0][0][0]).toMatchObject({ newQuantity: 10, delta: 3 });
   });
 });
 

@@ -17,7 +17,7 @@ import type {
   AccountType,
   MinimumQuantity,
   ThreeYearCommitmentRequestInput,
-} from '../shared/threeYearCommitment';
+} from '../shared/three-year-commitment';
 import { canRequestThreeYearCommitment } from '../utils/security';
 import { toIntOrNull } from '../utils/coerce';
 

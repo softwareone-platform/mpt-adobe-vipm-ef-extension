@@ -1,6 +1,6 @@
 import { ProductSegments } from '../shared/model';
 import type { ProductSegment } from '../shared/hooks/useSettings';
-import type { AccountType } from '../shared/threeYearCommitment';
+import type { AccountType } from '../shared/three-year-commitment';
 import { getProduct } from './settings';
 
 /**
