@@ -22,7 +22,7 @@ COPY backend/ .
 
 RUN uv sync --frozen --no-cache --no-dev
 
-FROM node:24-bookworm-slim AS frontend-build
+FROM node:26-bookworm-slim AS frontend-build
 
 WORKDIR /frontend
 
