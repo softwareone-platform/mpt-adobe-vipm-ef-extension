@@ -4,12 +4,12 @@ import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notifi
 import { StatusIndicator } from '@softwareone-platform/sdk-react-ui-v0/status-indicator';
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 
-import { useAgreementId } from '../../shared/hooks/useAgreementId';
-import { useAdobeCustomer } from '../../shared/hooks/useAdobeCustomer';
-import { useSettings } from '../../shared/hooks/useSettings';
+import { useAgreementId } from '../hooks/useAgreementId';
+import { useAdobeCustomer } from '../hooks/useAdobeCustomer';
+import { useSettings } from '../hooks/useSettings';
 import { DetailsGroup } from '../components/details/details-group/DetailsGroup';
-import { isGlobalSalesEnabled } from '../../shared/model';
-import type { AccountType } from '../../shared/threeYearCommitment';
+import { isGlobalSalesEnabled } from '../model';
+import type { AccountType } from '../ThreeYearCommitment/model';
 import { canRequestGlobalCustomer } from '../../utils/security';
 
 import './index.scss';

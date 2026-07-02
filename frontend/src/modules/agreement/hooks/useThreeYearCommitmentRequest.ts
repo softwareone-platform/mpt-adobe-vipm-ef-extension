@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { http } from '@mpt-extension/sdk';
 
 import type { AdobeCustomerData } from '../model';
-import type { ThreeYearCommitmentRequestInput } from '../threeYearCommitment';
+import type { ThreeYearCommitmentRequestInput } from '../ThreeYearCommitment/model';
 import type { Status } from './useAgreementSync';
 
 interface RequestState {
@@ -47,10 +47,7 @@ export function useThreeYearCommitmentRequest(agreementId: string) {
           `/api/v2/agreements/${encodedId}/3yc-request`,
           toBackendPayload(input),
         );
-        const customerData = (response.data as { data?: AdobeCustomerData } | undefined)?.data;
-        if (!customerData) {
-          throw new Error('Commitment response did not include customer data.');
-        }
+        const customerData = (response.data as { data: AdobeCustomerData }).data;
         setState({ error: '', status: 'success' });
         return customerData;
       } catch (submitError) {

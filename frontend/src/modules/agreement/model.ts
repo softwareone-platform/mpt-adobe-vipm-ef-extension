@@ -13,13 +13,7 @@ export interface AgreementContext {
   };
 }
 
-export interface SubscriptionContext {
-  data?: {
-    subscription?: Reference;
-  };
-}
-
-export interface CommerceParameter {
+export interface AgreementParameter {
   displayValue?: string;
   externalId?: string;
   id?: string;
@@ -35,16 +29,7 @@ export interface Agreement {
   id: string;
   status?: string;
   parameters?: {
-    fulfillment?: CommerceParameter[];
-  };
-  product?: Product;
-}
-
-export interface Subscription {
-  id: string;
-  status?: string;
-  parameters?: {
-    fulfillment?: CommerceParameter[];
+    fulfillment?: AgreementParameter[];
   };
   product?: Product;
 }
@@ -117,12 +102,8 @@ export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }
 
-export function resolveSubscriptionId(context?: SubscriptionContext): string {
-  return context?.data?.subscription?.id?.trim() ?? '';
-}
-
 export function readParameter(
-  parameters: CommerceParameter[] | undefined,
+  parameters: AgreementParameter[] | undefined,
   externalId: string,
 ): unknown {
   return parameters?.find((parameter) => parameter.externalId === externalId)?.value;

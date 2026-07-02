@@ -8,16 +8,16 @@ import { Switcher } from '@softwareone-platform/sdk-react-ui-v0/switcher';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
-import { useAgreementId } from '../shared/hooks/useAgreementId';
-import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
-import { useThreeYearCommitmentRequest } from '../shared/hooks/useThreeYearCommitmentRequest';
-import { useSettings } from '../shared/hooks/useSettings';
-import { findThreeYearBenefit, readMinimumQuantity } from '../shared/model';
+import { useAgreementId } from '../agreement/hooks/useAgreementId';
+import { useAdobeCustomer } from '../agreement/hooks/useAdobeCustomer';
+import { useThreeYearCommitmentRequest } from '../agreement/hooks/useThreeYearCommitmentRequest';
+import { useSettings } from '../agreement/hooks/useSettings';
+import { findThreeYearBenefit, readMinimumQuantity } from '../agreement/model';
 import type {
   AccountType,
   MinimumQuantity,
   ThreeYearCommitmentRequestInput,
-} from '../shared/threeYearCommitment';
+} from '../agreement/ThreeYearCommitment/model';
 import { canRequestThreeYearCommitment } from '../utils/security';
 import { toIntOrNull } from '../utils/coerce';
 

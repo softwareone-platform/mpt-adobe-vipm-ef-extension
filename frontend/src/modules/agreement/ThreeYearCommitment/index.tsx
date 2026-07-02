@@ -1,19 +1,19 @@
 import { BoldText, MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
-import { useAgreementId } from "../../shared/hooks/useAgreementId";
+import { useAgreementId } from "../hooks/useAgreementId";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
-import { useAdobeCustomer } from "../../shared/hooks/useAdobeCustomer";
+import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
 import {
   AdobeCommitmentDetail,
   findThreeYearBenefit,
   readMinimumQuantity,
-} from "../../shared/model";
-import { AccountType } from "../../shared/threeYearCommitment";
+} from "../model";
+import { AccountType } from "./model";
 import { canRequestThreeYearCommitment } from "../../utils/security";
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
-import { useSettings } from "../../shared/hooks/useSettings";
+import { useSettings } from "../hooks/useSettings";
 
 import "./index.scss";
 

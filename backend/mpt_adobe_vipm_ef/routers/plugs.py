@@ -10,8 +10,7 @@ plugs_router = PlugRouter()
 def agreement_plugs() -> list[Plug]:
     """Declare agreement UI plugs served from the static asset bridge."""
     product_ids = ",".join(segment.id for segment in load_product_segments())
-    agreement_condition = f"in(agreement.product.id,({product_ids}))"
-    subscription_condition = f"in(subscription.product.id,({product_ids}))"
+    condition = f"in(agreement.product.id,({product_ids}))"
     return [
         Plug(
             id="agreement-adobe",
@@ -19,7 +18,7 @@ def agreement_plugs() -> list[Plug]:
             description="Synchronize the current agreement with Marketplace data.",
             socket="portal.commerce.agreements.agreement",
             href="/static/agreement/index.js",
-            condition=agreement_condition,
+            condition=condition,
         ),
         Plug(
             id="request-commitment-action",
@@ -27,7 +26,7 @@ def agreement_plugs() -> list[Plug]:
             description="Request or update an Adobe 3-year commitment for the agreement.",
             socket="portal.commerce.agreements.agreement.modal",
             href="/static/request-commitment-action/index.js",
-            condition=agreement_condition,
+            condition=condition,
         ),
         Plug(
             id="request-linked-membership-action",
@@ -35,7 +34,7 @@ def agreement_plugs() -> list[Plug]:
             description="Create an Adobe linked membership for the agreement's customer.",
             socket="portal.commerce.agreements.agreement.modal",
             href="/static/request-linked-membership-action/index.js",
-            condition=agreement_condition,
+            condition=condition,
         ),
         Plug(
             id="request-global-customer-action",
@@ -43,14 +42,6 @@ def agreement_plugs() -> list[Plug]:
             description="Enable global sales for the agreement's Adobe customer.",
             socket="portal.commerce.agreements.agreement.modal",
             href="/static/request-global-customer-action/index.js",
-            condition=agreement_condition,
-        ),
-        Plug(
-            id="request-midterm-upgrade-action",
-            name="Upgrade",
-            description="Request a mid-term upgrade for the subscription.",
-            socket="portal.commerce.subscriptions.subscription.actions",
-            href="/static/request-midterm-upgrade-action/index.js",
-            condition=subscription_condition,
+            condition=condition,
         ),
     ]

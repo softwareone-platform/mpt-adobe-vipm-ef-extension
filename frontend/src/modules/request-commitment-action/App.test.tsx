@@ -3,8 +3,8 @@ import { ChangeEvent, ReactNode } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import App from './App';
-import type { AdobeCustomerData } from '../shared/model';
-import type { Status } from '../shared/hooks/useAgreementSync';
+import type { AdobeCustomerData } from '../agreement/model';
+import type { Status } from '../agreement/hooks/useAgreementSync';
 
 const mockClose = jest.fn();
 let mockCustomerData: AdobeCustomerData | null = null;
@@ -20,15 +20,15 @@ jest.mock('@mpt-extension/sdk-react', () => ({
   }),
 }), { virtual: true });
 
-jest.mock('../shared/hooks/useSettings', () => ({
+jest.mock('../agreement/hooks/useSettings', () => ({
   useSettings: () => ({ products: [{ id: 'PRD-1', segment: 'COM' }] }),
 }));
 
-jest.mock('../shared/hooks/useAgreementId', () => ({
+jest.mock('../agreement/hooks/useAgreementId', () => ({
   useAgreementId: () => 'AGR-1234-5678-9012',
 }));
 
-jest.mock('../shared/hooks/useAdobeCustomer', () => ({
+jest.mock('../agreement/hooks/useAdobeCustomer', () => ({
   useAdobeCustomer: () => ({
     status: 'success',
     error: null,
@@ -38,7 +38,7 @@ jest.mock('../shared/hooks/useAdobeCustomer', () => ({
   }),
 }));
 
-jest.mock('../shared/hooks/useThreeYearCommitmentRequest', () => ({
+jest.mock('../agreement/hooks/useThreeYearCommitmentRequest', () => ({
   useThreeYearCommitmentRequest: () => ({
     error: mockError,
     status: mockStatus,

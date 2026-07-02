@@ -1,12 +1,11 @@
 import {
-  CommerceParameter,
+  AgreementParameter,
   ProductSegments,
   findLinkedMembership,
   hasThreeYearCommitment,
   isGlobalSalesEnabled,
   readParameter,
   resolveAgreementId,
-  resolveSubscriptionId,
 } from './model';
 
 describe('agreement model helpers', () => {
@@ -41,40 +40,8 @@ describe('agreement model helpers', () => {
   });
 });
 
-describe('subscription model helpers', () => {
-  it('resolves subscription id from the Marketplace context subscription', () => {
-    const result = resolveSubscriptionId({
-      data: {
-        subscription: {
-          id: 'SUB-1234-5678-9012',
-        },
-      },
-    });
-
-    expect(result).toBe('SUB-1234-5678-9012');
-  });
-
-  it('trims subscription id from the Marketplace context subscription', () => {
-    const result = resolveSubscriptionId({
-      data: {
-        subscription: {
-          id: ' SUB-9876-5432-1098 ',
-        },
-      },
-    });
-
-    expect(result).toBe('SUB-9876-5432-1098');
-  });
-
-  it('returns an empty subscription id when the context subscription is missing', () => {
-    const result = resolveSubscriptionId({});
-
-    expect(result).toBe('');
-  });
-});
-
 describe('readParameter', () => {
-  const parameters: CommerceParameter[] = [
+  const parameters: AgreementParameter[] = [
     { externalId: '3YCEnrollStatus', value: 'Enrolled' },
     { externalId: '3YCMinLicenses', value: 100 },
   ];

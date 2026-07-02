@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { http } from '@mpt-extension/sdk';
 
 import type { AdobeCustomerData } from '../model';
-import type { LinkedMembershipRequestInput } from '../linkedMembership';
+import type { LinkedMembershipRequestInput } from '../LinkedMembership/model';
 import type { Status } from './useAgreementSync';
 
 interface RequestState {
@@ -29,10 +29,7 @@ export function useLinkedMembershipRequest(agreementId: string) {
           `/api/v2/agreements/${encodedId}/linked-membership`,
           { name: input.name, type: input.type },
         );
-        const customerData = (response.data as { data?: AdobeCustomerData } | undefined)?.data;
-        if (!customerData) {
-          throw new Error('Linked membership response did not include customer data.');
-        }
+        const customerData = (response.data as { data: AdobeCustomerData }).data;
         setState({ error: '', status: 'success' });
         return customerData;
       } catch (submitError) {

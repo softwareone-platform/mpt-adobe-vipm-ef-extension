@@ -1,4 +1,4 @@
-import type { AccountType } from './threeYearCommitment';
+import type { AccountType } from '../ThreeYearCommitment/model';
 
 export type { AccountType };
 

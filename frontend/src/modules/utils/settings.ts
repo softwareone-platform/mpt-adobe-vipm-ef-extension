@@ -1,4 +1,4 @@
-import { ProductSegment } from "../shared/hooks/useSettings";
+import { ProductSegment } from "../agreement/hooks/useSettings";
 
 export function getProduct(products: ProductSegment[] | undefined, productId: string) {
   return products?.find((product) => product.id === productId);

@@ -7,12 +7,12 @@ import { RadioButtonGroup } from '@softwareone-platform/sdk-react-ui-v0/radio';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { BoldText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
-import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
-import { useAgreementId } from '../shared/hooks/useAgreementId';
-import { useLinkedMembershipRequest } from '../shared/hooks/useLinkedMembershipRequest';
-import { useSettings } from '../shared/hooks/useSettings';
-import type { AccountType, LinkedMembershipType } from '../shared/linkedMembership';
-import { hasThreeYearCommitment } from '../shared/model';
+import { useAdobeCustomer } from '../agreement/hooks/useAdobeCustomer';
+import { useAgreementId } from '../agreement/hooks/useAgreementId';
+import { useLinkedMembershipRequest } from '../agreement/hooks/useLinkedMembershipRequest';
+import { useSettings } from '../agreement/hooks/useSettings';
+import type { AccountType, LinkedMembershipType } from '../agreement/LinkedMembership/model';
+import { hasThreeYearCommitment } from '../agreement/model';
 import { canRequestLinkedMembership } from '../utils/security';
 
 import './App.scss';

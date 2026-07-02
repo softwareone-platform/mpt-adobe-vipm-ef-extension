@@ -1,4 +1,4 @@
-import { ProductSegment } from '../shared/hooks/useSettings';
+import { ProductSegment } from '../agreement/hooks/useSettings';
 import {
   canRequestGlobalCustomer,
   canRequestLinkedMembership,
