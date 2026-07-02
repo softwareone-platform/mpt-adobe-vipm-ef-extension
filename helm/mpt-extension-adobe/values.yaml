@@ -10,6 +10,9 @@
 #   SDK_EXTENSION_ID                     SdkExtensionId         (required)
 #   MPT_API_BASE_URL                     mptPublicApiUrl        (required)
 #   MPT_PRODUCTS_IDS                     MpProductsIds          (required)
+#   MPT_TOOL_STORAGE_TYPE                MptToolStorageType
+#   MPT_TOOL_STORAGE_AIRTABLE_BASE_ID    MptToolStorageAirtableBaseId
+#   MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME MptToolStorageAirtableTableName
 #   EXT_ADOBE_API_BASE_URL               AdobeApiEndpoint       (required)
 #   EXT_ADOBE_AUTH_ENDPOINT_URL          AdobeAuthEndpoint      (required)
 #   EXT_PRODUCT_SEGMENTS                 ProductSegments
@@ -21,6 +24,7 @@
 #   -----------------------------------  -----------------------------
 #   SDK_EXTENSION_API_KEY                SdkExtensionApiKey     (required)
 #   SDK_APPLICATIONINSIGHTS_CONNECTION_STRING  AppInsightsConnectionString
+#   MPT_TOOL_STORAGE_AIRTABLE_API_KEY          AirTableApiToken
 #
 #   Mounted secret files (base64 JSON)   Global value
 #   -----------------------------------  -----------------------------
@@ -38,6 +42,12 @@ global:
   AdobeApiEndpoint: default
   AdobeAuthEndpoint: default
   ProductSegments: '{}'
+
+  # --- mpt-tool storage (Airtable-backed migration tracking) ---
+  MptToolStorageType: default
+  MptToolStorageAirtableBaseId: default
+  MptToolStorageAirtableTableName: default
+  AirTableApiToken: ZGVmYXVsdA==
 
   # --- Adobe credential files (base64-encoded JSON, mounted as a secret) ---
   CredentialsJson: ZGVmYXVsdA==
