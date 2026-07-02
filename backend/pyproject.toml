@@ -1,6 +1,6 @@
 [project]
 name = "mpt-adobe-vipm-ef-extension"
-version = "6.0.0"
+version = "5.0.0"
 description = "Adobe VIPM EF extension for SoftwareOne Marketplace."
 authors = [{ name = "SoftwareOne AG" }]
 requires-python = ">=3.12,<4"
