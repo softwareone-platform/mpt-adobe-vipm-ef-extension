@@ -9,95 +9,21 @@ import { Loader } from './components/loader/Loader';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
 import { UpgradeFromStep } from './UpgradeFromStep';
 import { UpgradeToStep } from './UpgradeToStep';
-import { SplitBillingStep } from './SplitBillingStep';
-import { DetailsStep } from './DetailsStep';
-
-import type {
-  Order,
-  SplitBillingAgreement,
-  SplitBillingAgreementAllocation,
-} from '../shared/midtermUpgrade';
 
 import './App.scss';
 
-const steps: StepProps[] = [
-  { title: 'Upgrade from' },
-  { title: 'Upgrade to' },
-  { title: 'Split billing' },
-  { title: 'Details' },
-];
-
-const agreement: SplitBillingAgreement = {
-  id: 'AGR-1111-1111',
-  buyer: {
-    id: 'BUY-1111-1111',
-    name: 'Buyer Name',
-  },
-  allocations: [
-    {
-      id: 'ALL-1111-1111',
-      buyer: {
-        id: 'BUY-1111-1111',
-        name: 'Buyer Name',
-      },
-      percentage: 60,
-      price: {
-        currency: 'USD',
-        SPxY: 1200,
-        SPxM: 100,
-        PPxY: 1000,
-        PPxM: 83.33,
-      },
-    },
-    {
-      id: 'ALL-2222-2222',
-      buyer: {
-        id: 'BUY-2222-2222',
-        name: 'Second Buyer Name',
-      },
-      percentage: 40,
-      price: {
-        currency: 'USD',
-        SPxY: 800,
-        SPxM: 66.67,
-        PPxY: 666.67,
-        PPxM: 55.56,
-      },
-    },
-  ],
-};
-
-const initialOrder: Order = {
-  id: 'ORD-1111-1111',
-  status: 'New',
-  type: 'Change',
-  billTo: {
-    id: 'BUY-1111-1111',
-    name: 'Buyer Name',
-  },
-};
+const steps: StepProps[] = [{ title: 'Upgrade from' }, { title: 'Upgrade to' }];
 
 export default function App() {
   const { close } = useMPTModal();
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
-  const [order, setOrder] = useState<Order>(initialOrder);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
 
   const onClose = useCallback(() => {
     close();
   }, [close]);
-
-  const addBuyerToOrder = useCallback(
-    async (buyer: { id?: string }) => {
-      const selected = agreement.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
-      if (!selected) return;
-      setOrder(prev => ({ ...prev, billTo: selected }));
-    },
-    []
-  );
 
   useEffect(() => {
     setIsLoading(false);
@@ -126,18 +52,6 @@ export default function App() {
                     return <UpgradeFromStep />;
                   case 1:
                     return <UpgradeToStep />;
-                  case 2:
-                    return (
-                      <SplitBillingStep
-                        agreement={agreement}
-                        order={order}
-                        addBuyerToOrder={addBuyerToOrder}
-                        selectedBuyer={selectedBuyer}
-                        onChange={setSelectedBuyer}
-                      />
-                    );
-                  case 3:
-                    return <DetailsStep order={order} setOrder={setOrder} />;
                   default:
                     return null;
                 }

@@ -195,8 +195,3 @@ export function isGlobalSalesEnabled(
 ): boolean {
   return data?.globalSalesEnabled === true;
 }
-
-export type Buyer = {
-  id: string;
-  name: string;
-}
