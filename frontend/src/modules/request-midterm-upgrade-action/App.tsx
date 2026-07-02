@@ -8,11 +8,10 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { Loader } from './components/loader/Loader';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
 import { UpgradeFromStep } from './UpgradeFromStep';
-import { UpgradeToStep } from './UpgradeToStep';
 
 import './App.scss';
 
-const steps: StepProps[] = [{ title: 'Upgrade from' }, { title: 'Upgrade to' }];
+const steps: StepProps[] = [{ title: 'Upgrade from' }];
 
 export default function App() {
   const { close } = useMPTModal();
@@ -50,8 +49,6 @@ export default function App() {
                 switch (activeStepIndex) {
                   case 0:
                     return <UpgradeFromStep />;
-                  case 1:
-                    return <UpgradeToStep />;
                   default:
                     return null;
                 }
