@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
-import type { ThreeYearCommitmentRequestInput } from '../three-year-commitment';
+import type { ThreeYearCommitmentRequestInput } from '../threeYearCommitment';
 import { useThreeYearCommitmentRequest } from './useThreeYearCommitmentRequest';
 
 jest.mock('@mpt-extension/sdk', () => ({

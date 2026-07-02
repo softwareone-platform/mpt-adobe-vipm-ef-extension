@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
-import type { LinkedMembershipRequestInput } from '../linked-membership';
+import type { LinkedMembershipRequestInput } from '../linkedMembership';
 import { useLinkedMembershipRequest } from './useLinkedMembershipRequest';
 
 jest.mock('@mpt-extension/sdk', () => ({

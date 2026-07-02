@@ -11,7 +11,7 @@ import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useLinkedMembershipRequest } from '../shared/hooks/useLinkedMembershipRequest';
 import { useSettings } from '../shared/hooks/useSettings';
-import type { AccountType, LinkedMembershipType } from '../shared/linked-membership';
+import type { AccountType, LinkedMembershipType } from '../shared/linkedMembership';
 import { hasThreeYearCommitment } from '../shared/model';
 import { canRequestLinkedMembership } from '../utils/security';
 

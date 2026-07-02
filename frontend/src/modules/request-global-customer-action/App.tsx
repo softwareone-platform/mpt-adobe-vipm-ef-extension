@@ -7,7 +7,7 @@ import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useGlobalSalesRequest } from '../shared/hooks/useGlobalSalesRequest';
 import { useSettings } from '../shared/hooks/useSettings';
-import type { AccountType } from '../shared/three-year-commitment';
+import type { AccountType } from '../shared/threeYearCommitment';
 import { isGlobalSalesEnabled } from '../shared/model';
 import { canRequestGlobalCustomer } from '../utils/security';
 

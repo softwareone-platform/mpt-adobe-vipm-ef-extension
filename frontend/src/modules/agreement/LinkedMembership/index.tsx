@@ -9,7 +9,7 @@ import { useSettings } from "../../shared/hooks/useSettings";
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
 import { findLinkedMembership, hasThreeYearCommitment } from "../../shared/model";
-import type { AccountType } from "../../shared/linked-membership";
+import type { AccountType } from "../../shared/linkedMembership";
 import { canRequestLinkedMembership } from "../../utils/security";
 
 import "./index.scss";

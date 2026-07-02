@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { http } from '@mpt-extension/sdk';
 
 import type { AdobeCustomerData } from '../model';
-import type { LinkedMembershipRequestInput } from '../linked-membership';
+import type { LinkedMembershipRequestInput } from '../linkedMembership';
 import type { Status } from './useAgreementSync';
 
 interface RequestState {

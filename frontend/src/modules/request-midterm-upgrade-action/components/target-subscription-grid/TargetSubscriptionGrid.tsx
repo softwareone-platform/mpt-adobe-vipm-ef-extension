@@ -11,13 +11,72 @@ import {
   useRadioPlugin,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
 import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
-import { TargetSubscription } from '../../../shared/midterm-upgrade';
+
+interface Item {
+  id: string;
+  name: string;
+  externalId: string;
+}
+
+interface TargetSubscription {
+  id: string | null;
+  name: string | null;
+  item: Item;
+  recommended: string;
+  currentQuantity: number;
+  newQuantity: number | null;
+  delta: number;
+  unitSP: string;
+  spxM: string;
+  spxY: string;
+}
+
+interface TargetSubscriptions{
+  subscriptions: TargetSubscription[];
+}
+
+const targetSubscriptionData: TargetSubscriptions = {
+  subscriptions: [
+    {
+      id: 'SUB-1525-6036-0087',
+      name: 'Subscription for Illustrator for Teams; Multi Language - N',
+      item: {
+        id: 'ITM-0520-2723-0405',
+        name: 'Illustrator for Teams; Multi Language - North America; Multi',
+        externalId: 'AO03.25470.MN | 30002000CB',
+      },
+      recommended: 'Yes',
+      currentQuantity: 7,
+      newQuantity: 7,
+      delta: 0,
+      unitSP: '179.88',
+      spxM: '104.93',
+      spxY: '1,259.16',
+    },
+    {
+      id: null,
+      name: null,
+      item: {
+        id: 'ITM-0520-2723-0406',
+        name: 'Creative Cloud All Apps for Enterprise; Multi Language - North America; Multi',
+        externalId: 'AO03.25471.MN | 30002000CC',
+      },
+      recommended: 'No',
+      currentQuantity: 0,
+      newQuantity: 7,
+      delta: 7,
+      unitSP: '599.88',
+      spxM: '349.93',
+      spxY: '4,199.16',
+    },
+  ],
+};
 
 const columns: GridColumnDefinition<TargetSubscription>[] = [
   {
@@ -105,26 +164,20 @@ function isEqual(a: TargetSubscription, b: TargetSubscription): boolean {
   return a.item.id === b.item.id;
 }
 
-interface TargetSubscriptionGridProps {
-  subscriptions: TargetSubscription[];
-  onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
-}
+export function TargetSubscriptionGrid() {
+  const [subscriptions, setSubscriptions] = useState(targetSubscriptionData.subscriptions);
 
-export function TargetSubscriptionGrid({ subscriptions, onSubscriptionsChange }: TargetSubscriptionGridProps) {
-  const updateQuantity = useCallback(
-    (target: TargetSubscription, value: string) => {
-      if (!/^\d*$/.test(value)) return;
-      const newQuantity = value === '' ? null : Number(value);
-      onSubscriptionsChange(
-        subscriptions.map((s) =>
-          isEqual(s, target)
-            ? { ...s, newQuantity, delta: (newQuantity ?? s.currentQuantity) - s.currentQuantity }
-            : s,
-        ),
-      );
-    },
-    [subscriptions, onSubscriptionsChange],
-  );
+  const updateQuantity = useCallback((target: TargetSubscription, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newQuantity = value === '' ? null : Number(value);
+    setSubscriptions((prev) =>
+      prev.map((s) =>
+        isEqual(s, target)
+          ? { ...s, newQuantity, delta: (newQuantity ?? s.currentQuantity) - s.currentQuantity }
+          : s,
+      ),
+    );
+  }, []);
 
   const cols = useMemo<GridColumnDefinition<TargetSubscription>[]>(
     () => [
