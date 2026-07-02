@@ -1,4 +1,4 @@
-import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
+import { MediumText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { MemoryRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 
 import { ThreeYearCommitment } from './ThreeYearCommitment';
@@ -8,24 +8,10 @@ import { GlobalCustomer } from './GlobalCustomer';
 const DEFAULT_PATH = '/3-year-commitment';
 
 const NAV_ITEMS: Array<{ label: string; path: string }> = [
-  { label: 'Sync account', path: '/sync-account' },
   { label: '3-year commitment', path: DEFAULT_PATH },
   { label: 'Linked membership', path: '/linked-membership' },
   { label: 'Global customer', path: '/global-customer' },
 ];
-
-function SectionPlaceholder({ title }: { title: string }) {
-  return (
-    <header className="extension__content-header">
-      <MediumText as="h2" size={4} className="extension__content-title">
-        {title}
-      </MediumText>
-      <RegularText as="p" size={2} color="grey-5">
-        This section is not available yet.
-      </RegularText>
-    </header>
-  );
-}
 
 export default function App() {
   return (
@@ -76,7 +62,6 @@ export default function App() {
         <section className="extension__content">
           <Routes>
             <Route path="/3-year-commitment" element={<ThreeYearCommitment />} />
-            <Route path="/sync-account" element={<SectionPlaceholder title="Sync account" />} />
             <Route path="/linked-membership" element={<LinkedMembership />} />
             <Route path="/global-customer" element={<GlobalCustomer />} />
             <Route path="*" element={<Navigate to={DEFAULT_PATH} replace />} />
