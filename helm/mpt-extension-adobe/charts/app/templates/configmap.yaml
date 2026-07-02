@@ -10,6 +10,9 @@ data:
   SDK_EXTENSION_ID: {{ .Values.global.SdkExtensionId | quote }}
   MPT_API_BASE_URL: {{ .Values.global.mptPublicApiUrl | quote }}
   MPT_PRODUCTS_IDS: {{ .Values.global.MpProductsIds | quote }}
+  MPT_TOOL_STORAGE_TYPE: {{ .Values.global.MptToolStorageType | quote }}
+  MPT_TOOL_STORAGE_AIRTABLE_BASE_ID: {{ .Values.global.MptToolStorageAirtableBaseId | quote }}
+  MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME: {{ .Values.global.MptToolStorageAirtableTableName | quote }}
   EXT_ADOBE_API_BASE_URL: {{ .Values.global.AdobeApiEndpoint | quote }}
   EXT_ADOBE_AUTH_ENDPOINT_URL: {{ .Values.global.AdobeAuthEndpoint | quote }}
   EXT_PRODUCT_SEGMENTS: {{ .Values.global.ProductSegments | quote }}
