@@ -10,7 +10,7 @@ import {
   findThreeYearBenefit,
   readMinimumQuantity,
 } from "../../shared/model";
-import { AccountType } from "../../shared/threeYearCommitment";
+import { AccountType } from "../../shared/three-year-commitment";
 import { canRequestThreeYearCommitment } from "../../utils/security";
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { useSettings } from "../../shared/hooks/useSettings";

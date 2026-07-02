@@ -9,7 +9,7 @@ import { useAdobeCustomer } from '../../shared/hooks/useAdobeCustomer';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { DetailsGroup } from '../components/details/details-group/DetailsGroup';
 import { isGlobalSalesEnabled } from '../../shared/model';
-import type { AccountType } from '../../shared/threeYearCommitment';
+import type { AccountType } from '../../shared/three-year-commitment';
 import { canRequestGlobalCustomer } from '../../utils/security';
 
 import './index.scss';

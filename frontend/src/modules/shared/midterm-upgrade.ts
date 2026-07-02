@@ -36,3 +36,24 @@ export type Order = {
   externalIds?: ExternalIds | null;
   notes?: string | null;
 }
+
+export type SubscriptionItem = {
+  id: string;
+  name: string;
+  externalId: string;
+};
+
+export type TargetSubscription = {
+  id: string | null;
+  name: string | null;
+  item: SubscriptionItem;
+  recommended: string;
+  currentQuantity: number;
+  newQuantity: number | null;
+  delta: number;
+  unitSP: string;
+  spxM: string;
+  spxY: string;
+  terms: string;
+  commitment: string;
+}

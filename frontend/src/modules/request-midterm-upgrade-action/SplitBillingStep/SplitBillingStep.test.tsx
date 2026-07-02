@@ -5,7 +5,7 @@ import type {
   Order,
   SplitBillingAgreement,
   SplitBillingAgreementAllocation,
-} from '../../shared/midtermUpgrade';
+} from '../../shared/midterm-upgrade';
 
 const agreement: SplitBillingAgreement = {
   id: 'AGR-1111-1111',
@@ -94,7 +94,10 @@ describe('SplitBillingStep', () => {
     const addBuyerToOrder = jest.fn().mockResolvedValue(undefined);
     renderStep({ addBuyerToOrder, selectedBuyer: { id: 'BUY-2222-2222' } });
 
-    const result = await registeredOnNext!({ currentStepIndex: 2, targetStepIndex: 3 });
+    let result: number | undefined;
+    await act(async () => {
+      result = await registeredOnNext!({ currentStepIndex: 2, targetStepIndex: 3 });
+    });
 
     expect(addBuyerToOrder).toHaveBeenCalledWith({ id: 'BUY-2222-2222' });
     expect(result).toBe(3);
@@ -128,7 +131,9 @@ describe('SplitBillingStep', () => {
     renderStep({ addBuyerToOrder });
 
     act(() => allocateProps.onChange({ id: 'BUY-2222-2222' }));
-    await registeredOnNext!({ currentStepIndex: 2, targetStepIndex: 3 });
+    await act(async () => {
+      await registeredOnNext!({ currentStepIndex: 2, targetStepIndex: 3 });
+    });
 
     expect(addBuyerToOrder).toHaveBeenCalledWith({ id: 'BUY-2222-2222' });
   });

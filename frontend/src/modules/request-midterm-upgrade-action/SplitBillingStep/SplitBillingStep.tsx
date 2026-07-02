@@ -12,7 +12,7 @@ import {
   Order,
   SplitBillingAgreement,
   SplitBillingAgreementAllocation,
-} from '../../shared/midtermUpgrade';
+} from '../../shared/midterm-upgrade';
 
 export function SplitBillingStep({
   agreement,
