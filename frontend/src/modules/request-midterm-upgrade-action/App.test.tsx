@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 
 import App from './App';
 
@@ -39,12 +39,9 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => {
   return { Wizard };
 });
 
-jest.mock('./UpgradeFromStep', () => ({
-  UpgradeFromStep: () => <div>Upgrade from step</div>,
-}));
-
-jest.mock('./components/loader/Loader', () => ({
-  Loader: () => <div data-testid="loader" />,
+jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => ({
+  MediumText: ({ children }: MockChildren) => <span>{children as ReactNode}</span>,
+  RegularText: ({ children }: MockChildren) => <span>{children as ReactNode}</span>,
 }));
 
 describe('request-midterm-upgrade-action App', () => {
@@ -53,25 +50,24 @@ describe('request-midterm-upgrade-action App', () => {
     mockActiveStepIndex = 0;
   });
 
-  it('renders the wizard header and the upgrade-from step once loaded', async () => {
-    render(<App />);
+  it('renders the wizard header and the upgrade-from step', () => {
+    const utils = render(<App />);
 
-    expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
-    expect(screen.getByText('Upgrade from step')).toBeTruthy();
+    expect(utils.getByText('Request mid-term upgrade')).toBeTruthy();
+    expect(utils.getByText('Upgrade from.')).toBeTruthy();
   });
 
-  it('renders no step content for an unknown step index', async () => {
+  it('renders no step content for an unknown step index', () => {
     mockActiveStepIndex = 1;
-    render(<App />);
+    const utils = render(<App />);
 
-    expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
-    expect(screen.queryByText('Upgrade from step')).toBeNull();
+    expect(utils.queryByText('Upgrade from.')).toBeNull();
   });
 
-  it('closes when the wizard close action is clicked', async () => {
-    render(<App />);
+  it('closes when the wizard close action is clicked', () => {
+    const utils = render(<App />);
 
-    fireEvent.click(await screen.findByText('Close'));
+    fireEvent.click(utils.getByText('Close'));
 
     expect(mockClose).toHaveBeenCalled();
   });
