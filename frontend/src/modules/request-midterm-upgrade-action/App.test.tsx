@@ -43,8 +43,16 @@ jest.mock('./UpgradeFromStep', () => ({
   UpgradeFromStep: () => <div>Upgrade from step</div>,
 }));
 
+interface UpgradeToProps {
+  subscriptions: unknown;
+}
+let upgradeToProps: UpgradeToProps;
+
 jest.mock('./UpgradeToStep', () => ({
-  UpgradeToStep: () => <div>Upgrade to step</div>,
+  UpgradeToStep: (props: UpgradeToProps) => {
+    upgradeToProps = props;
+    return <div>Upgrade to step</div>;
+  },
 }));
 
 interface SplitBillingProps {
@@ -74,6 +82,31 @@ jest.mock('./DetailsStep', () => ({
   },
 }));
 
+interface ReviewOrderProps {
+  order: unknown;
+  subscriptions: unknown;
+}
+let reviewOrderProps: ReviewOrderProps;
+
+jest.mock('./ReviewOrderStep', () => ({
+  ReviewOrderStep: (props: ReviewOrderProps) => {
+    reviewOrderProps = props;
+    return <div>Review order step</div>;
+  },
+}));
+
+interface SummaryProps {
+  order: unknown;
+}
+let summaryProps: SummaryProps;
+
+jest.mock('./SummaryStep', () => ({
+  SummaryStep: (props: SummaryProps) => {
+    summaryProps = props;
+    return <div>Summary step</div>;
+  },
+}));
+
 jest.mock('./components/loader/Loader', () => ({
   Loader: () => <div data-testid="loader" />,
 }));
@@ -91,12 +124,13 @@ describe('request-midterm-upgrade-action App', () => {
     expect(screen.getByText('Upgrade from step')).toBeTruthy();
   });
 
-  it('renders the upgrade-to step on the second step', async () => {
+  it('renders the upgrade-to step on the second step and wires its subscriptions', async () => {
     mockActiveStepIndex = 1;
     render(<App />);
 
     expect(await screen.findByText('Upgrade to step')).toBeTruthy();
     expect(screen.queryByText('Upgrade from step')).toBeNull();
+    expect(upgradeToProps.subscriptions).toBeDefined();
   });
 
   it('renders the split-billing step on the third step and wires its props', async () => {
@@ -118,8 +152,25 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof detailsProps.setOrder).toBe('function');
   });
 
-  it('renders no step content for an unknown step index', async () => {
+  it('renders the review-order step on the fifth step and wires its props', async () => {
     mockActiveStepIndex = 4;
+    render(<App />);
+
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    expect(reviewOrderProps.order).toBeDefined();
+    expect(reviewOrderProps.subscriptions).toBeDefined();
+  });
+
+  it('renders the summary step on the sixth step and wires its order', async () => {
+    mockActiveStepIndex = 5;
+    render(<App />);
+
+    expect(await screen.findByText('Summary step')).toBeTruthy();
+    expect(summaryProps.order).toBeDefined();
+  });
+
+  it('renders no step content for an unknown step index', async () => {
+    mockActiveStepIndex = 6;
     render(<App />);
 
     expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
@@ -127,6 +178,8 @@ describe('request-midterm-upgrade-action App', () => {
     expect(screen.queryByText('Upgrade to step')).toBeNull();
     expect(screen.queryByText('Split billing step')).toBeNull();
     expect(screen.queryByText('Details step')).toBeNull();
+    expect(screen.queryByText('Review order step')).toBeNull();
+    expect(screen.queryByText('Summary step')).toBeNull();
   });
 
   it('closes when the wizard close action is clicked', async () => {
