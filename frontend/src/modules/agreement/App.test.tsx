@@ -91,7 +91,7 @@ const mockUseMPTContext = jest.mocked(useMPTContext);
 const mockUseMPTModal = jest.mocked(useMPTModal);
 const mockGet = jest.mocked(http.get);
 
-const NAV_LABELS = ['Sync account', '3-year commitment', 'Linked membership', 'Global customer'];
+const NAV_LABELS = ['3-year commitment', 'Linked membership', 'Global customer'];
 
 const SETTINGS_PAYLOAD = { products: [{ id: 'PRD-1111-1111', segment: 'COM' }] };
 
@@ -165,7 +165,6 @@ describe('agreement plug app', () => {
       'aria-current',
       'page'
     );
-    expect(screen.getByRole('link', { name: 'Sync account' })).not.toHaveAttribute('aria-current');
 
     expect(screen.getByText('Current commitment')).toBeInTheDocument();
     expect(screen.getByText('Commitment request')).toBeInTheDocument();
