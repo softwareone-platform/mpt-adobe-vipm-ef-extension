@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { http } from '@mpt-extension/sdk';
 
 import type { AdobeCustomerData } from '../model';
-import type { ThreeYearCommitmentRequestInput } from '../threeYearCommitment';
+import type { ThreeYearCommitmentRequestInput } from '../three-year-commitment';
 import type { Status } from './useAgreementSync';
 
 interface RequestState {
