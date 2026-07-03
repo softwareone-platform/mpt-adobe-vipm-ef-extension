@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { LinkReference } from '../link-reference/LinkReference';
 import { ReferenceWithChip } from '../reference-with-chip/ReferenceWithChip';
 
-import { SplitBillingAgreementAllocation } from '../../../shared/midterm-upgrade';
+import { SplitBillingAgreementAllocation } from '../../model';
 
 import './AllocateToBuyer.scss';
 import { Column, List, Row, SelectionType, useListInMemory, UseListInMemoryHookModel } from '@softwareone-platform/sdk-react-ui-v0/list';

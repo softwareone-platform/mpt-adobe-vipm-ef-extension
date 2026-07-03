@@ -5,7 +5,7 @@ import type {
   Order,
   SplitBillingAgreement,
   SplitBillingAgreementAllocation,
-} from '../../shared/midterm-upgrade';
+} from '../model';
 
 const agreement: SplitBillingAgreement = {
   id: 'AGR-1111-1111',

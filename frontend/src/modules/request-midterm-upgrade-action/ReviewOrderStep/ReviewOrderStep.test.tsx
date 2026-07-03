@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { render } from '@testing-library/react';
 
 import { ReviewOrderStep } from './ReviewOrderStep';
-import { Order, TargetSubscription } from '../../shared/midterm-upgrade';
+import { Order, TargetSubscription } from '../model';
 
 interface CapturedConfig {
   id: string;

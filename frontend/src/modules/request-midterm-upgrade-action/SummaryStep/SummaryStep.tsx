@@ -1,6 +1,6 @@
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text'
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights'
-import { Order } from '../../shared/midterm-upgrade';
+import { Order } from '../model';
 import { ReactElement, useEffect, useState } from 'react';
 
 import './SummaryStep.scss';

@@ -1,4 +1,4 @@
-import type { Agreement, Buyer } from './model';
+import type { Agreement, Buyer } from '../shared/model';
 
 export type SplitBillingAllocationPrice = {
   currency?: string;

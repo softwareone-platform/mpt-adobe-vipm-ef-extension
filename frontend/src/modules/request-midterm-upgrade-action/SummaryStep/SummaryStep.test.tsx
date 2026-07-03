@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 
 import { SummaryStep, getTemplateForOrder } from './SummaryStep';
-import { Order } from '../../shared/midterm-upgrade';
+import { Order } from '../model';
 
 jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,

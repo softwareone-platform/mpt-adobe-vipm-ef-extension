@@ -15,7 +15,7 @@ import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 import { PopoverCell } from '../components/grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../components/grid-cell/text-cell/TextCell';
 import { ChipCell } from '../components/grid-cell/chip-cell/ChipCell';
-import { Order, TargetSubscription } from '../../shared/midterm-upgrade';
+import { Order, TargetSubscription } from '../model';
 import { parsePrice, formatPrice } from '../../utils/price';
 
 type ReviewRow = TargetSubscription & {
