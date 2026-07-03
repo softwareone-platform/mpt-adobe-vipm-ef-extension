@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { render } from '@testing-library/react';
 
 import { AllocateToBuyer } from './AllocateToBuyer';
-import type { SplitBillingAgreementAllocation } from '../../../shared/midterm-upgrade';
+import type { SplitBillingAgreementAllocation } from '../../model';
 
 type CellData = { id?: string; buyer?: { id?: string; name?: string } };
 

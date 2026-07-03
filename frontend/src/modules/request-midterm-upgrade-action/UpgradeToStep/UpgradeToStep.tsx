@@ -2,7 +2,7 @@ import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
-import { TargetSubscription } from '../../shared/midterm-upgrade';
+import { TargetSubscription } from '../model';
 
 import './UpgradeToStep.scss';
 

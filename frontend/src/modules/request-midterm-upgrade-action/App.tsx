@@ -19,7 +19,7 @@ import type {
   SplitBillingAgreement,
   SplitBillingAgreementAllocation,
   TargetSubscription,
-} from '../shared/midterm-upgrade';
+} from './model';
 
 import './App.scss';
 
