@@ -1,2 +1,8 @@
 # [health]
 GET http://localhost:8080/health
+
+# [live]
+GET http://localhost:8080/live
+
+# [ready]
+GET http://localhost:8080/ready
