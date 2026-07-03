@@ -17,7 +17,7 @@ import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
 import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
-import { TargetSubscription } from '../../../shared/midterm-upgrade';
+import { TargetSubscription } from '../../model';
 
 const columns: GridColumnDefinition<TargetSubscription>[] = [
   {

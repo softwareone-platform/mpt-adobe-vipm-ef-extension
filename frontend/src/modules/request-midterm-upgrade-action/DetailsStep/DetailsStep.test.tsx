@@ -1,7 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react';
 
 import { DetailsStep } from './DetailsStep';
-import type { Order } from '../../shared/midterm-upgrade';
+import type { Order } from '../model';
 
 const order: Order = {
   id: 'ORD-1111-1111',
