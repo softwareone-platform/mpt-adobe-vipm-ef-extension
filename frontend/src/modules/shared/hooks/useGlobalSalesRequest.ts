@@ -2,8 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 
-import type { AdobeCustomerData } from '../model';
-import type { Status } from './useAgreementSync';
+import type { AdobeCustomerData, Status } from '../model';
 
 interface RequestState {
   error: string;

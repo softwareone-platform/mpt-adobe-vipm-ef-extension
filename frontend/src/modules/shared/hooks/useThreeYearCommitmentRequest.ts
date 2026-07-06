@@ -4,7 +4,7 @@ import { http } from '@mpt-extension/sdk';
 
 import type { AdobeCustomerData } from '../model';
 import type { ThreeYearCommitmentRequestInput } from '../three-year-commitment';
-import type { Status } from './useAgreementSync';
+import type { Status } from '../model';
 
 interface RequestState {
   error: string;

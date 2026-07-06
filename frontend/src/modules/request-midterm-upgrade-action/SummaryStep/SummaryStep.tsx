@@ -1,6 +1,7 @@
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text'
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights'
 import { Order } from '../model';
+import { Subscription } from '../../shared/model';
 import { ReactElement, useEffect, useState } from 'react';
 
 import './SummaryStep.scss';
@@ -30,10 +31,11 @@ export async function getTemplateForOrder(_orderId?: string | null): Promise<str
 }
 
 interface SummaryStepProps {
+  subscription: Subscription;
   order: Order;
 }
 
-export function SummaryStep({ order }: SummaryStepProps): ReactElement | null {
+export function SummaryStep({ subscription, order }: SummaryStepProps): ReactElement | null {
   const [template, setTemplate] = useState<string>();
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function SummaryStep({ order }: SummaryStepProps): ReactElement | null {
         </RegularText>
       </div>
       <div className="summary-step__highlights">
-        <WizardHighlights />
+        <WizardHighlights subscription={subscription} />
       </div>
       <div
         className="summary-step__template"

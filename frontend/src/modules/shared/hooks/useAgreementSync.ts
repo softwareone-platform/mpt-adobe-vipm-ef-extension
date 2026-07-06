@@ -1,22 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
-
-export type Status = 'idle' | 'loading' | 'success' | 'error';
-
-interface SyncState {
-  error: string;
-  lastCompleted: string | null;
-  lastStatus: Status | null;
-  status: Status;
-}
-
-const INITIAL_SYNC_STATE: SyncState = {
-  error: '',
-  lastCompleted: null,
-  lastStatus: null,
-  status: 'idle',
-};
+import { INITIAL_SYNC_STATE, SyncState } from '../model';
 
 export function useAgreementSync(agreementId: string) {
   const [state, setState] = useState<SyncState>(INITIAL_SYNC_STATE);
