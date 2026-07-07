@@ -135,13 +135,14 @@ export function WizardHighlights({
         <EntityReference
           primaryContent={
             <ReferenceWithChip
-              text={subscription.agreement?.id ?? undefined}
+              text={subscription.agreement?.name ?? undefined}
               url={agreementUrl ?? undefined}
               statusLabel={agreementStatus}
               statusColor={agreementStatusColor}
               infoCard={agreementInfoCard}
             />
           }
+          secondaryContent={subscription.agreement?.id ?? undefined}
         />
       </Highlights.Item>
       <Highlights.Item label="Licensee">

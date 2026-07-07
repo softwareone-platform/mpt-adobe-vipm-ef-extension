@@ -131,7 +131,6 @@ export default function App() {
   const subscriptionId = useSubscriptionId();
   const { subscription, syncSubscription, error, status } = useSubscriptionSync(subscriptionId);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>(initialTargetSubscriptions);
@@ -159,28 +158,23 @@ export default function App() {
   );
 
   useEffect(() => {
-    syncSubscription().finally(() => setIsLoading(false));
+    syncSubscription();
   }, [syncSubscription]);
 
-  if (!isLoading && (status === 'error' || !subscription)) {
+  if (status === 'error' || (status === 'success' && !subscription)) {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <InlineNotification status="error" isStandalone>
           {error || 'Subscription could not be loaded.'}
         </InlineNotification>
-        <Button
-          onClick={() => {
-            setIsLoading(true);
-            syncSubscription().finally(() => setIsLoading(false));
-          }}
-        >
+        <Button onClick={() => syncSubscription()}>
           Retry
         </Button>
       </div>
     );
   }
 
-  if (isLoading || !subscription) {
+  if (!subscription) {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Loader />
