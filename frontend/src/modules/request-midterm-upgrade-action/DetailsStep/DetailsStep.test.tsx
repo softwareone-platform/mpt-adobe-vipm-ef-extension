@@ -2,6 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react';
 
 import { DetailsStep } from './DetailsStep';
 import type { Order } from '../model';
+import type { Subscription } from '../../shared/model';
 
 const order: Order = {
   id: 'ORD-1111-1111',
@@ -50,6 +51,7 @@ jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
 
 function renderStep(overrides: Partial<Parameters<typeof DetailsStep>[0]> = {}) {
   const props = {
+    subscription: { id: 'SUB-1' } as Subscription,
     order,
     setOrder: jest.fn(),
     ...overrides,

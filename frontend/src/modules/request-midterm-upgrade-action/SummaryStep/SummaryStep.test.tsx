@@ -26,7 +26,7 @@ describe('getTemplateForOrder', () => {
 describe('SummaryStep', () => {
   it('renders the heading and highlights', async () => {
     await act(async () => {
-      render(<SummaryStep order={order} />);
+      render(<SummaryStep subscription={{ id: 'SUB-1' }} order={order} />);
     });
 
     expect(screen.getByText('Summary')).toBeTruthy();
@@ -34,7 +34,7 @@ describe('SummaryStep', () => {
   });
 
   it('renders the order template once resolved', async () => {
-    render(<SummaryStep order={order} />);
+    render(<SummaryStep subscription={{ id: 'SUB-1' }} order={order} />);
 
     await waitFor(() => expect(screen.getByText('Your order is being processed')).toBeTruthy());
   });

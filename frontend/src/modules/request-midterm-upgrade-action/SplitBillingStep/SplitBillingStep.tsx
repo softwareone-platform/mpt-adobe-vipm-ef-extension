@@ -13,14 +13,17 @@ import {
   SplitBillingAgreement,
   SplitBillingAgreementAllocation,
 } from '../model';
+import { Subscription } from '../../shared/model';
 
 export function SplitBillingStep({
+  subscription,
   agreement,
   order,
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
   onChange,
 }: {
+  subscription: Subscription;
   agreement: SplitBillingAgreement;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
@@ -69,7 +72,7 @@ export function SplitBillingStep({
         </RegularText>
       </div>
       <div className="split-billing-step__highlights">
-        <WizardHighlights />
+        <WizardHighlights subscription={subscription} />
       </div>
       {error && (
         <InlineNotification status="error" isStandalone>

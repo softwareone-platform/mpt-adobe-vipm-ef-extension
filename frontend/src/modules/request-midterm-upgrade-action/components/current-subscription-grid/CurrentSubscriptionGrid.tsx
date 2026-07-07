@@ -11,47 +11,43 @@ import {
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { useMemo } from 'react';
 
+import { Subscription } from '../../../shared/model';
+
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
 
-interface Item {
+interface Row {
   id: string;
-  name: string;
-  externalId: string;
-}
-
-interface Subscription {
-  id: string;
-  name: string;
-  item: Item;
+  subscriptionId: string;
+  subscriptionName: string;
+  item: { id: string; name: string; externalId: string };
   quantity: number;
-  unitSP: string;
-  spxM: string;
-  spxY: string;
+  unitSP?: number;
+  spxM?: number;
+  spxY?: number;
   status: string;
 }
 
-const itemData: Item = {
-  id: 'ITM-0520-2723-0405',
-  name: 'Illustrator for Teams; Multi Language - North America; Multi',
-  externalId: 'AO03.25470.MN | 30002000CB',
-};
+function toRows(subscription: Subscription): Row[] {
+  return (subscription.lines ?? []).map((line) => ({
+    id: line.id,
+    subscriptionId: line.subscription?.id ?? subscription.id,
+    subscriptionName: line.subscription?.name ?? subscription.name ?? '',
+    item: {
+      id: line.item.id,
+      name: line.item.name,
+      externalId: line.item.externalIds?.vendor ?? '',
+    },
+    quantity: line.quantity,
+    unitSP: line.price?.unitSP,
+    spxM: line.price?.SPxM,
+    spxY: line.price?.SPxY,
+    status: line.status ?? subscription.status ?? '',
+  }));
+}
 
-const subscriptionData: Subscription[] = [
-  {
-    id: 'SUB-1525-6036-0087',
-    name: 'Subscription for Illustrator for Teams; Multi Language - N',
-    item: itemData,
-    quantity: 7,
-    unitSP: '179.88',
-    spxM: '104.93',
-    spxY: '1,259.16',
-    status: 'Active',
-  },
-];
-
-const columns: GridColumnDefinition<Subscription>[] = [
+const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'select',
     header: <GridCellHeader></GridCellHeader>,
@@ -84,11 +80,11 @@ const columns: GridColumnDefinition<Subscription>[] = [
     cell: (item) => (
       <PopoverCell
         title="Subscription"
-        text={item.name}
-        secondaryContent={item.id}
+        text={item.subscriptionName}
+        secondaryContent={item.subscriptionId}
         items={[
-          { title: 'ID', content: item.id },
-          { title: 'Name', content: item.name },
+          { title: 'ID', content: item.subscriptionId },
+          { title: 'Name', content: item.subscriptionName },
           { title: 'Status', content: <Chip label={item.status} /> },
         ]}
       />
@@ -135,29 +131,35 @@ const fields: GridFieldDefinition[] = [
   { name: 'name', title: 'Name' },
   { name: 'subscription', title: 'Subscription' },
   { name: 'quantity', title: 'Qty', type: 'number' },
-  { name: 'unitSP', title: 'Unit SP' },
-  { name: 'spxM', title: 'SPxM' },
-  { name: 'spxY', title: 'SPxY' },
+  { name: 'unitSP', title: 'Unit SP', type: 'number' },
+  { name: 'spxM', title: 'SPxM', type: 'number' },
+  { name: 'spxY', title: 'SPxY', type: 'number' },
   { name: 'status', title: 'Status' },
 ];
 
 const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];
 
-function isEqual(a: Subscription, b: Subscription): boolean {
+function isEqual(a: Row, b: Row): boolean {
   return a?.id === b?.id;
 }
 
-export function CurrentSubscriptionGrid() {
-  const { plugin: radioPlugin } = useRadioPlugin<Subscription>(isEqual);
+export function CurrentSubscriptionGrid({
+  subscription,
+}: {
+  subscription: Subscription;
+}) {
+  const { plugin: radioPlugin } = useRadioPlugin<Row>(isEqual);
   const plugins = useMemo(() => [radioPlugin], [radioPlugin]);
 
-  const gridProps = useGridInMemory(subscriptionData, {
+  const rows = useMemo(() => toRows(subscription), [subscription]);
+
+  const gridProps = useGridInMemory(rows, {
     id: 'components__request-midterm-upgrade__current-subscription--client',
     columns,
     fields,
     sort,
     plugins,
-    paging: { page: 1, pageSize: subscriptionData.length, total: subscriptionData.length },
+    paging: { page: 1, pageSize: Math.max(rows.length, 1), total: rows.length },
   });
 
   return <Grid {...gridProps} />;
