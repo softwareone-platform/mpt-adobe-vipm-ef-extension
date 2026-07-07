@@ -5,12 +5,23 @@
   align-items: center;
   gap: $var-spacing-2;
   min-width: 0;
+  max-width: 100%;
+
+  > a {
+    min-width: 0;
+    overflow: hidden;
+  }
 
   &__text {
+    display: block;
     overflow: hidden;
     min-width: 0;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  > :last-child {
+    flex-shrink: 0;
   }
 
   &--with-info-card {
