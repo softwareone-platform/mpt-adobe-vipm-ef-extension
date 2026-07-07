@@ -1,0 +1,8 @@
+.text-input-cell {
+  > div,
+  > div > span {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+}

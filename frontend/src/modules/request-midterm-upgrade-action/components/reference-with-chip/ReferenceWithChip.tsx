@@ -1,9 +1,9 @@
 import { ReactNode, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { Ellipsis } from '@softwareone-platform/sdk-react-ui-v0/ellipsis';
 
+import { getPortalOrigin } from '../../../utils/link';
 import { InfoCardPopover } from '../info-card-popover/InfoCardPopover';
 
 import './ReferenceWithChip.scss';
@@ -17,6 +17,8 @@ export interface ReferenceWithChipProps {
 }
 
 export function ReferenceWithChip({ text, url, statusLabel, statusColor, infoCard }: ReferenceWithChipProps) {
+  const href = url ? `${getPortalOrigin()}${url}` : undefined;
+
   const referenceElement = (
     <span className="entity-reference-with-chip__text">
       <Ellipsis isToHideTooltip={!!infoCard}>{text}</Ellipsis>
@@ -33,7 +35,7 @@ export function ReferenceWithChip({ text, url, statusLabel, statusColor, infoCar
 
   const reference = (
     <div className={className}>
-      {!!text && (url ? <Link to={url}>{referenceElement}</Link> : referenceElement)}
+      {!!text && (href ? <a href={href} target="_top" rel="noopener noreferrer">{referenceElement}</a> : referenceElement)}
       <Chip label={statusLabel} color={statusColor} />
     </div>
   );

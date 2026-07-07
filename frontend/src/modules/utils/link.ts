@@ -1,5 +1,12 @@
 import { EntityDomain, EntityType } from '../shared/constants';
 
+export function getPortalOrigin(): string {
+  return (
+    window.location.ancestorOrigins?.[0] ??
+    (document.referrer ? new URL(document.referrer).origin : window.location.origin)
+  );
+}
+
 export function getEntityLink(
   entityDomain: EntityDomain,
   entityType: EntityType,

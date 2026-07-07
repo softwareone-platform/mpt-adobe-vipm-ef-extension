@@ -8,11 +8,11 @@ import { LinkReference } from './LinkReference';
 const renderWithRouter = (ui: ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('LinkReference', () => {
-  it('renders the text as a link when a url is provided', () => {
+  it('renders the text as a link to the portal origin when a url is provided', () => {
     const { getByRole } = renderWithRouter(<LinkReference text="My Agreement" url="/agreements/1" />);
 
     const link = getByRole('link', { name: 'My Agreement' });
-    expect(link).toHaveAttribute('href', '/agreements/1');
+    expect(link).toHaveAttribute('href', `${window.location.origin}/agreements/1`);
   });
 
   it('renders plain text without a link when no url is provided', () => {
