@@ -71,16 +71,20 @@ jobs:
             exit 1
           fi
 
-          # 4. The version must be strictly greater than the highest tag reachable
-          #    from the dispatched ref (monotonic increase per branch). The version
+          # 4. The version must be strictly greater than the highest tag of the same
+          #    major reachable from the dispatched ref (monotonic increase per release
+          #    line). Only same-major tags are considered so a maintenance line
+          #    (e.g. release/5 -> 5.x) is not blocked by a higher major present in
+          #    shared history (e.g. a 6.0.0 tag inherited from main). The version
           #    itself is excluded so a leftover tag from an interrupted run does not
           #    block its own completion.
+          MAJOR="${VERSION%%.*}"
           LATEST="$(git tag --merged HEAD --sort=-v:refname \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "${VERSION}" | head -n1 || true)"
+            | grep -E "^${MAJOR}\.[0-9]+\.[0-9]+$" | grep -vx "${VERSION}" | head -n1 || true)"
           if [ -n "${LATEST}" ]; then
             HIGHEST="$(printf '%s\n%s\n' "${LATEST}" "${VERSION}" | sort -V | tail -n1)"
             if [ "${HIGHEST}" != "${VERSION}" ]; then
-              echo "::error::Version '${VERSION}' must be greater than the latest reachable tag '${LATEST}'."
+              echo "::error::Version '${VERSION}' must be greater than the latest reachable ${MAJOR}.x tag '${LATEST}'."
               exit 1
             fi
           fi
