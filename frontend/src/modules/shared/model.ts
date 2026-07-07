@@ -196,6 +196,25 @@ export interface AdobeCustomer {
   data: AdobeCustomerData | null;
 }
 
+export interface AdobeTarget {
+  targetBaseOfferId: string;
+  sequence: number;
+  switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY'
+}
+
+export interface AdobeProductUpgrade {
+  sourceBaseOfferId: string;
+  targetList: AdobeTarget[];
+}
+
+export interface AdobeOfferSwitchPath {
+  totalCount: number;
+  count: number;
+  offset: number;
+  limit: number;
+  productUpgrades: AdobeProductUpgrade[];
+}
+
 export enum ProductSegments {
   COM = 'COM',
   EDU = 'EDU',

@@ -20,7 +20,10 @@ describe('ReferenceWithChip', () => {
       <ReferenceWithChip text="Acme" url="/customers/1" statusLabel="Active" />
     );
 
-    expect(getByRole('link', { name: 'Acme' })).toHaveAttribute('href', '/customers/1');
+    expect(getByRole('link', { name: 'Acme' })).toHaveAttribute(
+      'href',
+      `${window.location.origin}/customers/1`
+    );
   });
 
   it('renders the text without a link when no url is provided', () => {

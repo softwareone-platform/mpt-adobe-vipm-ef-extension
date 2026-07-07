@@ -1,8 +1,8 @@
 import { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 
 import { EntityReference } from '@softwareone-platform/sdk-react-ui-v0/entity-reference';
 
+import { getPortalOrigin } from '../../../utils/link';
 import { InfoCardPopover } from '../info-card-popover/InfoCardPopover';
 
 export interface LinkReferenceProps {
@@ -14,7 +14,15 @@ export interface LinkReferenceProps {
 }
 
 export function LinkReference({ text, secondaryContent, url, icon, infoCard }: LinkReferenceProps) {
-  const primaryContent = url ? <Link to={url}>{text}</Link> : text;
+  const href = url ? `${getPortalOrigin()}${url}` : undefined;
+
+  const primaryContent = href ? (
+    <a href={href} target="_top" rel="noopener noreferrer">
+      {text}
+    </a>
+  ) : (
+    text
+  );
 
   const reference = (
     <EntityReference primaryContent={primaryContent} secondaryContent={secondaryContent} icon={icon} />
