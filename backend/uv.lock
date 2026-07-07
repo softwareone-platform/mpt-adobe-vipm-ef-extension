@@ -660,16 +660,16 @@ wheels = [
 
 [[package]]
 name = "fastapi-pagination"
-version = "0.15.13"
+version = "0.15.15"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f9/d5/33326364b30976148e92baad853b8fbe34f3a33f2dd40ed1fd70d17b1d3b/fastapi_pagination-0.15.13.tar.gz", hash = "sha256:2ed92e90085fdeb818fa88432e1b2d1b66aa3240b7c09f1eec7ba55e069a86ca", size = 606282, upload-time = "2026-05-19T13:49:40.716Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/79/826b79dd718b0d9a91f21c3cfed365e5ecf44bc31419615c4cebeebb9ada/fastapi_pagination-0.15.15.tar.gz", hash = "sha256:d6e9e4bc4d6e20709dcabc11b16056cd5cd184c995ee214b0190f6b81426fa0c", size = 614873, upload-time = "2026-06-16T17:25:44.055Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/dc/5f770e102a3500a1a363e72d9f2b1f05e37867a5ef1c625ff23a566e6143/fastapi_pagination-0.15.13-py3-none-any.whl", hash = "sha256:95c6733f7c93280ccfa551c3a76722ccea2ffb3ad6a5e4a733cbbf03df4c6b30", size = 65387, upload-time = "2026-05-19T13:49:42.009Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/02/2e794ea498515afdadf2891f89aaed404de3ed619dd9cbf1ca637f17df19/fastapi_pagination-0.15.15-py3-none-any.whl", hash = "sha256:dc828d7cd15614c650c284bd2c3a98a8a2d9ce340508be3970dc8986908a02aa", size = 65864, upload-time = "2026-06-16T17:25:42.734Z" },
 ]
 
 [[package]]
@@ -1306,7 +1306,7 @@ wheels = [
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "6.4.4"
+version = "6.4.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
@@ -1321,9 +1321,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3e/38/bbeff3a8885038a0108431c719476b5d58cf17bb9ef72139b2894e68917a/mpt_extension_sdk-6.4.4.tar.gz", hash = "sha256:fcd270e694e0ebc3589b2019d012fa581c8a098c32527a50c8812abeae66ad98", size = 54074, upload-time = "2026-07-03T14:19:30.034Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/17/757bfdd6418a5c8050ed79a1ba734834deef1c5afd4b00743e4ad6e4b177/mpt_extension_sdk-6.4.5.tar.gz", hash = "sha256:fbf159bcafebb8ede53eee289f382119a4983ce3ca39004726ac5e2d347df2af", size = 54143, upload-time = "2026-07-07T14:33:30.488Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/7c/8db5409ccb2d85b97943028093ede53cd2dd59aea6800628de9171d485d0/mpt_extension_sdk-6.4.4-py3-none-any.whl", hash = "sha256:a356c970a35669e70c30e5c5b0c5ec64f1c909c8232443534e7a01c985681227", size = 93579, upload-time = "2026-07-03T14:19:28.951Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/c9/b2b85e31049d6da0af755a58ff4cf290763ef1e0be7445ff6e2ccbdfeb5d/mpt_extension_sdk-6.4.5-py3-none-any.whl", hash = "sha256:779c3546c6c32c84487307bd73a4241938310ac9a11e7675ddaf5a45831fae25", size = 93628, upload-time = "2026-07-07T14:33:29.401Z" },
 ]
 
 [[package]]
@@ -1342,7 +1342,7 @@ wheels = [
 
 [[package]]
 name = "mrok"
-version = "0.10.0"
+version = "0.10.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asn1crypto" },
@@ -1367,9 +1367,9 @@ dependencies = [
     { name = "typer" },
     { name = "uvicorn-worker" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/de/64/0e5bfff35d7164e10cd990975f97d983b6dabb72f1bb106f6243d12cce56/mrok-0.10.0.tar.gz", hash = "sha256:d11cec56f855b7a59ca95ab9c2887d991db70bd6f3521429750ccb6a53839d1e", size = 802402, upload-time = "2026-06-25T10:36:39.835Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/ea/5883e17174f51683a9fb28de2dfb6bc354f7abfddb3dc143afe51b2f0fd8/mrok-0.10.2.tar.gz", hash = "sha256:1291170814210cec8c88f3328d11baeae9129441fea3eec004bdf24fcb9a3a26", size = 812741, upload-time = "2026-07-01T10:44:13.723Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/14/bc1292c2408dd449d941aee917366e6834c455619f77d309548a4d1ed0c9/mrok-0.10.0-py3-none-any.whl", hash = "sha256:31aad829bf4754ef4312b2fa704fd027198d7e02888fae078c8bf86aa4e12d94", size = 86990, upload-time = "2026-06-25T10:36:38.38Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/20/530359c99f24e19b16a79d88e39a38619aa941875b2fd9967c9d6c815bec/mrok-0.10.2-py3-none-any.whl", hash = "sha256:9fcd70151cdd2729f2f6cb9f5294d2466ea5a8fd4dbb76fdca3082173fa20612", size = 86990, upload-time = "2026-07-01T10:44:12.196Z" },
 ]
 
 [[package]]
