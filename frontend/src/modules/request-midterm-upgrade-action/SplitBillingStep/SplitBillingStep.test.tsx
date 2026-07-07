@@ -1,6 +1,7 @@
 import { act, render } from '@testing-library/react';
 
 import { SplitBillingStep } from './SplitBillingStep';
+import type { Subscription } from '../../shared/model';
 import type {
   Order,
   SplitBillingAgreement,
@@ -56,6 +57,7 @@ jest.mock('../components/allocate-to-buyer/AllocateToBuyer', () => ({
 
 function renderStep(overrides: Partial<Parameters<typeof SplitBillingStep>[0]> = {}) {
   const props = {
+    subscription: { id: 'SUB-1' } as Subscription,
     agreement,
     order,
     addBuyerToOrder: jest.fn().mockResolvedValue(undefined),

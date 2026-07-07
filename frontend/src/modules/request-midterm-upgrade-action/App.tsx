@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { useMPTModal } from '@mpt-extension/sdk-react';
+import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
+import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
+
+import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
+import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
@@ -123,6 +128,8 @@ const initialTargetSubscriptions: TargetSubscription[] = [
 
 export default function App() {
   const { close } = useMPTModal();
+  const subscriptionId = useSubscriptionId();
+  const { subscription, syncSubscription, error, status } = useSubscriptionSync(subscriptionId);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
@@ -152,11 +159,33 @@ export default function App() {
   );
 
   useEffect(() => {
-    setIsLoading(false);
-  }, []);
+    syncSubscription().finally(() => setIsLoading(false));
+  }, [syncSubscription]);
 
-  if (isLoading) {
-    return <Loader />;
+  if (!isLoading && (status === 'error' || !subscription)) {
+    return (
+      <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <InlineNotification status="error" isStandalone>
+          {error || 'Subscription could not be loaded.'}
+        </InlineNotification>
+        <Button
+          onClick={() => {
+            setIsLoading(true);
+            syncSubscription().finally(() => setIsLoading(false));
+          }}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (isLoading || !subscription) {
+    return (
+      <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <Loader />
+      </div>
+    );
   }
 
   return (
@@ -176,10 +205,11 @@ export default function App() {
               {({ activeStepIndex }) => {
                 switch (activeStepIndex) {
                   case 0:
-                    return <UpgradeFromStep />;
+                    return <UpgradeFromStep subscription={subscription} />;
                   case 1:
                     return (
                       <UpgradeToStep
+                        subscription={subscription}
                         subscriptions={targetSubscriptions}
                         onSubscriptionsChange={setTargetSubscriptions}
                       />
@@ -187,6 +217,7 @@ export default function App() {
                   case 2:
                     return (
                       <SplitBillingStep
+                        subscription={subscription}
                         agreement={agreement}
                         order={order}
                         addBuyerToOrder={addBuyerToOrder}
@@ -195,11 +226,11 @@ export default function App() {
                       />
                     );
                   case 3:
-                    return <DetailsStep order={order} setOrder={setOrder} />;
+                    return <DetailsStep subscription={subscription} order={order} setOrder={setOrder} />;
                   case 4:
-                    return <ReviewOrderStep order={order} subscriptions={targetSubscriptions} />;
+                    return <ReviewOrderStep subscription={subscription} order={order} subscriptions={targetSubscriptions} />;
                   case 5:
-                    return <SummaryStep order={order} />;
+                    return <SummaryStep subscription={subscription} order={order} />;
                   default:
                     return null;
                 }

@@ -1,5 +1,6 @@
 import { Dispatch, SetStateAction, useState, useMemo, useEffect, useCallback } from 'react';
 import { Order } from '../model';
+import { Subscription } from '../../shared/model';
 import { StepNavigationProperties, useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { Button, Input } from '@softwareone-platform/sdk-react-ui-v0';
@@ -9,6 +10,7 @@ import './DetailsStep.scss';
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 
 interface DetailsStepProps {
+  subscription: Subscription;
   order: Order;
   setOrder: Dispatch<SetStateAction<Order>>;
   isSplitBillingStepSkip?: boolean;
@@ -22,6 +24,7 @@ export function useUpdateOrder(orderId?: string | null) {
 }
 
 export function DetailsStep({
+  subscription,
   order,
   setOrder,
   isSplitBillingStepSkip,
@@ -87,7 +90,7 @@ export function DetailsStep({
         </RegularText>
       </div>
       <div className="details__section__highlights">
-        <WizardHighlights />
+        <WizardHighlights subscription={subscription} />
       </div>
       <div className="details__section">
         <div className="details__section__inputs">

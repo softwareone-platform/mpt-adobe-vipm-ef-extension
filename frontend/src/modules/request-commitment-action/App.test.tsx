@@ -4,7 +4,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import App from './App';
 import type { AdobeCustomerData } from '../shared/model';
-import type { Status } from '../shared/hooks/useAgreementSync';
+import type { Status } from '../shared/model';
 
 const mockClose = jest.fn();
 let mockCustomerData: AdobeCustomerData | null = null;

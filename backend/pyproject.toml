@@ -79,7 +79,7 @@ statistics = false
 per-file-ignores = [
   # The leading `*` makes this match both CI (`migrations/...`) and pre-commit (`backend/migrations/...`) paths.
   "*migrations/**:WPS102",
-  "*tests/**: WPS118 WPS202",
+  "*tests/**: WPS118 WPS202 WPS204",
   "adobe/config.py: WPS121 WPS122 WPS214 WPS420",
   "mpt_adobe_vipm_ef/routers/api/customer.py: WPS202 WPS238"
 ]

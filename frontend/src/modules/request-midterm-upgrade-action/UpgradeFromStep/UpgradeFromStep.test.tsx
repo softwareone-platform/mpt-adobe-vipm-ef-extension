@@ -12,27 +12,27 @@ jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
 
 describe('UpgradeFromStep', () => {
   it('renders the heading', () => {
-    const { getByText } = render(<UpgradeFromStep />);
+    const { getByText } = render(<UpgradeFromStep subscription={{ id: 'SUB-1' }} />);
 
     expect(getByText('Upgrade from')).toBeTruthy();
   });
 
   it('renders the wizard highlights and the current subscription grid', () => {
-    const { getByTestId } = render(<UpgradeFromStep />);
+    const { getByTestId } = render(<UpgradeFromStep subscription={{ id: 'SUB-1' }} />);
 
     expect(getByTestId('wizard-highlights')).toBeTruthy();
     expect(getByTestId('current-subscription-grid')).toBeTruthy();
   });
 
   it('explains the upgrade and termination behavior', () => {
-    const { getByText } = render(<UpgradeFromStep />);
+    const { getByText } = render(<UpgradeFromStep subscription={{ id: 'SUB-1' }} />);
 
     expect(getByText(/will be upgraded/)).toBeTruthy();
     expect(getByText(/will be terminated/)).toBeTruthy();
   });
 
   it('renders the estimated price disclaimer', () => {
-    const { getByText } = render(<UpgradeFromStep />);
+    const { getByText } = render(<UpgradeFromStep subscription={{ id: 'SUB-1' }} />);
 
     expect(getByText(/These estimated prices/)).toBeTruthy();
   });
