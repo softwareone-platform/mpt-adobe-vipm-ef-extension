@@ -7,7 +7,7 @@ import type { Subscription } from '../../../shared/model';
 
 const subscription: Subscription = {
   id: 'SUB-1',
-  agreement: { id: 'AGR-1111-1111', status: 'Active' },
+  agreement: { id: 'AGR-1111-1111', name: 'Agreement Name', status: 'Active' },
   licensee: { id: 'LIC-1111-1111', name: 'Licensee Name' },
   buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
   seller: { id: 'SEL-1111-1111', name: 'Seller Name' },
@@ -33,6 +33,7 @@ describe('WizardHighlights', () => {
   it('renders the agreement and account references', () => {
     const { getByText } = renderHighlights();
 
+    expect(getByText('Agreement Name')).toBeTruthy();
     expect(getByText('AGR-1111-1111')).toBeTruthy();
     expect(getByText('Licensee Name')).toBeTruthy();
     expect(getByText('Buyer Name')).toBeTruthy();

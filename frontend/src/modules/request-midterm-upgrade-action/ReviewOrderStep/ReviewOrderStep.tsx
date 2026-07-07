@@ -19,6 +19,8 @@ import { Order, TargetSubscription } from '../model';
 import { Subscription } from '../../shared/model';
 import { parsePrice, formatPrice } from '../../utils/price';
 
+import './ReviewOrderStep.scss';
+
 type ReviewRow = TargetSubscription & {
   isSummary?: boolean;
   summaryTitle?: string;

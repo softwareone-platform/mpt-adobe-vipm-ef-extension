@@ -18,6 +18,7 @@
 
   &__info {
     @extend %regular2;
+    margin: 0;
     padding-bottom: $var-spacing-3;
   }
 }
