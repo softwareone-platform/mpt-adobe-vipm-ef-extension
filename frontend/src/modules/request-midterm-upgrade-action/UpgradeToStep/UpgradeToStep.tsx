@@ -3,15 +3,17 @@ import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 import { TargetSubscription } from '../model';
+import { Subscription } from '../../shared/model';
 
 import './UpgradeToStep.scss';
 
 interface UpgradeToStepProps {
+  subscription: Subscription;
   subscriptions: TargetSubscription[];
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
 }
 
-export function UpgradeToStep({ subscriptions, onSubscriptionsChange }: UpgradeToStepProps) {
+export function UpgradeToStep({ subscription, subscriptions, onSubscriptionsChange }: UpgradeToStepProps) {
   return (
     <div className="upgrade-to-step">
       <div className="upgrade-to-step__header">
@@ -20,7 +22,7 @@ export function UpgradeToStep({ subscriptions, onSubscriptionsChange }: UpgradeT
         </RegularText>
       </div>
       <div className="upgrade-to-step__highlights">
-        <WizardHighlights />
+        <WizardHighlights subscription={subscription} />
       </div>
       <div className="upgrade-to-step__inline-text">
         <span className="upgrade-to-step__inline-text__pill" />

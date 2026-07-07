@@ -3,8 +3,74 @@ export interface Reference {
   name?: string;
 }
 
-export interface Product {
+export interface NamedEntity {
   id: string;
+  name: string;
+}
+
+export type Product = NamedEntity;
+
+export interface Seller {
+  id: string;
+  name: string;
+  status?: string;
+  audit?: Audit;
+}
+
+export interface Buyer {
+  id: string;
+  name: string;
+  status?: string;
+  taxId?: string;
+  externalIds?: { erpCustomer?: string };
+  account?: Reference;
+  audit?: Audit;
+}
+
+export interface Licensee {
+  id: string;
+  name: string;
+  status?: string;
+  account?: Reference;
+  buyer?: Buyer;
+  seller?: Seller;
+  externalId?: string;
+  audit?: Audit;
+}
+
+export interface Price {
+  currency?: string;
+  PPxY?: number;
+  PPxM?: number;
+  unitPP?: number;
+  SPxY?: number;
+  SPxM?: number;
+  unitSP?: number;
+  markup?: number;
+  margin?: number;
+}
+
+export interface ExternalIds {
+  seller?: string;
+  vendor?: string;
+}
+
+export interface ProductItem {
+  id: string;
+  name: string;
+  externalIds?: ExternalIds;
+}
+
+export interface SubscriptionLine {
+  id: string;
+  status?: string;
+  quantity: number;
+  item: ProductItem;
+  price?: Price;
+  subscription?: {
+    id: string;
+    name?: string;
+  };
 }
 
 export interface AgreementContext {
@@ -15,7 +81,7 @@ export interface AgreementContext {
 
 export interface SubscriptionContext {
   data?: {
-    subscription?: Reference;
+    subscription?: Subscription;
   };
 }
 
@@ -31,22 +97,46 @@ export interface CommerceParameter {
   multiple?: boolean;
 }
 
+export interface AuditEvent {
+  at?: string;
+  by?: Reference;
+}
+
+export interface Audit {
+  created?: AuditEvent;
+  updated?: AuditEvent;
+}
+
 export interface Agreement {
   id: string;
+  name?: string;
   status?: string;
   parameters?: {
     fulfillment?: CommerceParameter[];
   };
   product?: Product;
+  vendor?: Reference;
+  client?: Reference;
+  seller?: Seller;
+  buyer?: Buyer;
+  licensee?: Licensee;
+  audit?: Audit;
 }
 
 export interface Subscription {
   id: string;
+  name?: string;
   status?: string;
+  agreement?: Agreement;
   parameters?: {
     fulfillment?: CommerceParameter[];
   };
   product?: Product;
+  lines?: SubscriptionLine[];
+  buyer?: Buyer;
+  licensee?: Licensee;
+  seller?: Seller;
+  price?: Price;
 }
 
 export interface AdobeMinimumQuantity {
@@ -196,7 +286,18 @@ export function isGlobalSalesEnabled(
   return data?.globalSalesEnabled === true;
 }
 
-export type Buyer = {
-  id: string;
-  name: string;
+export type Status = 'idle' | 'loading' | 'success' | 'error';
+
+export interface SyncState {
+  error: string;
+  lastCompleted: string | null;
+  lastStatus: Status | null;
+  status: Status;
 }
+
+export const INITIAL_SYNC_STATE: SyncState = {
+  error: '',
+  lastCompleted: null,
+  lastStatus: null,
+  status: 'idle',
+};

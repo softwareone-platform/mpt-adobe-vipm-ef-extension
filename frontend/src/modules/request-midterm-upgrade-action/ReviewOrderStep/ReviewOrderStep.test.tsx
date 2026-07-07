@@ -87,7 +87,7 @@ const subscriptions: TargetSubscription[] = [
 
 describe('ReviewOrderStep', () => {
   it('renders the heading, highlights and grid', () => {
-    const { getByText, getByTestId } = render(<ReviewOrderStep order={order} subscriptions={subscriptions} />);
+    const { getByText, getByTestId } = render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 
     expect(getByText('Review order')).toBeTruthy();
     expect(getByTestId('wizard-highlights')).toBeTruthy();
@@ -95,7 +95,7 @@ describe('ReviewOrderStep', () => {
   });
 
   it('renders the Items, Parameters and Details tabs', () => {
-    const { getByText } = render(<ReviewOrderStep order={order} subscriptions={subscriptions} />);
+    const { getByText } = render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 
     expect(getByText('Items')).toBeTruthy();
     expect(getByText('Parameters')).toBeTruthy();
@@ -104,7 +104,7 @@ describe('ReviewOrderStep', () => {
   });
 
   it('feeds the grid the subscriptions followed by an order price total row', () => {
-    render(<ReviewOrderStep order={order} subscriptions={subscriptions} />);
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 
     expect(capturedRows).toHaveLength(subscriptions.length + 1);
     expect(capturedRows[0]).toMatchObject({ id: 'SUB-1525-6036-0087' });
@@ -121,7 +121,7 @@ describe('ReviewOrderStep', () => {
   });
 
   it('configures the expected columns and pages all rows on one page', () => {
-    render(<ReviewOrderStep order={order} subscriptions={subscriptions} />);
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 
     expect(capturedConfig.columns.map((column) => column.name)).toEqual([
       'rowNumber',
@@ -137,7 +137,7 @@ describe('ReviewOrderStep', () => {
   });
 
   it('advances to the next step when placing the order', () => {
-    render(<ReviewOrderStep order={order} subscriptions={subscriptions} />);
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 
     expect(registeredOnNext).toBeDefined();
     expect(registeredOnNext!({ currentStepIndex: 4, targetStepIndex: 5 })).toBe(5);

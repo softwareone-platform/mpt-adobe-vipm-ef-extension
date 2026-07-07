@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { http } from '@mpt-extension/sdk';
+
 import App from './App';
 
 const mockClose = jest.fn();
@@ -9,7 +11,11 @@ let mockActiveStepIndex = 0;
 
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTModal: () => ({ open: jest.fn(), close: mockClose }),
-  useMPTContext: () => ({}),
+  useMPTContext: () => ({ data: { subscription: { id: 'SUB-1' } } }),
+}), { virtual: true });
+
+jest.mock('@mpt-extension/sdk', () => ({
+  http: { post: jest.fn().mockResolvedValue({ data: { data: { id: 'SUB-1' } } }) },
 }), { virtual: true });
 
 interface MockChildren {
@@ -111,6 +117,25 @@ jest.mock('./components/loader/Loader', () => ({
   Loader: () => <div data-testid="loader" />,
 }));
 
+interface MockButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+}
+interface MockNotificationProps {
+  status: string;
+  children: ReactNode;
+}
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => ({
+  Button: ({ children, onClick }: MockButtonProps) => <button onClick={onClick}>{children}</button>,
+}));
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/notification', () => ({
+  InlineNotification: ({ status, children }: MockNotificationProps) => (
+    <div data-testid={`notification-${status}`}>{children}</div>
+  ),
+}));
+
 describe('request-midterm-upgrade-action App', () => {
   beforeEach(() => {
     mockClose.mockReset();
@@ -188,5 +213,27 @@ describe('request-midterm-upgrade-action App', () => {
     fireEvent.click(await screen.findByText('Close'));
 
     expect(mockClose).toHaveBeenCalled();
+  });
+
+  it('shows the error state when no subscription is returned', async () => {
+    (http.post as jest.Mock).mockResolvedValueOnce({ data: { data: null } });
+    render(<App />);
+
+    expect(await screen.findByTestId('notification-error')).toBeTruthy();
+    expect(screen.getByText('Retry')).toBeTruthy();
+    expect(screen.queryByTestId('loader')).toBeNull();
+  });
+
+  it('surfaces a sync error and recovers on retry', async () => {
+    (http.post as jest.Mock).mockRejectedValueOnce(new Error('Sync boom'));
+    render(<App />);
+
+    expect(await screen.findByTestId('notification-error')).toBeTruthy();
+    expect(screen.getByText('Sync boom')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Retry'));
+
+    expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
+    expect(screen.queryByTestId('notification-error')).toBeNull();
   });
 });

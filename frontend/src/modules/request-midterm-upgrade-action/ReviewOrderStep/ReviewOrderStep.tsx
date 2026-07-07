@@ -16,6 +16,7 @@ import { PopoverCell } from '../components/grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../components/grid-cell/text-cell/TextCell';
 import { ChipCell } from '../components/grid-cell/chip-cell/ChipCell';
 import { Order, TargetSubscription } from '../model';
+import { Subscription } from '../../shared/model';
 import { parsePrice, formatPrice } from '../../utils/price';
 
 type ReviewRow = TargetSubscription & {
@@ -187,11 +188,12 @@ function ItemsGrid({ subscriptions }: { subscriptions: TargetSubscription[] }) {
 }
 
 interface ReviewOrderStepProps {
+  subscription: Subscription;
   order: Order;
   subscriptions: TargetSubscription[];
 }
 
-export function ReviewOrderStep({ order, subscriptions }: ReviewOrderStepProps): ReactElement | null {
+export function ReviewOrderStep({ subscription, order, subscriptions }: ReviewOrderStepProps): ReactElement | null {
   const [tabId, setTabId] = useState('items');
   const { registerOnNextCallback } = useStepActions();
 
@@ -217,7 +219,7 @@ export function ReviewOrderStep({ order, subscriptions }: ReviewOrderStepProps):
         </RegularText>
       </div>
       <div className="review-order-step__highlights">
-        <WizardHighlights />
+        <WizardHighlights subscription={subscription} />
       </div>
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title="Items">

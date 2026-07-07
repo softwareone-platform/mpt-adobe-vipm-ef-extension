@@ -5,9 +5,7 @@ import './Loader.scss';
 export function Loader() {
   return (
     <div className="loader" data-testid="loader">
-      <div className="loader__panel">
-        <LoadingSpinner size="small" />
-      </div>
+      <LoadingSpinner size="small" />
     </div>
   );
 }
