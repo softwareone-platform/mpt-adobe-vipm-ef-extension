@@ -12,6 +12,7 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { Loader } from './components/loader/Loader';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { getPortalOrigin } from '../utils/link';
 import { UpgradeFromStep } from './UpgradeFromStep';
 import { UpgradeToStep } from './UpgradeToStep';
 import { SplitBillingStep } from './SplitBillingStep';
@@ -27,6 +28,7 @@ import type {
 } from './model';
 
 import './App.scss';
+import { AdobeOfferSwitchPath } from '../shared/model';
 
 const steps: StepProps[] = [
   { title: 'Upgrade from' },
@@ -126,6 +128,32 @@ const initialTargetSubscriptions: TargetSubscription[] = [
   },
 ];
 
+const offerPaths: AdobeOfferSwitchPath[] = [
+  {
+    totalCount: 2,
+    count: 2,
+    offset: 0,
+    limit: 2,
+    productUpgrades: [
+      {
+        sourceBaseOfferId: 'AO03.25470.MN | 30002000CB',
+        targetList: [
+          {
+            targetBaseOfferId: 'AO03.25470.MN | 30002000CB',
+            sequence: 1,
+            switchType: 'PARTIAL_ALLOWED',
+          },
+          {
+            targetBaseOfferId: 'AO03.25471.MN | 30002000CC',
+            sequence: 2,
+            switchType: 'FULL_ONLY',
+          }
+        ],
+      }
+    ]
+  }
+]
+
 export default function App() {
   const { close } = useMPTModal();
   const subscriptionId = useSubscriptionId();
@@ -143,7 +171,7 @@ export default function App() {
 
   const viewOrder = useCallback(() => {
     if (order?.id) {
-      window.open(`/commerce/orders/${order.id}`, '_top');
+      window.open(`${getPortalOrigin()}/commerce/orders/${order.id}`, '_top');
     }
     close();
   }, [order?.id, close]);
@@ -206,6 +234,7 @@ export default function App() {
                         subscription={subscription}
                         subscriptions={targetSubscriptions}
                         onSubscriptionsChange={setTargetSubscriptions}
+                        offerPaths={offerPaths}
                       />
                     );
                   case 2:

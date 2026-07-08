@@ -3,17 +3,18 @@ import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 import { TargetSubscription } from '../model';
-import { Subscription } from '../../shared/model';
+import { AdobeOfferSwitchPath, Subscription } from '../../shared/model';
 
 import './UpgradeToStep.scss';
 
 interface UpgradeToStepProps {
   subscription: Subscription;
   subscriptions: TargetSubscription[];
+  offerPaths: AdobeOfferSwitchPath[];
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
 }
 
-export function UpgradeToStep({ subscription, subscriptions, onSubscriptionsChange }: UpgradeToStepProps) {
+export function UpgradeToStep({ subscription, subscriptions, offerPaths, onSubscriptionsChange }: UpgradeToStepProps) {
   return (
     <div className="upgrade-to-step">
       <div className="upgrade-to-step__header">
@@ -31,7 +32,11 @@ export function UpgradeToStep({ subscription, subscriptions, onSubscriptionsChan
         </RegularText>
       </div>
       <div className="upgrade-to-step__grid">
-        <TargetSubscriptionGrid subscriptions={subscriptions} onSubscriptionsChange={onSubscriptionsChange} />
+        <TargetSubscriptionGrid
+          subscriptions={subscriptions}
+          offerPaths={offerPaths}
+          onSubscriptionsChange={onSubscriptionsChange}
+        />
       </div>
       <div className="upgrade-to-step__footer-text">
         <RegularText as="p" size={1}>
