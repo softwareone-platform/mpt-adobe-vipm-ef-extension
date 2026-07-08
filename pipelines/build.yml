@@ -1,0 +1,29 @@
+trigger:
+  branches:
+    include:
+      - main
+      - azure-pipelines
+      - release/*
+
+pool:
+  name: Standard-Linux
+
+resources:
+  repositories:
+    - repository: buildTemplates
+      type: git
+      name: MPT/ops-build-templates
+      ref: refs/heads/feature/build_template
+
+extends:
+  template: common-build/extends-py.yml@buildTemplates
+  parameters:
+    appName: mpt-extension-adobe
+    components:
+      web-api:
+        name: Api
+        repository: mpt-extension-adobe
+        dockerArgs: --target prod
+    deploymentManifestEnabled: false
+    sbomWorkingDirectory: /backend
+    testEnabled: false
