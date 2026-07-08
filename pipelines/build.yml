@@ -2,7 +2,6 @@ trigger:
   branches:
     include:
       - main
-      - azure-pipelines
       - release/*
 
 pool:
@@ -22,7 +21,6 @@ extends:
     components:
       web-api:
         name: Api
-        repository: mpt-extension-adobe
         dockerArgs: --target prod
     deploymentManifestEnabled: false
     sbomWorkingDirectory: /backend
