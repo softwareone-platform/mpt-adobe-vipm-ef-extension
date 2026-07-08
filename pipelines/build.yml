@@ -1,9 +1,8 @@
-#https://dev.azure.com/softwareone-pc/MPT/_build?definitionId=5655
-
 trigger:
   branches:
     include:
       - main
+      - azure-pipelines
       - release/*
 
 pool:
@@ -20,5 +19,11 @@ extends:
   template: common-build/extends-py.yml@buildTemplates
   parameters:
     appName: mpt-extension-adobe
-    deploymentManifestEnabled: true
+    components:
+      web-api:
+        name: Api
+        repository: mpt-extension-adobe
+        dockerArgs: --target prod
+    deploymentManifestEnabled: false
     sbomWorkingDirectory: /backend
+    testEnabled: false
