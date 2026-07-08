@@ -1,6 +1,6 @@
 # Testing
 
-Shared unit-test rules live in [unittests.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/unittests.md).
+Shared unit-test rules live in [unittests.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/unittests.md). Frontend (UI) tests follow [extensions-ui-testing-best-practices.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/extensions-ui-testing-best-practices.md).
 
 Shared build and target knowledge also applies:
 
