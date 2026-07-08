@@ -26,4 +26,3 @@ extends:
         dockerArgs: --target prod
     deploymentManifestEnabled: false
     sbomWorkingDirectory: /backend
-    testEnabled: false
