@@ -18,6 +18,7 @@ import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
 import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
 import { TargetSubscription } from '../../model';
+import { AdobeOfferSwitchPath } from '../../../shared/model';
 
 const columns: GridColumnDefinition<TargetSubscription>[] = [
   {
@@ -105,12 +106,51 @@ function isEqual(a: TargetSubscription, b: TargetSubscription): boolean {
   return a.item.id === b.item.id;
 }
 
+type SwitchType = 'PARTIAL_ALLOWED' | 'FULL_ONLY';
+
+interface OfferRule {
+  switchType: SwitchType;
+  sourceQuantity: number;
+}
+
+function getOfferRule(
+  offerPaths: AdobeOfferSwitchPath[],
+  subscriptions: TargetSubscription[],
+  target: TargetSubscription,
+): OfferRule | undefined {
+  for (const path of offerPaths) {
+    for (const upgrade of path.productUpgrades) {
+      const match = upgrade.targetList.find((t) => t.targetBaseOfferId === target.item.externalId);
+      if (match) {
+        const source = subscriptions.find((s) => s.item.externalId === upgrade.sourceBaseOfferId);
+        return { switchType: match.switchType, sourceQuantity: source?.currentQuantity ?? 0 };
+      }
+    }
+  }
+  return undefined;
+}
+
+function validateNewQuantity(newQuantity: number | null, rule: OfferRule): string | null {
+  if (newQuantity === null) return 'Quantity is required';
+  if (rule.switchType === 'FULL_ONLY') {
+    return newQuantity === rule.sourceQuantity ? null : `Quantity must be ${rule.sourceQuantity}`;
+  }
+  if (newQuantity < 1) return 'Quantity must be at least 1';
+  if (newQuantity > rule.sourceQuantity) return `Quantity cannot exceed ${rule.sourceQuantity}`;
+  return null;
+}
+
 interface TargetSubscriptionGridProps {
   subscriptions: TargetSubscription[];
+  offerPaths: AdobeOfferSwitchPath[];
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
 }
 
-export function TargetSubscriptionGrid({ subscriptions, onSubscriptionsChange }: TargetSubscriptionGridProps) {
+export function TargetSubscriptionGrid({
+  subscriptions,
+  offerPaths,
+  onSubscriptionsChange,
+}: TargetSubscriptionGridProps) {
   const updateQuantity = useCallback(
     (target: TargetSubscription, value: string) => {
       if (!/^\d*$/.test(value)) return;
@@ -133,7 +173,7 @@ export function TargetSubscriptionGrid({ subscriptions, onSubscriptionsChange }:
         name: 'newQuantity',
         title: 'New Quantity',
         fields: ['newQuantity'],
-        cell: (item) => getNewQuantityCell(item, updateQuantity),
+        cell: (item) => getNewQuantityCell(item, offerPaths, subscriptions, updateQuantity),
       },
       {
         name: 'delta',
@@ -143,7 +183,7 @@ export function TargetSubscriptionGrid({ subscriptions, onSubscriptionsChange }:
       },
       ...priceColumns,
     ],
-    [updateQuantity],
+    [offerPaths, subscriptions, updateQuantity],
   );
 
   const { plugin: radioPlugin } = useRadioPlugin<TargetSubscription>(isEqual);
@@ -214,15 +254,20 @@ export function getCurrentQuantityCell(subscription: TargetSubscription): React.
 
 export function getNewQuantityCell(
   subscription: TargetSubscription,
+  offerPaths: AdobeOfferSwitchPath[],
+  subscriptions: TargetSubscription[],
   onChange: (subscription: TargetSubscription, value: string) => void,
 ): React.ReactNode {
-  const enabled = subscription.recommended === 'Yes';
+  const rule = getOfferRule(offerPaths, subscriptions, subscription);
+  const enabled = subscription.recommended === 'Yes' && rule?.switchType !== 'FULL_ONLY';
+  const errorMessage = rule ? validateNewQuantity(subscription.newQuantity, rule) ?? undefined : undefined;
 
   return (
     <TextInputCell
       value={subscription.newQuantity?.toString() ?? ''}
       htmlInputType="number"
       enabled={enabled}
+      errorMessage={errorMessage}
       onChange={(value) => onChange(subscription, value)}
     />
   );
