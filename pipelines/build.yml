@@ -20,9 +20,5 @@ extends:
   template: common-build/extends-py.yml@buildTemplates
   parameters:
     appName: mpt-extension-adobe
-    components:
-      web-api:
-        name: Api
-        dockerArgs: --target prod
     deploymentManifestEnabled: false
     sbomWorkingDirectory: /backend
