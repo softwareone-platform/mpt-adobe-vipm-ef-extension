@@ -1,6 +1,11 @@
 @use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
 
 .upgrade-from-step {
+  &__header {
+    h2 {
+      margin: 0;
+    }
+  }
   &__grid {
     margin-top: $var-spacing-3;
   }
