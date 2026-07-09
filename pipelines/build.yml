@@ -20,5 +20,5 @@ extends:
   template: common-build/extends-py.yml@buildTemplates
   parameters:
     appName: mpt-extension-adobe
-    deploymentManifestEnabled: false
+    deploymentManifestEnabled: true
     sbomWorkingDirectory: /backend

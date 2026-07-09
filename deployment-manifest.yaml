@@ -1,0 +1,88 @@
+owner: marketplace-team
+migrations:
+  data:
+    enabled: true
+    image: nlpapp0336cre.azurecr.io/mpt-extension-adobe
+    command: ["mpt-service-cli"]
+    args: ["migrate", "--data"]
+dbup:
+  enabled: true
+  image: nlpapp0336cre.azurecr.io/mpt-extension-adobe
+  command: ["mpt-service-cli"]
+  args: ["migrate", "--schema"]
+api:
+  enabled: true
+  image: mpt-extension-adobe
+  command:
+    - mpt-ext
+  args:
+    - run
+  hosts:
+    - mpt-platform-api.domain.global
+worker:
+  enabled: false
+env:
+  SdkExtensionUrl:
+    name: SDK_EXTENSION_URL
+  SdkExtensionId:
+    name: SDK_EXTENSION_ID
+  mptPublicApiUrl:
+    name: MPT_API_BASE_URL
+  MpProductsIds:
+    name: MPT_PRODUCTS_IDS
+  MptToolStorageType:
+    name: MPT_TOOL_STORAGE_TYPE
+    defaultValue: airtable
+  MptToolStorageAirtableBaseId:
+    name: MPT_TOOL_STORAGE_AIRTABLE_BASE_ID
+  MptToolStorageAirtableTableName:
+    name: MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME
+    defaultValue: Migrations
+  AdobeApiEndpoint:
+    name: EXT_ADOBE_API_BASE_URL
+  AdobeAuthEndpoint:
+    name: EXT_ADOBE_AUTH_ENDPOINT_URL
+  ProductSegments:
+    name: EXT_PRODUCT_SEGMENTS
+    defaultValue: "{}"
+  AdobeCredentialsFile:
+    name: EXT_ADOBE_CREDENTIALS_FILE
+    defaultValue: /extension/config/adobe_credentials.json
+  AdobeAuthorizationsFile:
+    name: EXT_ADOBE_AUTHORIZATIONS_FILE
+    defaultValue: /extension/config/adobe_authorizations.json
+  SdkObservabilityEnabled:
+    name: SDK_OBSERVABILITY_ENABLED
+    defaultValue: "false"
+  SdkOtelServiceName:
+    name: SDK_OTEL_SERVICE_NAME
+    defaultValue: Swo.AdobeVipm.Ef.Extension
+  SdkZitiWorkers:
+    name: SDK_ZITI_WORKERS
+    defaultValue: "4"
+  LogLevel:
+    name: LOG_LEVEL
+    defaultValue: INFO
+secrets:
+  SdkExtensionApiKey:
+    name: SDK_EXTENSION_API_KEY
+  AppInsightsConnectionString:
+    name: SDK_APPLICATIONINSIGHTS_CONNECTION_STRING
+  MptApiToken:
+    name: MPT_API_TOKEN
+  MptToolStorageAirtableApiKey:
+    name: MPT_TOOL_STORAGE_AIRTABLE_API_KEY
+  CredentialsJson:
+    name: EXT_ADOBE_CREDENTIALS_JSON
+  AuthorizationsJson:
+    name: EXT_ADOBE_AUTHORIZATIONS_JSON
+secretFiles:
+  - name: files
+    mountPath: /extension/config
+    readOnly: true
+    items:
+      - secret: CredentialsJson
+        path: adobe_credentials.json
+      - secret: AuthorizationsJson
+        path: adobe_authorizations.json
+cronjobs: {}
