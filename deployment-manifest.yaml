@@ -78,7 +78,7 @@ secrets:
   AuthorizationsJson:
     name: EXT_ADOBE_AUTHORIZATIONS_JSON
 secretFiles:
-  - name: adobe-config
+  - name: files
     mountPath: /extension/config
     readOnly: true
     items:
