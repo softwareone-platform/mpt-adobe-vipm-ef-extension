@@ -17,7 +17,6 @@ api:
     - mpt-ext
   args:
     - run
-  probesEnabled: false
   hosts:
     - mpt-platform-api.domain.global
 worker:
