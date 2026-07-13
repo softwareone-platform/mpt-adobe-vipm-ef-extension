@@ -18,6 +18,16 @@ jest.mock('@mpt-extension/sdk', () => ({
   http: { post: jest.fn().mockResolvedValue({ data: { data: { id: 'SUB-1' } } }) },
 }), { virtual: true });
 
+let mockRecommendation: { status: string; error: string | null; data: unknown; refresh: () => void } = {
+  status: 'idle',
+  error: null,
+  data: null,
+  refresh: () => {},
+};
+jest.mock('../shared/hooks/useAdobeRecommendation', () => ({
+  useAdobeRecommendation: () => mockRecommendation,
+}));
+
 interface MockChildren {
   children?: ReactNode | ((args: { activeStepIndex: number }) => ReactNode);
 }
@@ -91,6 +101,7 @@ jest.mock('./DetailsStep', () => ({
 interface ReviewOrderProps {
   order: unknown;
   subscriptions: unknown;
+  recommendationTrackerId: string;
 }
 let reviewOrderProps: ReviewOrderProps;
 
@@ -140,6 +151,7 @@ describe('request-midterm-upgrade-action App', () => {
   beforeEach(() => {
     mockClose.mockReset();
     mockActiveStepIndex = 0;
+    mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {
@@ -184,6 +196,20 @@ describe('request-midterm-upgrade-action App', () => {
     expect(await screen.findByText('Review order step')).toBeTruthy();
     expect(reviewOrderProps.order).toBeDefined();
     expect(reviewOrderProps.subscriptions).toBeDefined();
+  });
+
+  it('captures the recommendation tracker id and forwards it to the review-order step', async () => {
+    mockRecommendation = {
+      status: 'success',
+      error: null,
+      data: { productRecommendations: { upsells: [], crossSells: [], addOns: [] }, xRecommendationTrackerId: 'TRACKER-1' },
+      refresh: jest.fn(),
+    };
+    mockActiveStepIndex = 4;
+    render(<App />);
+
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    expect(reviewOrderProps.recommendationTrackerId).toBe('TRACKER-1');
   });
 
   it('renders the summary step on the sixth step and wires its order', async () => {

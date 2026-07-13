@@ -223,6 +223,55 @@ export interface OfferSwitchPaths {
   data: AdobeOfferSwitchPath | null;
 }
 
+export interface AdobeRecommendationProduct {
+  baseOfferId?: string;
+}
+
+export interface AdobeRecommendationSource {
+  sourceType?: string;
+  offerIds?: string[];
+}
+
+export interface AdobeRecommendation {
+  rank?: number;
+  product?: AdobeRecommendationProduct;
+  source?: AdobeRecommendationSource;
+}
+
+export interface AdobeRecommendations {
+  upsells: AdobeRecommendation[];
+  crossSells: AdobeRecommendation[];
+  addOns: AdobeRecommendation[];
+}
+
+export interface AdobeRecommendationData {
+  productRecommendations: AdobeRecommendations;
+  xRecommendationTrackerId: string;
+}
+
+export interface Recommendations {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+  data: AdobeRecommendationData | null;
+}
+
+export function getRecommendedOfferIds(
+  data: AdobeRecommendationData | null | undefined,
+): Set<string> {
+  const recommendations = data?.productRecommendations;
+  if (!recommendations) return new Set();
+  const flattened = [
+    ...recommendations.upsells,
+    ...recommendations.crossSells,
+    ...recommendations.addOns,
+  ];
+  return new Set(
+    flattened
+      .map((recommendation) => recommendation.product?.baseOfferId)
+      .filter((offerId): offerId is string => Boolean(offerId)),
+  );
+}
+
 export enum ProductSegments {
   COM = 'COM',
   EDU = 'EDU',

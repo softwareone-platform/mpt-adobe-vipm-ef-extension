@@ -22,3 +22,14 @@ def product_item_payload():
 @pytest.fixture
 def target_payload():
     return {"targetBaseOfferId": OFFER_ID}
+
+
+@pytest.fixture
+def recommendations_payload():
+    return {
+        "productRecommendations": {
+            "upsells": [],
+            "crossSells": [{"rank": 0, "product": {"baseOfferId": "OFFER-CROSS"}}],
+            "addOns": [{"rank": 1, "product": {"baseOfferId": "OFFER-ADDON"}}],
+        }
+    }

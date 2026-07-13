@@ -27,17 +27,23 @@ type ReviewRow = TargetSubscription & {
   summarySubtitle?: string;
 };
 
-function saveOrder(order: Order, subscriptions: TargetSubscription[]): void {
+function saveOrder(
+  order: Order,
+  subscriptions: TargetSubscription[],
+  recommendationTrackerId: string | undefined,
+): void {
   void order;
   void subscriptions;
+  void recommendationTrackerId;
 }
 
 function getSummaryRow(subscriptions: TargetSubscription[]): ReviewRow {
   return {
     id: 'order-price',
     name: null,
+    status: '',
     item: { id: '', name: '', externalId: '' },
-    recommended: '',
+    recommended: false,
     currentQuantity: 0,
     newQuantity: null,
     delta: 0,
@@ -193,18 +199,24 @@ interface ReviewOrderStepProps {
   subscription: Subscription;
   order: Order;
   subscriptions: TargetSubscription[];
+  recommendationTrackerId?: string;
 }
 
-export function ReviewOrderStep({ subscription, order, subscriptions }: ReviewOrderStepProps): ReactElement | null {
+export function ReviewOrderStep({
+  subscription,
+  order,
+  subscriptions,
+  recommendationTrackerId,
+}: ReviewOrderStepProps): ReactElement | null {
   const [tabId, setTabId] = useState('items');
   const { registerOnNextCallback } = useStepActions();
 
   const onNext = useCallback(
     ({ targetStepIndex }: StepNavigationProperties) => {
-      saveOrder(order, subscriptions);
+      saveOrder(order, subscriptions, recommendationTrackerId);
       return targetStepIndex;
     },
-    [order, subscriptions],
+    [order, subscriptions, recommendationTrackerId],
   );
 
   useEffect(() => {
