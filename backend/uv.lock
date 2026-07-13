@@ -1388,16 +1388,16 @@ azure-monitor = [
 
 [[package]]
 name = "mpt-tool"
-version = "6.0.1"
+version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mpt-api-client" },
     { name = "pyairtable" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/ec/5927ac6d55eaed4211d60827b31004dd81c2810c3d7dd96d13ca7f7e7632/mpt_tool-6.0.1.tar.gz", hash = "sha256:47ed0f78b7be04adda3717ec5e39685119a3c4871887543b7dd6634eceaaf614", size = 20786, upload-time = "2026-06-25T16:01:37.278Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/3d/ffad82b8d2b8fe41a4f12167bc801341d41262c40b16229794888b93f23a/mpt_tool-6.0.2.tar.gz", hash = "sha256:66f929d46391d30c1d9d852eddbe388efe255809b966dc4b1657053150817d9e", size = 20814, upload-time = "2026-07-13T12:41:20.411Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/ba/068d003b6d77456378b277b72b030cef6b4f421eb9e57133e0a161d1a899/mpt_tool-6.0.1-py3-none-any.whl", hash = "sha256:7073abcb12e840b0057cb36722adb35623eef996bc55f228a834f1aaebf84982", size = 34122, upload-time = "2026-06-25T16:01:36.373Z" },
+    { url = "https://files.pythonhosted.org/packages/94/a6/3f445c81363eb73483ca0d4d184e0607e85e3aae85729953d4ec00a5c1f9/mpt_tool-6.0.2-py3-none-any.whl", hash = "sha256:0f3734f2e207173b758aa3aae8f773785c97679fd4269e59932e639e0d44dda4", size = 34152, upload-time = "2026-07-13T12:41:19.417Z" },
 ]
 
 [[package]]
