@@ -127,6 +127,7 @@ export interface Subscription {
   id: string;
   name?: string;
   status?: string;
+  externalIds?: ExternalIds;
   agreement?: Agreement;
   parameters?: {
     fulfillment?: CommerceParameter[];
@@ -199,7 +200,8 @@ export interface AdobeCustomer {
 export interface AdobeTarget {
   targetBaseOfferId: string;
   sequence: number;
-  switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY'
+  switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY';
+  item?: { id: string; name: string; externalId: string; unitSP?: number | null } | null;
 }
 
 export interface AdobeProductUpgrade {
@@ -213,6 +215,12 @@ export interface AdobeOfferSwitchPath {
   offset: number;
   limit: number;
   productUpgrades: AdobeProductUpgrade[];
+}
+
+export interface OfferSwitchPaths {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  error: string | null;
+  data: AdobeOfferSwitchPath | null;
 }
 
 export enum ProductSegments {

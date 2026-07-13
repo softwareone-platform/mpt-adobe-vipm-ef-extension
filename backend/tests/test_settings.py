@@ -5,7 +5,7 @@ from mpt_extension_sdk.errors.runtime import ConfigError
 
 from adobe.dataclasses import Authorization
 from adobe.errors import AuthorizationNotFoundError
-from mpt_adobe_vipm_ef.models import ProductSegment
+from mpt_adobe_vipm_ef.models.product import ProductSegment
 from mpt_adobe_vipm_ef.settings import ExtensionSettings, get_settings
 
 

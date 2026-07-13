@@ -5,6 +5,7 @@ import { useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 
+import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -89,79 +90,20 @@ const initialOrder: Order = {
   },
 };
 
-const initialTargetSubscriptions: TargetSubscription[] = [
-  {
-    id: 'SUB-1525-6036-0087',
-    name: 'Subscription for Illustrator for Teams; Multi Language - N',
-    item: {
-      id: 'ITM-0520-2723-0405',
-      name: 'Illustrator for Teams; Multi Language - North America; Multi',
-      externalId: 'AO03.25470.MN | 30002000CB',
-    },
-    recommended: 'Yes',
-    currentQuantity: 7,
-    newQuantity: 7,
-    delta: 0,
-    unitSP: '179.88',
-    spxM: '104.93',
-    spxY: '1,259.16',
-    terms: 'Yearly billing',
-    commitment: '1 year commitment',
-  },
-  {
-    id: null,
-    name: null,
-    item: {
-      id: 'ITM-0520-2723-0406',
-      name: 'Creative Cloud All Apps for Enterprise; Multi Language - North America; Multi',
-      externalId: 'AO03.25471.MN | 30002000CC',
-    },
-    recommended: 'No',
-    currentQuantity: 0,
-    newQuantity: 7,
-    delta: 7,
-    unitSP: '599.88',
-    spxM: '349.93',
-    spxY: '4,199.16',
-    terms: 'Yearly billing',
-    commitment: '1 year commitment',
-  },
-];
-
-const offerPaths: AdobeOfferSwitchPath[] = [
-  {
-    totalCount: 2,
-    count: 2,
-    offset: 0,
-    limit: 2,
-    productUpgrades: [
-      {
-        sourceBaseOfferId: 'AO03.25470.MN | 30002000CB',
-        targetList: [
-          {
-            targetBaseOfferId: 'AO03.25470.MN | 30002000CB',
-            sequence: 1,
-            switchType: 'PARTIAL_ALLOWED',
-          },
-          {
-            targetBaseOfferId: 'AO03.25471.MN | 30002000CC',
-            sequence: 2,
-            switchType: 'FULL_ONLY',
-          }
-        ],
-      }
-    ]
-  }
-]
-
 export default function App() {
   const { close } = useMPTModal();
   const subscriptionId = useSubscriptionId();
   const { subscription, syncSubscription, error, status } = useSubscriptionSync(subscriptionId);
+  const { data: offerSwitchPaths, status: offerStatus } = useAdobeOffer(
+    subscription?.agreement?.id ?? '',
+    subscription?.externalIds?.vendor ?? '',
+  );
+  const offerPaths: AdobeOfferSwitchPath[] = offerSwitchPaths ? [offerSwitchPaths] : [];
+  const sourceQuantity = subscription?.lines?.[0]?.quantity ?? 0;
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
   const [order, setOrder] = useState<Order>(initialOrder);
-  const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>(initialTargetSubscriptions);
+  const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
 
@@ -188,6 +130,34 @@ export default function App() {
   useEffect(() => {
     syncSubscription();
   }, [syncSubscription]);
+
+  useEffect(() => {
+    if (!offerSwitchPaths) return;
+    const rows: TargetSubscription[] = (offerSwitchPaths.productUpgrades ?? []).flatMap((upgrade) =>
+      (upgrade.targetList ?? []).map((target) => {
+        const unitSP = target.item?.unitSP;
+        return {
+        id: null,
+        name: null,
+        item: {
+          id: target.item?.id ?? '',
+          name: target.item?.name ?? 'Item Name',
+          externalId: target.item?.externalId ?? '1234567890',
+        },
+        recommended: '',
+        currentQuantity: 0,
+        newQuantity: sourceQuantity,
+        delta: sourceQuantity,
+        unitSP: unitSP != null ? unitSP.toFixed(2) : '',
+        spxM: unitSP != null ? (unitSP * sourceQuantity / 12).toFixed(2) : '',
+        spxY: unitSP != null ? (unitSP * sourceQuantity).toFixed(2) : '',
+        terms: '',
+        commitment: '',
+        };
+      }),
+    );
+    setTargetSubscriptions(rows);
+  }, [offerSwitchPaths, sourceQuantity]);
 
   if (status === 'error' || (status === 'success' && !subscription)) {
     return (
@@ -235,6 +205,8 @@ export default function App() {
                         subscriptions={targetSubscriptions}
                         onSubscriptionsChange={setTargetSubscriptions}
                         offerPaths={offerPaths}
+                        sourceQuantity={sourceQuantity}
+                        offerStatus={offerStatus}
                       />
                     );
                   case 2:

@@ -113,17 +113,22 @@ interface OfferRule {
   sourceQuantity: number;
 }
 
+function getPartialSku(offerId: string): string {
+  return offerId.slice(0, 10);
+}
+
 function getOfferRule(
   offerPaths: AdobeOfferSwitchPath[],
-  subscriptions: TargetSubscription[],
   target: TargetSubscription,
+  sourceQuantity: number,
 ): OfferRule | undefined {
   for (const path of offerPaths) {
-    for (const upgrade of path.productUpgrades) {
-      const match = upgrade.targetList.find((t) => t.targetBaseOfferId === target.item.externalId);
+    for (const upgrade of path.productUpgrades ?? []) {
+      const match = (upgrade.targetList ?? []).find(
+        (t) => getPartialSku(t.targetBaseOfferId) === target.item.externalId,
+      );
       if (match) {
-        const source = subscriptions.find((s) => s.item.externalId === upgrade.sourceBaseOfferId);
-        return { switchType: match.switchType, sourceQuantity: source?.currentQuantity ?? 0 };
+        return { switchType: match.switchType, sourceQuantity };
       }
     }
   }
@@ -143,12 +148,14 @@ function validateNewQuantity(newQuantity: number | null, rule: OfferRule): strin
 interface TargetSubscriptionGridProps {
   subscriptions: TargetSubscription[];
   offerPaths: AdobeOfferSwitchPath[];
+  sourceQuantity: number;
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
 }
 
 export function TargetSubscriptionGrid({
   subscriptions,
   offerPaths,
+  sourceQuantity,
   onSubscriptionsChange,
 }: TargetSubscriptionGridProps) {
   const updateQuantity = useCallback(
@@ -173,7 +180,7 @@ export function TargetSubscriptionGrid({
         name: 'newQuantity',
         title: 'New Quantity',
         fields: ['newQuantity'],
-        cell: (item) => getNewQuantityCell(item, offerPaths, subscriptions, updateQuantity),
+        cell: (item) => getNewQuantityCell(item, offerPaths, sourceQuantity, updateQuantity),
       },
       {
         name: 'delta',
@@ -183,7 +190,7 @@ export function TargetSubscriptionGrid({
       },
       ...priceColumns,
     ],
-    [offerPaths, subscriptions, updateQuantity],
+    [offerPaths, sourceQuantity, updateQuantity],
   );
 
   const { plugin: radioPlugin } = useRadioPlugin<TargetSubscription>(isEqual);
@@ -194,7 +201,7 @@ export function TargetSubscriptionGrid({
     fields,
     sort,
     plugins,
-    paging: { page: 1, pageSize: subscriptions.length, total: subscriptions.length },
+    paging: { page: 1, pageSize: subscriptions.length || 3, total: subscriptions.length },
   });
 
   return <Grid {...gridProps} />;
@@ -255,11 +262,11 @@ export function getCurrentQuantityCell(subscription: TargetSubscription): React.
 export function getNewQuantityCell(
   subscription: TargetSubscription,
   offerPaths: AdobeOfferSwitchPath[],
-  subscriptions: TargetSubscription[],
+  sourceQuantity: number,
   onChange: (subscription: TargetSubscription, value: string) => void,
 ): React.ReactNode {
-  const rule = getOfferRule(offerPaths, subscriptions, subscription);
-  const enabled = subscription.recommended === 'Yes' && rule?.switchType !== 'FULL_ONLY';
+  const rule = getOfferRule(offerPaths, subscription, sourceQuantity);
+  const enabled = rule?.switchType === 'PARTIAL_ALLOWED';
   const errorMessage = rule ? validateNewQuantity(subscription.newQuantity, rule) ?? undefined : undefined;
 
   return (
