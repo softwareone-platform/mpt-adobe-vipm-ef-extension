@@ -35,12 +35,8 @@ async def add_selling_prices(subscription: dict[str, Any], ctx: APIContext) -> N
     if not item_ids:
         return
 
-    try:
-        unit_prices = await _load_unit_selling_prices(subscription, ctx, item_ids)
-    except MPTError:
-        logger.exception("Failed to load selling prices for subscription")
-        return
-
+    agreement_id = subscription["agreement"]["id"]
+    unit_prices = await get_unit_selling_prices(ctx, agreement_id, item_ids)
     period = subscription.get("terms", {}).get("period")
     for line in lines:
         apply_selling_price(line, unit_prices.get(_item_id(line)), period)
@@ -61,44 +57,43 @@ def apply_selling_price(line: Line, unit_sp: float | None, period: str | None) -
         price["SPxM"] = round(unit_sp * monthly * quantity, PRICE_PRECISION)
 
 
-async def _load_unit_selling_prices(
-    subscription: dict[str, Any], ctx: APIContext, item_ids: list[Any]
+async def get_unit_selling_prices(
+    ctx: APIContext, agreement_id: str, item_ids: list[Any]
 ) -> dict[str, float]:
-    """Resolve the subscription's price list and fetch its per-unit selling prices."""
-    price_list_id = await _resolve_price_list_id(subscription, ctx)
-    if not price_list_id:
+    """Fetch per-unit selling prices for items on the agreement's listing price list.
+
+    An API failure yields an empty map so callers can degrade gracefully.
+    """
+    if not item_ids:
         return {}
-    return await _fetch_unit_selling_prices(ctx, price_list_id, item_ids)
-
-
-async def _resolve_price_list_id(subscription: dict[str, Any], ctx: APIContext) -> Any:
-    """Walk subscription -> agreement -> listing to find the price list id."""
-    agreement_id = subscription.get("agreement", {}).get("id")
-    if not agreement_id:
-        return None
-    agreement = await ctx.mpt_api_service.agreements.get_by_id(agreement_id)
-    listing_id = agreement.to_dict().get("listing", {}).get("id")
-    if not listing_id:
-        return None
-    catalog = ctx.mpt_api_service.client.catalog
-    listing = await catalog.listings.get(listing_id, select=["priceList"])
-    return listing.to_dict().get("priceList", {}).get("id")
+    try:
+        return await _fetch_unit_selling_prices(ctx, agreement_id, item_ids)
+    except MPTError:
+        logger.exception("Failed to load selling prices for items")
+        return {}
 
 
 async def _fetch_unit_selling_prices(  # noqa: WPS210
-    ctx: APIContext, price_list_id: str, item_ids: list[Any]
+    ctx: APIContext, agreement_id: str, item_ids: list[Any]
 ) -> dict[str, float]:
-    """Fetch per-unit selling prices from the price list, keyed by item id.
+    """Walk agreement -> listing -> price list and read each item's per-unit price.
 
     Selling prices are only visible to the caller's own token, so we use the
-    caller's bearer token here rather than the extension's minted account token
-    (which only sees purchase prices).
+    caller's bearer token rather than the extension's minted account token.
     """
+    agreement = await ctx.mpt_api_service.agreements.get_by_id(agreement_id)
+    listing_id = agreement.to_dict()["listing"]["id"]
     client = build_caller_client(ctx)
     if client is None:
         return {}
-    price_items = client.catalog.price_lists.items(price_list_id)
-    query = price_items.filter(RQLQuery().n("item.id").in_(item_ids))
+    catalog = ctx.mpt_api_service.client.catalog
+    listing = await catalog.listings.get(listing_id, select=["priceList"])
+    price_list_id = listing.to_dict().get("priceList", {}).get("id")
+    if not price_list_id:
+        return {}
+    query = client.catalog.price_lists.items(price_list_id).filter(
+        RQLQuery().n("item.id").in_(item_ids)
+    )
     unit_prices: dict[str, float] = {}
     async for price_item in query.iterate():
         item_id = getattr(price_item.item, "id", None)

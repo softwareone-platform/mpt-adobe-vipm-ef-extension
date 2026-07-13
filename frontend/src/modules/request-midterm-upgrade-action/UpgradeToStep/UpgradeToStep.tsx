@@ -1,9 +1,10 @@
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
+import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
 import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 import { TargetSubscription } from '../model';
-import { AdobeOfferSwitchPath, Subscription } from '../../shared/model';
+import { AdobeOfferSwitchPath, Status, Subscription } from '../../shared/model';
 
 import './UpgradeToStep.scss';
 
@@ -11,10 +12,14 @@ interface UpgradeToStepProps {
   subscription: Subscription;
   subscriptions: TargetSubscription[];
   offerPaths: AdobeOfferSwitchPath[];
+  sourceQuantity: number;
+  offerStatus: Status;
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
 }
 
-export function UpgradeToStep({ subscription, subscriptions, offerPaths, onSubscriptionsChange }: UpgradeToStepProps) {
+export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQuantity, offerStatus, onSubscriptionsChange }: UpgradeToStepProps) {
+  const showEmptyState = subscriptions.length === 0 && offerStatus !== 'idle' && offerStatus !== 'loading';
+
   return (
     <div className="upgrade-to-step">
       <div className="upgrade-to-step__header">
@@ -35,8 +40,17 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, onSubsc
         <TargetSubscriptionGrid
           subscriptions={subscriptions}
           offerPaths={offerPaths}
+          sourceQuantity={sourceQuantity}
           onSubscriptionsChange={onSubscriptionsChange}
         />
+        {showEmptyState && (
+          <div className="upgrade-to-step__empty-overlay">
+            <NoDataCard
+              title="No upgrades available"
+              description="Adobe has not published any upgrades for this item"
+            />
+          </div>
+        )}
       </div>
       <div className="upgrade-to-step__footer-text">
         <RegularText as="p" size={1}>

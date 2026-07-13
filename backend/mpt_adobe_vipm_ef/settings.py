@@ -10,7 +10,7 @@ from mpt_extension_sdk.settings.extension import BaseExtensionSettings
 
 from adobe.dataclasses import Authorization
 from adobe.errors import AuthorizationNotFoundError
-from mpt_adobe_vipm_ef.models import ProductSegment
+from mpt_adobe_vipm_ef.models.product import ProductSegment
 
 ADOBE_API_SCOPES = ("openid", "AdobeID", "read_organizations")
 
