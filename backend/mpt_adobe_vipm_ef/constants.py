@@ -18,3 +18,8 @@ AGREEMENT_SELECT = ("audit", "buyer", "client", "licensee", "product", "seller",
 LICENSEE_SELECT = ("account", "audit", "buyer", "seller")
 BUYER_SELECT = ("account", "audit")
 SELLER_SELECT = ("audit",)
+
+CUSTOMER_ID_PARAM = "customerId"
+MIN_LENGTH = 1
+MAX_LENGTH = 255
+AGREEMENT_CACHE_KEY = "agreements_by_id"

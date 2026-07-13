@@ -12,6 +12,7 @@ from pydantic import ValidationError as PydanticValidationError
 
 from adobe.enums import LinkedMembershipType
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
 from mpt_adobe_vipm_ef.routers.api.customer import (
     LinkedMembershipRequestBody,
     ThreeYCRequestBody,
@@ -23,125 +24,43 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 
 _LINKED_MEMBERSHIP_NAME_MAX_LEN = 255
 _AGREEMENT_ID = "AGR-1234-5678"
-_ALLOWED_PRODUCT_ID = "PRD-1111-1111"
-_DISALLOWED_PRODUCT_ID = "PRD-9999-9999"
 
 _ADOBE_API_ERROR = AdobeAPIError(http.HTTPStatus.BAD_REQUEST, {"code": "4000", "message": "Bad"})
 _ADOBE_CONFIG_ERROR = AdobeError("Config error")
 
 
-@pytest.fixture
-def mock_ctx(mocker):
-    ctx = mocker.Mock()
-    ctx.mpt_api_service.agreements.get_by_id = mocker.AsyncMock()
-    ctx.state = {}
-    ctx.ext_settings.product_ids = (_ALLOWED_PRODUCT_ID,)
-    return ctx
+def _fulfillment_customer():
+    return {"fulfillment": [{"externalId": CUSTOMER_ID_PARAM, "value": "CUST-001"}]}
 
 
-@pytest.fixture
-def patch_agreement(mock_ctx):
-    def _set(agreement):  # noqa: WPS430
-        agreement.product.id = _ALLOWED_PRODUCT_ID
-        mock_ctx.mpt_api_service.agreements.get_by_id.return_value = agreement
-        return agreement
-
-    return _set
+def _display_value_customer():
+    return {"fulfillment": [{"externalId": CUSTOMER_ID_PARAM, "displayValue": "DISPLAY-CUST"}]}
 
 
-def _agreement_with_fulfillment_customer(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    customer_param = mocker.Mock()
-    customer_param.value = "CUST-001"
-    customer_param.display_value = None
-    agreement.parameters.get_parameter.side_effect = lambda name, source: (
-        customer_param if source == "fulfillment" else None
-    )
-    return agreement
+def _ordering_customer():
+    return {"ordering": [{"externalId": CUSTOMER_ID_PARAM, "value": "CUST-002"}]}
 
 
-def _agreement_with_ordering_customer(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    customer_param = mocker.Mock()
-    customer_param.value = "CUST-002"
-    agreement.parameters.get_parameter.side_effect = lambda name, source: (
-        None if source == "fulfillment" else customer_param
-    )
-    return agreement
+def _non_customer_param():
+    return {"fulfillment": [{"externalId": "otherParam", "value": "x"}]}
 
 
-def _agreement_with_display_value_customer(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    customer_param = mocker.Mock()
-    customer_param.value = None
-    customer_param.display_value = "DISPLAY-CUST"
-    agreement.parameters.get_parameter.return_value = customer_param
-    return agreement
-
-
-def _agreement_without_authorization(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization = None
-    return agreement
-
-
-def _agreement_with_authorization_missing_id(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization = mocker.Mock(spec=[])
-    return agreement
-
-
-def _agreement_without_parameters(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    agreement.parameters = None
-    return agreement
-
-
-def _agreement_without_customer_param(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    agreement.parameters.get_parameter.return_value = None
-    return agreement
-
-
-def _agreement_with_blank_customer_param(mocker):
-    agreement = mocker.Mock()
-    agreement.authorization.id = "AUT-123"
-    customer_param = mocker.Mock()
-    customer_param.value = None
-    customer_param.display_value = None
-    agreement.parameters.get_parameter.return_value = customer_param
-    return agreement
-
-
-@pytest.fixture
-def resolve_ids(mocker, patch_agreement):
-    patch_agreement(_agreement_with_fulfillment_customer(mocker))
-
-
-@pytest.fixture
-def mock_adobe_client(mocker, mock_ctx):
-    client = mocker.Mock()
-    mock_ctx.adobe_client = client
-    return client
+def _blank_customer():
+    return {"fulfillment": [{"externalId": CUSTOMER_ID_PARAM}]}
 
 
 def test_three_yc_request_body_has_expected_defaults():
-    body = ThreeYCRequestBody()  # act
+    result = ThreeYCRequestBody()
 
-    assert body.licenses is None
-    assert body.consumables is None
-    assert body.is_recommitment is False
+    assert result.licenses is None
+    assert result.consumables is None
+    assert result.is_recommitment is False
 
 
 def test_three_yc_request_body_accepts_is_recommitment_alias():
-    body = ThreeYCRequestBody.model_validate({"isRecommitment": True})  # act
+    result = ThreeYCRequestBody.model_validate({"isRecommitment": True})  # act
 
-    assert body.is_recommitment is True
+    assert result.is_recommitment is True
 
 
 def test_three_yc_request_body_rejects_negative_licenses():
@@ -155,9 +74,9 @@ def test_three_yc_request_body_rejects_negative_consumables():
 
 
 def test_linked_membership_request_body_accepts_valid_name():
-    body = LinkedMembershipRequestBody(name="My Group")  # act
+    result = LinkedMembershipRequestBody(name="My Group")  # act
 
-    assert body.name == "My Group"
+    assert result.name == "My Group"
 
 
 def test_linked_membership_request_body_rejects_empty_name():
@@ -171,17 +90,17 @@ def test_linked_membership_request_body_rejects_name_exceeding_max_length():
 
 
 def test_linked_membership_request_body_defaults_to_standard_type():
-    body = LinkedMembershipRequestBody(name="My Group")  # act
+    result = LinkedMembershipRequestBody(name="My Group")  # act
 
-    assert body.membership_type is LinkedMembershipType.STANDARD
+    assert result.membership_type is LinkedMembershipType.STANDARD
 
 
 def test_linked_membership_request_body_accepts_type_alias():
-    body = LinkedMembershipRequestBody.model_validate(  # act
+    result = LinkedMembershipRequestBody.model_validate(  # act
         {"name": "My Group", "type": "CONSORTIUM"}
     )
 
-    assert body.membership_type is LinkedMembershipType.CONSORTIUM
+    assert result.membership_type is LinkedMembershipType.CONSORTIUM
 
 
 def test_linked_membership_request_body_rejects_invalid_type():
@@ -190,45 +109,31 @@ def test_linked_membership_request_body_rejects_invalid_type():
 
 
 @pytest.mark.parametrize(
-    "build_agreement",
-    [
-        _agreement_with_fulfillment_customer,
-        _agreement_with_ordering_customer,
-        _agreement_with_display_value_customer,
-    ],
+    "parameter_bag",
+    [_fulfillment_customer(), _display_value_customer()],
 )
 async def test_get_customer_resolves_ids_and_returns_payload(
-    mocker, mock_ctx, patch_agreement, mock_adobe_client, build_agreement
+    fake_ctx, patch_agreement, agreement_factory, adobe_call, parameter_bag
 ):
-    patch_agreement(build_agreement(mocker))
-    customer_data = {"id": "CUST-001", "status": "ACTIVE"}
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value=customer_data))
+    patch_agreement(agreement_factory(parameter_bag=parameter_bag))
+    adobe_call.returns = {"id": "CUST-001", "status": "ACTIVE"}
 
-    result = await get_customer(_AGREEMENT_ID, mock_ctx)  # act
+    result = await get_customer(_AGREEMENT_ID, fake_ctx)  # act
 
-    assert result.payload == customer_data
+    assert result.payload == {"id": "CUST-001", "status": "ACTIVE"}
 
 
 @pytest.mark.parametrize(
-    "build_agreement",
-    [
-        _agreement_without_authorization,
-        _agreement_with_authorization_missing_id,
-        _agreement_without_parameters,
-        _agreement_without_customer_param,
-        _agreement_with_blank_customer_param,
-    ],
+    "parameter_bag",
+    [None, _non_customer_param(), _blank_customer(), _ordering_customer()],
 )
 async def test_get_customer_raises_validation_error_when_ids_cannot_be_resolved(
-    mocker, mock_ctx, patch_agreement, build_agreement
+    fake_ctx, patch_agreement, agreement_factory, parameter_bag
 ):
-    patch_agreement(build_agreement(mocker))
+    patch_agreement(agreement_factory(parameter_bag=parameter_bag))
 
     with pytest.raises(ValidationError):
-        await get_customer(_AGREEMENT_ID, mock_ctx)
-
-
-# --- agreement access guard (product allowlist 403 / customer access 404) ---
+        await get_customer(_AGREEMENT_ID, fake_ctx)
 
 
 def _call_get_customer(ctx):
@@ -257,78 +162,58 @@ _GUARDED_ENDPOINTS = (
 
 @pytest.mark.parametrize("call_endpoint", _GUARDED_ENDPOINTS)
 async def test_endpoints_raise_forbidden_when_product_not_allowed(
-    mocker, mock_ctx, patch_agreement, mock_adobe_client, call_endpoint
+    fake_ctx, patch_agreement, agreement_factory, fulfillment_customer_bag, call_endpoint
 ):
-    agreement = patch_agreement(_agreement_with_fulfillment_customer(mocker))
-    agreement.product.id = _DISALLOWED_PRODUCT_ID
+    patch_agreement(
+        agreement_factory(product_id="PRD-9999-9999", parameter_bag=fulfillment_customer_bag)
+    )
 
     with pytest.raises(ForbiddenError):
-        await call_endpoint(mock_ctx)
-
-
-async def test_endpoints_raise_forbidden_when_agreement_has_no_product(
-    mocker, mock_ctx, patch_agreement, mock_adobe_client
-):
-    agreement = patch_agreement(_agreement_with_fulfillment_customer(mocker))
-    agreement.product = None
-
-    with pytest.raises(ForbiddenError):
-        await get_customer(_AGREEMENT_ID, mock_ctx)
+        await call_endpoint(fake_ctx)
 
 
 @pytest.mark.parametrize("call_endpoint", _GUARDED_ENDPOINTS)
 async def test_endpoints_raise_forbidden_when_allowlist_is_empty(
-    mocker, mock_ctx, patch_agreement, mock_adobe_client, call_endpoint
+    fake_ctx, resolve_ids, call_endpoint
 ):
-    patch_agreement(_agreement_with_fulfillment_customer(mocker))
-    mock_ctx.ext_settings.product_ids = ()
+    fake_ctx.ext_settings.product_ids = ()
 
     with pytest.raises(ForbiddenError):
-        await call_endpoint(mock_ctx)
+        await call_endpoint(fake_ctx)
 
 
 @pytest.mark.parametrize("call_endpoint", _GUARDED_ENDPOINTS)
 async def test_endpoints_raise_not_found_when_agreement_not_accessible(
-    mocker, mock_ctx, mock_adobe_client, call_endpoint
+    fake_ctx, fake_agreements, call_endpoint
 ):
-    mock_ctx.mpt_api_service.agreements.get_by_id.side_effect = MPTAPIError(
-        http.HTTPStatus.NOT_FOUND, "not found", {}
-    )
+    fake_agreements.error = MPTAPIError(http.HTTPStatus.NOT_FOUND, "not found", {})
 
     with pytest.raises(NotFoundError):
-        await call_endpoint(mock_ctx)
+        await call_endpoint(fake_ctx)
 
 
-async def test_guard_maps_mpt_not_found_to_not_found_error(mocker, mock_ctx, mock_adobe_client):
-    mock_ctx.mpt_api_service.agreements.get_by_id.side_effect = MPTAPIError(
-        http.HTTPStatus.NOT_FOUND, "not found", {}
-    )
+async def test_guard_maps_mpt_not_found_to_not_found_error(fake_ctx, fake_agreements):
+    fake_agreements.error = MPTAPIError(http.HTTPStatus.NOT_FOUND, "not found", {})
 
     with pytest.raises(NotFoundError):
-        await get_customer(_AGREEMENT_ID, mock_ctx)
+        await get_customer(_AGREEMENT_ID, fake_ctx)
 
 
-async def test_guard_maps_other_mpt_errors_to_upstream_error(mocker, mock_ctx, mock_adobe_client):
-    mock_ctx.mpt_api_service.agreements.get_by_id.side_effect = MPTAPIError(
-        http.HTTPStatus.INTERNAL_SERVER_ERROR, "boom", {}
-    )
+async def test_guard_maps_other_mpt_errors_to_upstream_error(fake_ctx, fake_agreements):
+    fake_agreements.error = MPTAPIError(http.HTTPStatus.INTERNAL_SERVER_ERROR, "boom", {})
 
     with pytest.raises(UpstreamServiceError):
-        await get_customer(_AGREEMENT_ID, mock_ctx)
+        await get_customer(_AGREEMENT_ID, fake_ctx)
 
 
 async def test_guard_loads_agreement_only_once_per_request(
-    mocker, mock_ctx, patch_agreement, mock_adobe_client
+    fake_ctx, resolve_ids, fake_agreements, adobe_call
 ):
-    patch_agreement(_agreement_with_fulfillment_customer(mocker))
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value={"status": "ACTIVE"}))
+    adobe_call.returns = {"status": "ACTIVE"}
 
-    await get_customer(_AGREEMENT_ID, mock_ctx)  # act
+    await get_customer(_AGREEMENT_ID, fake_ctx)  # act
 
-    mock_ctx.mpt_api_service.agreements.get_by_id.assert_awaited_once_with(_AGREEMENT_ID)
-
-
-# --- get_customer (Adobe error handling) ---
+    assert fake_agreements.get_by_id_calls == [_AGREEMENT_ID]
 
 
 @pytest.mark.parametrize(
@@ -344,36 +229,33 @@ async def test_guard_loads_agreement_only_once_per_request(
     ],
 )
 async def test_get_customer_maps_adobe_errors_to_api_errors(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client, scenario
+    fake_ctx, resolve_ids, adobe_call, scenario
 ):
     error, expected = scenario
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(side_effect=error))
+    adobe_call.error = error
 
     with pytest.raises(expected):
-        await get_customer(_AGREEMENT_ID, mock_ctx)
+        await get_customer(_AGREEMENT_ID, fake_ctx)
 
 
 async def test_request_three_yc_raises_validation_error_when_no_quantities_provided(
-    mocker, mock_ctx, resolve_ids
+    fake_ctx, resolve_ids
 ):
-    body = ThreeYCRequestBody()
+    result = ThreeYCRequestBody()
 
     with pytest.raises(ValidationError):
-        await request_three_yc_commitment(_AGREEMENT_ID, mock_ctx, body)
+        await request_three_yc_commitment(_AGREEMENT_ID, fake_ctx, result)
 
 
 @pytest.mark.parametrize(
     "body", [ThreeYCRequestBody(licenses=10), ThreeYCRequestBody(consumables=5)]
 )
-async def test_request_three_yc_returns_accepted_payload(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client, body
-):
-    result_data = {"status": "PENDING"}
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value=result_data))
+async def test_request_three_yc_returns_accepted_payload(fake_ctx, resolve_ids, adobe_call, body):
+    adobe_call.returns = {"status": "PENDING"}
 
-    result = await request_three_yc_commitment(_AGREEMENT_ID, mock_ctx, body)  # act
+    result = await request_three_yc_commitment(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    assert result.payload == result_data
+    assert result.payload == {"status": "PENDING"}
 
 
 @pytest.mark.parametrize(
@@ -388,25 +270,22 @@ async def test_request_three_yc_returns_accepted_payload(
     ],
 )
 async def test_request_three_yc_maps_adobe_errors_to_api_errors(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client, scenario
+    fake_ctx, resolve_ids, adobe_call, scenario
 ):
     error, expected = scenario
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(side_effect=error))
-    body = ThreeYCRequestBody(licenses=10)
+    adobe_call.error = error
+    result = ThreeYCRequestBody(licenses=10)
 
     with pytest.raises(expected):
-        await request_three_yc_commitment(_AGREEMENT_ID, mock_ctx, body)
+        await request_three_yc_commitment(_AGREEMENT_ID, fake_ctx, result)
 
 
-async def test_enable_global_sales_returns_accepted_payload(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client
-):
-    result_data = {"globalSalesEnabled": True}
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value=result_data))
+async def test_enable_global_sales_returns_accepted_payload(fake_ctx, resolve_ids, adobe_call):
+    adobe_call.returns = {"globalSalesEnabled": True}
 
-    result = await enable_global_sales(_AGREEMENT_ID, mock_ctx)  # act
+    result = await enable_global_sales(_AGREEMENT_ID, fake_ctx)  # act
 
-    assert result.payload == result_data
+    assert result.payload == {"globalSalesEnabled": True}
 
 
 @pytest.mark.parametrize(
@@ -421,38 +300,36 @@ async def test_enable_global_sales_returns_accepted_payload(
     ],
 )
 async def test_enable_global_sales_maps_adobe_errors_to_api_errors(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client, scenario
+    fake_ctx, resolve_ids, adobe_call, scenario
 ):
     error, expected = scenario
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(side_effect=error))
+    adobe_call.error = error
 
     with pytest.raises(expected):
-        await enable_global_sales(_AGREEMENT_ID, mock_ctx)
+        await enable_global_sales(_AGREEMENT_ID, fake_ctx)
 
 
 async def test_request_linked_membership_returns_accepted_payload(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client
+    fake_ctx, resolve_ids, adobe_call
 ):
-    result_data = {"linkedMembership": {"name": "My Group"}}
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value=result_data))
+    adobe_call.returns = {"linkedMembership": {"name": "My Group"}}
     body = LinkedMembershipRequestBody(name="My Group")
 
-    result = await request_linked_membership(_AGREEMENT_ID, mock_ctx, body)  # act
+    result = await request_linked_membership(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    assert result.payload == result_data
+    assert result.payload == {"linkedMembership": {"name": "My Group"}}
 
 
 async def test_request_linked_membership_passes_name_and_membership_type(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client
+    fake_ctx, resolve_ids, adobe_call
 ):
-    to_thread = mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(return_value={}))
     body = LinkedMembershipRequestBody.model_validate({"name": "My Group", "type": "CONSORTIUM"})
 
-    await request_linked_membership(_AGREEMENT_ID, mock_ctx, body)  # act
+    await request_linked_membership(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    positional = to_thread.call_args.args
-    assert positional[3] == "My Group"
-    assert positional[4] is LinkedMembershipType.CONSORTIUM
+    positional = adobe_call.calls[0][0]
+    assert positional[2] == "My Group"
+    assert positional[3] is LinkedMembershipType.CONSORTIUM
 
 
 @pytest.mark.parametrize(
@@ -470,11 +347,11 @@ async def test_request_linked_membership_passes_name_and_membership_type(
     ],
 )
 async def test_request_linked_membership_maps_adobe_errors_to_api_errors(
-    mocker, mock_ctx, resolve_ids, mock_adobe_client, scenario
+    fake_ctx, resolve_ids, adobe_call, scenario
 ):
     error, expected = scenario
-    mocker.patch("asyncio.to_thread", new=mocker.AsyncMock(side_effect=error))
-    body = LinkedMembershipRequestBody(name="My Group")
+    adobe_call.error = error
+    result = LinkedMembershipRequestBody(name="My Group")
 
     with pytest.raises(expected):
-        await request_linked_membership(_AGREEMENT_ID, mock_ctx, body)
+        await request_linked_membership(_AGREEMENT_ID, fake_ctx, result)

@@ -1,6 +1,14 @@
 from adobe.client import AdobeClient, get_adobe_client, reset_adobe_client
 from adobe.resources.customer import CustomerClient
+from adobe.resources.offer import OfferClient
 from adobe.transport import AdobeTransport
+
+
+def test_adobe_client_composes_offer_client_sharing_transport(adobe_env):
+    result = AdobeClient()
+
+    assert isinstance(result.offer, OfferClient)
+    assert result.offer._transport is result._transport
 
 
 def test_adobe_client_composes_transport_and_customer(adobe_env):

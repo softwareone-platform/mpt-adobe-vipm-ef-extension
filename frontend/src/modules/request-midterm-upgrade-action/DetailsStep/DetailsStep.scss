@@ -11,6 +11,12 @@
     gap: $var-spacing-2;
     width: 500px;
 
+    &__header {
+      h2 {
+        margin: 0;
+      }
+    }
+
     &__inputs {
       display: flex;
       flex-direction: column;
