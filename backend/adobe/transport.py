@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import threading
 from collections import defaultdict
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -27,6 +28,17 @@ _RETRY_STRATEGY = Retry(
     status_forcelist={429, 500, 502, 503, 504},
     allowed_methods={"GET", "POST", "PATCH"},
 )
+
+
+def get_header_value(headers: Mapping[str, str], name: str) -> str:
+    """Return the response header ``name`` or an empty string when it is absent.
+
+    Kept as a module-level function taking the headers rather than a
+    method on AdobeTransport: the transport is shared and used
+    by concurrent requests, so storing a response's headers on it would let one
+    request read another request's headers.
+    """
+    return headers.get(name) or ""
 
 
 class AdobeTransport:
@@ -74,6 +86,26 @@ class AdobeTransport:
         logger.info("Adobe API response: %s %s -> %s", method, url, response.status_code)
         response.raise_for_status()
         return response.json()  # type: ignore[no-any-return]
+
+    def request_raw(
+        self,
+        method: str,
+        authorization: Authorization,
+        path: str,
+        *,
+        correlation_id: str | None = None,
+        **kwargs: Any,
+    ) -> requests.Response:
+        """Like :meth:`request` but return the raw response so callers can read headers."""
+        url = urljoin(self._settings.adobe_api_base_url, path)
+        headers = self._get_headers(authorization, correlation_id)
+        logger.info("Adobe API request: %s %s", method, url)
+        response = self._session.request(
+            method, url, headers=headers, timeout=self._TIMEOUT, **kwargs
+        )
+        logger.info("Adobe API response: %s %s -> %s", method, url, response.status_code)
+        response.raise_for_status()
+        return response
 
     def _get_headers(
         self, authorization: Authorization, correlation_id: str | None = None

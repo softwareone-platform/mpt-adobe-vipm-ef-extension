@@ -1,6 +1,7 @@
 import pytest
 
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
+from mpt_adobe_vipm_ef.models.recommendation import RecommendationRequest
 
 
 @pytest.fixture
@@ -35,11 +36,12 @@ class FakeAdobeNamespace:
 
 
 class FakeAdobeClient:
-    """Fake Adobe client exposing customer and offer namespaces backed by one stub."""
+    """Fake Adobe client exposing customer, offer and recommendation namespaces."""
 
     def __init__(self, call):
         self.customer = FakeAdobeNamespace(call)
         self.offer = FakeAdobeNamespace(call)
+        self.recommendation = FakeAdobeNamespace(call)
 
 
 class FakeAgreements:
@@ -129,3 +131,31 @@ def patch_agreement(fake_agreements):
 @pytest.fixture
 def resolve_ids(patch_agreement, agreement_factory, fulfillment_customer_bag):
     patch_agreement(agreement_factory(parameter_bag=fulfillment_customer_bag))
+
+
+@pytest.fixture
+def recommendation_body():
+    return RecommendationRequest.model_validate({
+        "offers": [{"offerId": "OFFER-SOURCE", "quantity": 10}],
+    })
+
+
+@pytest.fixture
+def recommendations_data():
+    return {
+        "productRecommendations": {
+            "upsells": [],
+            "crossSells": [{"rank": 0, "product": {"baseOfferId": "OFFER-CROSS"}}],
+            "addOns": [],
+        }
+    }
+
+
+@pytest.fixture
+def tracker_headers():
+    return {"x-recommendation-tracker-id": "TRACKER-1"}
+
+
+@pytest.fixture
+def adobe_recommendation_return(recommendations_data, tracker_headers):
+    return (recommendations_data, tracker_headers)
