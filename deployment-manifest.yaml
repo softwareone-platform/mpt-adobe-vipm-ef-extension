@@ -19,7 +19,7 @@ api:
     - run
   hosts:
     - mpt-platform-api.domain.global
-  healthCheck:                                                                                                                                                                       │
+  healthCheck:
     port: 8080
 worker:
   enabled: false
