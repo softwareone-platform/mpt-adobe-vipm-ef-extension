@@ -170,17 +170,19 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
     def _create_parameter_for_product(self, product_id: str, params_service: Any) -> None:  # noqa: WPS210
         params_def = self.new_parameter()
         group = self._fetch_details_group(product_id)
-        active_ids = self._active_external_ids_by_scope(params_service, "Order")
+        active_params = self._active_params_by_scope(params_service)
         logger.info("Start the parameter creation")
 
         for param_def in params_def:
             external_id = param_def["externalId"]
+            scope = param_def["scope"]
 
-            if external_id in active_ids:
+            if (scope, external_id) in active_params:
                 logger.info(
-                    "Product %s: parameter %s already exists, skipping.",
+                    "Product %s: parameter %s (scope %s) already exists, skipping.",
                     product_id,
                     external_id,
+                    scope,
                 )
                 continue
 
@@ -189,16 +191,23 @@ class Migration(SchemaBaseMigration, MPTAPIClientMixin):
                 base_param = {**param_def, "group": group}
 
             params_service.create({**base_param})
-            logger.info("Product %s: created parameter %s", product_id, external_id)
+            logger.info(
+                "Product %s: created parameter %s (scope %s)",
+                product_id,
+                external_id,
+                scope,
+            )
 
-    def _active_external_ids_by_scope(self, params_service: Any, scope: str) -> set[str]:
+    def _active_params_by_scope(self, params_service: Any) -> set[tuple[str, str]]:
         result = set()
 
         for parameter in params_service.iterate():
             param_data = parameter.to_dict()
 
-            if param_data.get("status") == "Active" and param_data.get("scope") == scope:
-                result.add(param_data.get("externalId", ""))
+            if param_data.get("status") == "Active":
+                scope = param_data.get("scope", "")
+                external_id = param_data.get("externalId", "")
+                result.add((scope, external_id))
 
         return result
 
