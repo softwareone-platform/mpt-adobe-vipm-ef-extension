@@ -6,7 +6,7 @@ authors = [{ name = "SoftwareOne AG" }]
 requires-python = ">=3.12,<4"
 license = { text = "Apache-2.0 license" }
 dependencies = [
-    "mpt-extension-sdk[azure-monitor]==6.4.*",
+    "mpt-extension-sdk[azure-monitor]==6.5.*",
     "mpt-tool==6.0.*",
 ]
 
