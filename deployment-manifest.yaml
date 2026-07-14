@@ -21,6 +21,8 @@ api:
     - mpt-platform-api.domain.global
   healthCheck:
     port: 8080
+    livenessPath: /bypass/live
+    readinessPath: /bypass/probe
 worker:
   enabled: false
 env:
