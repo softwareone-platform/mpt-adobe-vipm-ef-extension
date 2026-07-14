@@ -2,6 +2,7 @@ import {
   CommerceParameter,
   ProductSegments,
   findLinkedMembership,
+  getRecommendedOfferIds,
   hasThreeYearCommitment,
   isGlobalSalesEnabled,
   readParameter,
@@ -147,6 +148,35 @@ describe('isGlobalSalesEnabled', () => {
     expect(isGlobalSalesEnabled({})).toBe(false);
     expect(isGlobalSalesEnabled(null)).toBe(false);
     expect(isGlobalSalesEnabled(undefined)).toBe(false);
+  });
+});
+
+describe('getRecommendedOfferIds', () => {
+  it('flattens upsells, crossSells and addOns into a set of base offer ids', () => {
+    const result = getRecommendedOfferIds({
+      productRecommendations: {
+        upsells: [{ product: { baseOfferId: 'OFFER-UP' } }],
+        crossSells: [{ product: { baseOfferId: 'OFFER-CROSS' } }],
+        addOns: [{ product: { baseOfferId: 'OFFER-ADDON' } }],
+      },
+      xRecommendationTrackerId: 'TRACKER-1',
+    });
+
+    expect(result).toEqual(new Set(['OFFER-UP', 'OFFER-CROSS', 'OFFER-ADDON']));
+  });
+
+  it('skips recommendations without a base offer id', () => {
+    const result = getRecommendedOfferIds({
+      productRecommendations: { upsells: [{ rank: 0 }], crossSells: [], addOns: [] },
+      xRecommendationTrackerId: '',
+    });
+
+    expect(result.size).toBe(0);
+  });
+
+  it('returns an empty set when there is no data', () => {
+    expect(getRecommendedOfferIds(null).size).toBe(0);
+    expect(getRecommendedOfferIds(undefined).size).toBe(0);
   });
 });
 

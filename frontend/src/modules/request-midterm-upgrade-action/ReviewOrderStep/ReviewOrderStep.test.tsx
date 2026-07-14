@@ -58,8 +58,9 @@ const subscriptions: TargetSubscription[] = [
   {
     id: 'SUB-1525-6036-0087',
     name: 'Subscription for Illustrator',
+    status: 'Active',
     item: { id: 'ITM-0520-2723-0405', name: 'Illustrator for Teams', externalId: 'AO03.25470.MN | 30002000CB' },
-    recommended: 'Yes',
+    recommended: true,
     currentQuantity: 7,
     newQuantity: 7,
     delta: 0,
@@ -72,8 +73,9 @@ const subscriptions: TargetSubscription[] = [
   {
     id: null,
     name: null,
+    status: '',
     item: { id: 'ITM-0520-2723-0406', name: 'Illustrator for Enterprise', externalId: 'AO03.25471.MN | 30002000CC' },
-    recommended: 'No',
+    recommended: false,
     currentQuantity: 0,
     newQuantity: 7,
     delta: 7,
