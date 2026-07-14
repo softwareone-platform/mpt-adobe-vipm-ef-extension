@@ -15,7 +15,7 @@ jest.mock('@mpt-extension/sdk-react', () => ({
 }), { virtual: true });
 
 jest.mock('@mpt-extension/sdk', () => ({
-  http: { post: jest.fn().mockResolvedValue({ data: { data: { id: 'SUB-1' } } }) },
+  http: { post: jest.fn().mockResolvedValue({ data: { data: { id: 'SUB-1', splitStatus: 'Active' } } }) },
 }), { virtual: true });
 
 let mockRecommendation: { status: string; error: string | null; data: unknown; refresh: () => void } = {
@@ -26,6 +26,28 @@ let mockRecommendation: { status: string; error: string | null; data: unknown; r
 };
 jest.mock('../shared/hooks/useAdobeRecommendation', () => ({
   useAdobeRecommendation: () => mockRecommendation,
+}));
+
+const splitWithAllocations = {
+  status: 'success',
+  error: null,
+  data: {
+    id: 'SBA-1111-1111',
+    revision: 1,
+    allocations: [
+      {
+        buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+        percentage: 100,
+        price: { currency: 'USD', SPxY: 100, SPxM: 10 },
+      },
+    ],
+  },
+  refresh: () => {},
+};
+let mockSplit: { status: string; error: string | null; data: unknown; refresh: () => void } =
+  splitWithAllocations;
+jest.mock('../shared/hooks/useAgreementSplit', () => ({
+  useAgreementSplit: () => mockSplit,
 }));
 
 interface MockChildren {
@@ -152,6 +174,7 @@ describe('request-midterm-upgrade-action App', () => {
     mockClose.mockReset();
     mockActiveStepIndex = 0;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
+    mockSplit = splitWithAllocations;
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {
@@ -178,6 +201,17 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof splitBillingProps.addBuyerToOrder).toBe('function');
     expect(typeof splitBillingProps.onChange).toBe('function');
     expect(splitBillingProps.selectedBuyer).toBeDefined();
+  });
+
+  it('skips the split-billing step when split billing is disabled', async () => {
+    (http.post as jest.Mock).mockResolvedValueOnce({
+      data: { data: { id: 'SUB-1', splitStatus: 'Disabled' } },
+    });
+    mockActiveStepIndex = 2;
+    render(<App />);
+
+    expect(await screen.findByText('Details step')).toBeTruthy();
+    expect(screen.queryByText('Split billing step')).toBeNull();
   });
 
   it('renders the details step on the fourth step and wires its props', async () => {

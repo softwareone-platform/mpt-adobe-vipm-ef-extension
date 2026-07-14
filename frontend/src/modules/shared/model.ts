@@ -127,6 +127,7 @@ export interface Subscription {
   id: string;
   name?: string;
   status?: string;
+  splitStatus?: string;
   externalIds?: ExternalIds;
   agreement?: Agreement;
   parameters?: {
@@ -377,3 +378,27 @@ export const INITIAL_SYNC_STATE: SyncState = {
   lastStatus: null,
   status: 'idle',
 };
+
+export interface AgreementSplitPrice {
+  currency: string;
+  SPxY: number;
+  SPxM: number;
+}
+
+export interface AgreementSplitAllocation {
+  buyer: { id: string; name: string };
+  percentage: number;
+  price: AgreementSplitPrice;
+}
+
+export interface AgreementSplit {
+  id: string;
+  revision: number;
+  allocations: AgreementSplitAllocation[];
+}
+
+export interface AgreementSplitState {
+  status: Status;
+  error: string | null;
+  data: AgreementSplit | null;
+}
