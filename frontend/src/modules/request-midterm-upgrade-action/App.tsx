@@ -6,6 +6,7 @@ import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
+import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -29,7 +30,7 @@ import type {
 } from './model';
 
 import './App.scss';
-import { AdobeOfferSwitchPath } from '../shared/model';
+import { AdobeOfferSwitchPath, getRecommendedOfferIds } from '../shared/model';
 
 const steps: StepProps[] = [
   { title: 'Upgrade from' },
@@ -100,10 +101,17 @@ export default function App() {
   );
   const offerPaths: AdobeOfferSwitchPath[] = offerSwitchPaths ? [offerSwitchPaths] : [];
   const sourceQuantity = subscription?.lines?.[0]?.quantity ?? 0;
+  const sourceSku = subscription?.lines?.[0]?.item?.externalIds?.vendor ?? '';
+  const { data: recommendations } = useAdobeRecommendation(
+    subscription?.agreement?.id ?? '',
+    sourceSku,
+    sourceQuantity,
+  );
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
+  const [recommendationTrackerId, setRecommendationTrackerId] = useState<string>('');
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
 
@@ -132,19 +140,25 @@ export default function App() {
   }, [syncSubscription]);
 
   useEffect(() => {
+    setRecommendationTrackerId(recommendations?.xRecommendationTrackerId ?? '');
+  }, [recommendations]);
+
+  useEffect(() => {
     if (!offerSwitchPaths) return;
+    const recommendedOfferIds = getRecommendedOfferIds(recommendations);
     const rows: TargetSubscription[] = (offerSwitchPaths.productUpgrades ?? []).flatMap((upgrade) =>
       (upgrade.targetList ?? []).map((target) => {
         const unitSP = target.item?.unitSP;
         return {
         id: null,
         name: null,
+        status: '',
         item: {
           id: target.item?.id ?? '',
           name: target.item?.name ?? 'Item Name',
           externalId: target.item?.externalId ?? '1234567890',
         },
-        recommended: '',
+        recommended: recommendedOfferIds.has(target.targetBaseOfferId),
         currentQuantity: 0,
         newQuantity: sourceQuantity,
         delta: sourceQuantity,
@@ -157,7 +171,7 @@ export default function App() {
       }),
     );
     setTargetSubscriptions(rows);
-  }, [offerSwitchPaths, sourceQuantity]);
+  }, [offerSwitchPaths, sourceQuantity, recommendations]);
 
   if (status === 'error' || (status === 'success' && !subscription)) {
     return (
@@ -223,7 +237,7 @@ export default function App() {
                   case 3:
                     return <DetailsStep subscription={subscription} order={order} setOrder={setOrder} />;
                   case 4:
-                    return <ReviewOrderStep subscription={subscription} order={order} subscriptions={targetSubscriptions} />;
+                    return <ReviewOrderStep subscription={subscription} order={order} subscriptions={targetSubscriptions} recommendationTrackerId={recommendationTrackerId} />;
                   case 5:
                     return <SummaryStep subscription={subscription} order={order} />;
                   default:

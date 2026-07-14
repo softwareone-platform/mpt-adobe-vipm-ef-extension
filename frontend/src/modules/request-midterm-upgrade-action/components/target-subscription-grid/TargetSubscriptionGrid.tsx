@@ -217,7 +217,7 @@ export function getSubscriptionCell(subscription: TargetSubscription): React.Rea
         items={[
           { title: 'ID', content: subscription.id ?? '—' },
           { title: 'Name', content: subscription.name ?? '—' },
-          { title: 'Status', content: <Chip label={subscription.recommended ?? '—'} /> },
+          { title: 'Status', content: <Chip label={subscription.status || '—'} /> },
         ]}
       />
     );
@@ -227,7 +227,7 @@ export function getSubscriptionCell(subscription: TargetSubscription): React.Rea
 }
 
 export function getRecommendedCell(subscription: TargetSubscription): React.ReactNode {
-  if (subscription.recommended === 'Yes') {
+  if (subscription.recommended) {
     return (
       <GridCellSimple>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>

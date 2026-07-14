@@ -23,3 +23,5 @@ CUSTOMER_ID_PARAM = "customerId"
 MIN_LENGTH = 1
 MAX_LENGTH = 255
 AGREEMENT_CACHE_KEY = "agreements_by_id"
+
+RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"

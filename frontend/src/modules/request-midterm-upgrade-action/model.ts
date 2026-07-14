@@ -46,8 +46,9 @@ export type SubscriptionItem = {
 export type TargetSubscription = {
   id: string | null;
   name: string | null;
+  status: string;
   item: SubscriptionItem;
-  recommended: string;
+  recommended: boolean;
   currentQuantity: number;
   newQuantity: number | null;
   delta: number;

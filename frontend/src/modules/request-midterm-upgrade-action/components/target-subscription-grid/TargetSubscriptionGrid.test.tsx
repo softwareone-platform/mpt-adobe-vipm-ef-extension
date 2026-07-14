@@ -46,12 +46,13 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
   return {
     id: 'SUB-1525-6036-0087',
     name: 'Subscription for Illustrator',
+    status: 'Active',
     item: {
       id: 'ITM-0520-2723-0405',
       name: 'Illustrator for Teams',
       externalId: 'AO03.25470',
     },
-    recommended: 'Yes',
+    recommended: true,
     currentQuantity: 7,
     newQuantity: 7,
     delta: 0,
@@ -174,14 +175,14 @@ describe('getSubscriptionCell', () => {
 
 describe('getRecommendedCell', () => {
   it('renders "Yes" with an icon when recommended', () => {
-    const { getByText, container } = render(<>{getRecommendedCell(makeSubscription({ recommended: 'Yes' }))}</>);
+    const { getByText, container } = render(<>{getRecommendedCell(makeSubscription({ recommended: true }))}</>);
 
     expect(getByText('Yes')).toBeTruthy();
     expect(container.querySelector('svg')).toBeTruthy();
   });
 
   it('renders a dash when not recommended', () => {
-    const { getByText } = render(<>{getRecommendedCell(makeSubscription({ recommended: 'No' }))}</>);
+    const { getByText } = render(<>{getRecommendedCell(makeSubscription({ recommended: false }))}</>);
 
     expect(getByText('—')).toBeTruthy();
   });
@@ -224,7 +225,7 @@ describe('getDeltaCell', () => {
 describe('getNewQuantityCell', () => {
   it('enables the input and forwards changes for a PARTIAL_ALLOWED target', () => {
     const onChange = jest.fn();
-    const subscription = makeSubscription({ recommended: 'Yes', newQuantity: 7 });
+    const subscription = makeSubscription({ recommended: true, newQuantity: 7 });
     const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, onChange)}</>);
 
     const input = getByRole('spinbutton');
@@ -248,7 +249,7 @@ describe('getNewQuantityCell', () => {
 
   it('disables the input for a FULL_ONLY target', () => {
     const subscription = makeSubscription({
-      recommended: 'Yes',
+      recommended: true,
       item: { id: 'ITM-2', name: 'Creative Cloud', externalId: 'AO03.25471' },
     });
     const { getByRole } = render(
