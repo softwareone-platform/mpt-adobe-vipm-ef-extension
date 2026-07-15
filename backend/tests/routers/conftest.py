@@ -36,11 +36,12 @@ class FakeAdobeNamespace:
 
 
 class FakeAdobeClient:
-    """Fake Adobe client exposing customer, offer and recommendation namespaces."""
+    """Fake Adobe client exposing customer, offer, order and recommendation namespaces."""
 
     def __init__(self, call):
         self.customer = FakeAdobeNamespace(call)
         self.offer = FakeAdobeNamespace(call)
+        self.order = FakeAdobeNamespace(call)
         self.recommendation = FakeAdobeNamespace(call)
 
 
@@ -59,11 +60,27 @@ class FakeAgreements:
         return self.agreement
 
 
-class FakeMPTApiService:
-    """Fake MPT API service exposing the agreements accessor."""
+class FakeSubscriptions:
+    """Fake subscriptions service returning a preset subscription or raising, recording ids."""
 
-    def __init__(self, agreements):
+    def __init__(self):
+        self.subscription = None
+        self.error = None
+        self.get_by_id_calls = []
+
+    async def get_by_id(self, subscription_id):
+        self.get_by_id_calls.append(subscription_id)
+        if self.error is not None:
+            raise self.error
+        return self.subscription
+
+
+class FakeMPTApiService:
+    """Fake MPT API service exposing the agreements and subscriptions accessors."""
+
+    def __init__(self, agreements, subscriptions=None):
         self.agreements = agreements
+        self.subscriptions = subscriptions
 
 
 class FakeExtSettings:
@@ -76,8 +93,8 @@ class FakeExtSettings:
 class FakeContext:
     """Fake request context mirroring the fields the router handlers read."""
 
-    def __init__(self, agreements, adobe, product_ids):
-        self.mpt_api_service = FakeMPTApiService(agreements)
+    def __init__(self, agreements, adobe, product_ids, subscriptions=None):
+        self.mpt_api_service = FakeMPTApiService(agreements, subscriptions)
         self.ext_settings = FakeExtSettings(product_ids)
         self.adobe_client = adobe
         self.state = {}
@@ -115,11 +132,17 @@ def fake_agreements():
 
 
 @pytest.fixture
-def fake_ctx(fake_agreements, adobe_call, allowed_product_id):
+def fake_subscriptions():
+    return FakeSubscriptions()
+
+
+@pytest.fixture
+def fake_ctx(fake_agreements, fake_subscriptions, adobe_call, allowed_product_id):
     return FakeContext(
         agreements=fake_agreements,
         adobe=FakeAdobeClient(adobe_call),
         product_ids=(allowed_product_id,),
+        subscriptions=fake_subscriptions,
     )
 
 
