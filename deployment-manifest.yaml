@@ -12,8 +12,7 @@ dbup:
   args: ["migrate", "--schema"]
 api:
   enabled: true
-  probes:
-    enabled: false
+  probesEnabled: false
   image: mpt-extension-adobe
   command:
     - mpt-ext
