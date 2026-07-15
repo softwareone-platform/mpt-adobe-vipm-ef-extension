@@ -8,23 +8,19 @@ import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 
 import './SplitBillingStep.scss';
 import { AllocateToBuyer } from '../components/allocate-to-buyer/AllocateToBuyer';
-import {
-  Order,
-  SplitBillingAgreement,
-  SplitBillingAgreementAllocation,
-} from '../model';
-import { Subscription } from '../../shared/model';
+import { Order, SplitBillingAgreementAllocation } from '../model';
+import { AgreementSplit, Subscription } from '../../shared/model';
 
 export function SplitBillingStep({
   subscription,
-  agreement,
+  splitAgreement,
   order,
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
   onChange,
 }: {
   subscription: Subscription;
-  agreement: SplitBillingAgreement;
+  splitAgreement: AgreementSplit | null;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: SplitBillingAgreementAllocation;
@@ -81,10 +77,10 @@ export function SplitBillingStep({
       )}
       <div className="split-billing-step__allocate-to-buyer">
         <AllocateToBuyer
-          agreementBuyerId={agreement?.buyer?.id ?? ''}
+          agreementBuyerId={subscription?.buyer?.id ?? ''}
           selectedBuyerId={order?.billTo?.id ?? ''}
           onChange={changeSelectedBuyer}
-          allocations={agreement?.allocations ?? []}
+          allocations={splitAgreement?.allocations ?? []}
         />
       </div>
     </div>

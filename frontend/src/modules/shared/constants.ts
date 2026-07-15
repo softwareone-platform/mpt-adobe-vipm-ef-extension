@@ -1,3 +1,5 @@
+import type { AgreementSplitState } from './model';
+
 export const SCREEN_HEIGHT_FACTOR = 0.85;
 export const SCREEN_WIDTH_FACTOR = 0.90;
 
@@ -15,3 +17,9 @@ export enum EntityType {
   Buyers = 'buyers',
   Licensees = 'licensees',
 }
+
+export const INITIAL_SPLIT_STATE: AgreementSplitState = {
+  status: 'idle',
+  error: null,
+  data: null,
+};
