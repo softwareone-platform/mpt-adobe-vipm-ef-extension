@@ -20,8 +20,11 @@ BUYER_SELECT = ("account", "audit")
 SELLER_SELECT = ("audit",)
 
 CUSTOMER_ID_PARAM = "customerId"
+SWITCH_PAYLOAD_PARAM = "switchPayload"
 MIN_LENGTH = 1
 MAX_LENGTH = 255
 AGREEMENT_CACHE_KEY = "agreements_by_id"
 
 RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"
+
+CHANGE_ORDER_TYPE = "Change"
