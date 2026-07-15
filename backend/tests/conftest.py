@@ -19,6 +19,31 @@ def agreement_payload():
 
 
 @pytest.fixture
+def agreement_id():
+    return "AGR-0000-0001"
+
+
+@pytest.fixture
+def split_payload():
+    return {
+        "id": "SBA-0000-0001",
+        "revision": 1,
+        "allocations": [
+            {
+                "buyer": {"id": "BUY-0000-0001", "name": "Dummy Buyer One"},
+                "percentage": 100,
+                "price": {"currency": "USD", "SPxY": 100, "SPxM": 10},
+            },
+            {
+                "buyer": {"id": "BUY-0000-0002", "name": "Dummy Buyer Two"},
+                "percentage": 0,
+                "price": {"currency": "USD", "SPxY": 0, "SPxM": 0},
+            },
+        ],
+    }
+
+
+@pytest.fixture
 def agreement_factory():
     def factory(product_id="PRD-1111-1111", parameter_bag=None):
         payload = {

@@ -1,19 +1,23 @@
 import { act, render } from '@testing-library/react';
 
 import { SplitBillingStep } from './SplitBillingStep';
-import type { Subscription } from '../../shared/model';
-import type {
-  Order,
-  SplitBillingAgreement,
-  SplitBillingAgreementAllocation,
-} from '../model';
+import type { AgreementSplit, Subscription } from '../../shared/model';
+import type { Order, SplitBillingAgreementAllocation } from '../model';
 
-const agreement: SplitBillingAgreement = {
-  id: 'AGR-1111-1111',
-  buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+const agreement: AgreementSplit = {
+  id: 'SBA-1111-1111',
+  revision: 1,
   allocations: [
-    { id: 'ALL-1111-1111', buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' }, percentage: 60 },
-    { id: 'ALL-2222-2222', buyer: { id: 'BUY-2222-2222', name: 'Second Buyer Name' }, percentage: 40 },
+    {
+      buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+      percentage: 60,
+      price: { currency: 'USD', SPxY: 1200, SPxM: 100 },
+    },
+    {
+      buyer: { id: 'BUY-2222-2222', name: 'Second Buyer Name' },
+      percentage: 40,
+      price: { currency: 'USD', SPxY: 800, SPxM: 66.67 },
+    },
   ],
 };
 
@@ -57,8 +61,8 @@ jest.mock('../components/allocate-to-buyer/AllocateToBuyer', () => ({
 
 function renderStep(overrides: Partial<Parameters<typeof SplitBillingStep>[0]> = {}) {
   const props = {
-    subscription: { id: 'SUB-1' } as Subscription,
-    agreement,
+    subscription: { id: 'SUB-1', buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' } } as Subscription,
+    splitAgreement: agreement,
     order,
     addBuyerToOrder: jest.fn().mockResolvedValue(undefined),
     selectedBuyer: {} as SplitBillingAgreementAllocation,

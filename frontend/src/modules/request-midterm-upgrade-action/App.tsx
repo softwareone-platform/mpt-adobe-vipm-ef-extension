@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { useMPTModal } from '@mpt-extension/sdk-react';
@@ -7,6 +7,7 @@ import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notifi
 
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
 import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
+import { useAgreementSplit } from '../shared/hooks/useAgreementSplit';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -24,7 +25,6 @@ import { SummaryStep } from './SummaryStep';
 
 import type {
   Order,
-  SplitBillingAgreement,
   SplitBillingAgreementAllocation,
   TargetSubscription,
 } from './model';
@@ -32,63 +32,10 @@ import type {
 import './App.scss';
 import { AdobeOfferSwitchPath, getRecommendedOfferIds } from '../shared/model';
 
-const steps: StepProps[] = [
-  { title: 'Upgrade from' },
-  { title: 'Upgrade to' },
-  { title: 'Split billing' },
-  { title: 'Details' },
-  { title: 'Review order', nextButton: { label: 'Place order' } },
-  { title: 'Summary', nextButton: { label: 'View order' } },
-];
-
-const agreement: SplitBillingAgreement = {
-  id: 'AGR-1111-1111',
-  buyer: {
-    id: 'BUY-1111-1111',
-    name: 'Buyer Name',
-  },
-  allocations: [
-    {
-      id: 'ALL-1111-1111',
-      buyer: {
-        id: 'BUY-1111-1111',
-        name: 'Buyer Name',
-      },
-      percentage: 60,
-      price: {
-        currency: 'USD',
-        SPxY: 1200,
-        SPxM: 100,
-        PPxY: 1000,
-        PPxM: 83.33,
-      },
-    },
-    {
-      id: 'ALL-2222-2222',
-      buyer: {
-        id: 'BUY-2222-2222',
-        name: 'Second Buyer Name',
-      },
-      percentage: 40,
-      price: {
-        currency: 'USD',
-        SPxY: 800,
-        SPxM: 66.67,
-        PPxY: 666.67,
-        PPxM: 55.56,
-      },
-    },
-  ],
-};
-
 const initialOrder: Order = {
   id: 'ORD-1111-1111',
   status: 'New',
   type: 'Change',
-  billTo: {
-    id: 'BUY-1111-1111',
-    name: 'Buyer Name',
-  },
 };
 
 export default function App() {
@@ -107,6 +54,8 @@ export default function App() {
     sourceSku,
     sourceQuantity,
   );
+  const hasSplit = subscription?.splitStatus === 'Active';
+  const { data: splitAgreement } = useAgreementSplit(hasSplit ? (subscription?.agreement?.id ?? '') : '');
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
   const [order, setOrder] = useState<Order>(initialOrder);
@@ -128,11 +77,10 @@ export default function App() {
 
   const addBuyerToOrder = useCallback(
     async (buyer: { id?: string }) => {
-      const selected = agreement.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
-      if (!selected) return;
-      setOrder(prev => ({ ...prev, billTo: selected }));
+      const selected = splitAgreement?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
+      setOrder(prev => ({ ...prev, billTo: selected ?? null }));
     },
-    []
+    [splitAgreement]
   );
 
   useEffect(() => {
@@ -194,11 +142,69 @@ export default function App() {
     );
   }
 
+  const wizardSteps: (StepProps & { render: () => ReactNode })[] = [
+    {
+      title: 'Upgrade from',
+      render: () => <UpgradeFromStep subscription={subscription} />,
+    },
+    {
+      title: 'Upgrade to',
+      render: () => (
+        <UpgradeToStep
+          subscription={subscription}
+          subscriptions={targetSubscriptions}
+          onSubscriptionsChange={setTargetSubscriptions}
+          offerPaths={offerPaths}
+          sourceQuantity={sourceQuantity}
+          offerStatus={offerStatus}
+        />
+      ),
+    },
+    ...(hasSplit
+      ? [
+          {
+            title: 'Split billing',
+            render: () => (
+              <SplitBillingStep
+                subscription={subscription}
+                splitAgreement={splitAgreement}
+                order={order}
+                addBuyerToOrder={addBuyerToOrder}
+                selectedBuyer={selectedBuyer}
+                onChange={setSelectedBuyer}
+              />
+            ),
+          },
+        ]
+      : []),
+    {
+      title: 'Details',
+      render: () => <DetailsStep subscription={subscription} order={order} setOrder={setOrder} />,
+    },
+    {
+      title: 'Review order',
+      nextButton: { label: 'Place order' },
+      render: () => (
+        <ReviewOrderStep
+          subscription={subscription}
+          order={order}
+          subscriptions={targetSubscriptions}
+          recommendationTrackerId={recommendationTrackerId}
+        />
+      ),
+    },
+    {
+      title: 'Summary',
+      nextButton: { label: 'View order' },
+      render: () => <SummaryStep subscription={subscription} order={order} />,
+    },
+  ];
+
   return (
     <MemoryRouter>
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Wizard
-          stepsProps={steps}
+          stepsProps={wizardSteps.map((step) => ({ title: step.title, nextButton: step.nextButton }))}
           activeStepIndex={activeStepIndex}
           onActiveStepIndexChange={setActiveStepIndex}
           onClose={onClose}
@@ -208,42 +214,7 @@ export default function App() {
           <Wizard.Content>
             <Wizard.Content.Steps />
             <Wizard.Content.StepContent>
-              {({ activeStepIndex }) => {
-                switch (activeStepIndex) {
-                  case 0:
-                    return <UpgradeFromStep subscription={subscription} />;
-                  case 1:
-                    return (
-                      <UpgradeToStep
-                        subscription={subscription}
-                        subscriptions={targetSubscriptions}
-                        onSubscriptionsChange={setTargetSubscriptions}
-                        offerPaths={offerPaths}
-                        sourceQuantity={sourceQuantity}
-                        offerStatus={offerStatus}
-                      />
-                    );
-                  case 2:
-                    return (
-                      <SplitBillingStep
-                        subscription={subscription}
-                        agreement={agreement}
-                        order={order}
-                        addBuyerToOrder={addBuyerToOrder}
-                        selectedBuyer={selectedBuyer}
-                        onChange={setSelectedBuyer}
-                      />
-                    );
-                  case 3:
-                    return <DetailsStep subscription={subscription} order={order} setOrder={setOrder} />;
-                  case 4:
-                    return <ReviewOrderStep subscription={subscription} order={order} subscriptions={targetSubscriptions} recommendationTrackerId={recommendationTrackerId} />;
-                  case 5:
-                    return <SummaryStep subscription={subscription} order={order} />;
-                  default:
-                    return null;
-                }
-              }}
+              {({ activeStepIndex }) => wizardSteps[activeStepIndex]?.render() ?? null}
             </Wizard.Content.StepContent>
           </Wizard.Content>
           <Wizard.Actions />
