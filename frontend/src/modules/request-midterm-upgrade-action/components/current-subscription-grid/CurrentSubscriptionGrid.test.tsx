@@ -32,6 +32,7 @@ interface CapturedConfig {
 let capturedData: { id: string; quantity: number; status: string }[];
 let capturedConfig: CapturedConfig;
 const radioPlugin = { id: 'radio' };
+const setSelectedItem = jest.fn();
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: () => <div data-testid="grid" />,
@@ -42,14 +43,24 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
     capturedConfig = config;
     return { data, config };
   },
-  useRadioPlugin: () => ({ plugin: radioPlugin }),
+  useRadioPlugin: () => ({ plugin: radioPlugin, selectedItem: null, setSelectedItem }),
 }));
 
 describe('CurrentSubscriptionGrid', () => {
+  beforeEach(() => {
+    setSelectedItem.mockClear();
+  });
+
   it('renders the grid', () => {
     const { getByTestId } = render(<CurrentSubscriptionGrid subscription={subscription} />);
 
     expect(getByTestId('grid')).toBeTruthy();
+  });
+
+  it('preselects the first row', () => {
+    render(<CurrentSubscriptionGrid subscription={subscription} />);
+
+    expect(setSelectedItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'ALI-1' }));
   });
 
   it('feeds the grid the current subscription data', () => {

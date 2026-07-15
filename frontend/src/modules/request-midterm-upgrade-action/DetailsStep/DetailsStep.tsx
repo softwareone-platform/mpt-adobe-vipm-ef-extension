@@ -3,7 +3,7 @@ import { Order } from '../model';
 import { Subscription } from '../../shared/model';
 import { StepNavigationProperties, useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
-import { Button, Input } from '@softwareone-platform/sdk-react-ui-v0';
+import { Input } from '@softwareone-platform/sdk-react-ui-v0';
 import { isValueChanged } from '../../utils/value';
 
 import './DetailsStep.scss';
@@ -118,14 +118,6 @@ export function DetailsStep({
           />
         </div>
       </div>
-      <Button
-        type='secondary'
-        className={'details__section__saveButton'}
-        disabled={isSaving}
-        onClick={() => saveOrder()}
-      >
-        Save Order
-      </Button>
     </div>
   )
 }
