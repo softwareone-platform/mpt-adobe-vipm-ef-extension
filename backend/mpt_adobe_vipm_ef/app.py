@@ -6,6 +6,7 @@ from mpt_adobe_vipm_ef.routers.api.offer import offer_router
 from mpt_adobe_vipm_ef.routers.api.recommendations import recommendation_router
 from mpt_adobe_vipm_ef.routers.api.settings import settings_router
 from mpt_adobe_vipm_ef.routers.api.subscriptions import subscriptions_router
+from mpt_adobe_vipm_ef.routers.api.upgrade import upgrade_router
 from mpt_adobe_vipm_ef.routers.events.order import orders_router
 from mpt_adobe_vipm_ef.routers.plugs import plugs_router
 
@@ -17,3 +18,4 @@ ext_app.include_router(recommendation_router)
 ext_app.include_router(plugs_router)
 ext_app.include_router(settings_router)
 ext_app.include_router(subscriptions_router)
+ext_app.include_router(upgrade_router)
