@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect } from 'react';
 
-import { RegularText} from '@softwareone-platform/sdk-react-ui-v0/text';
+import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { useStepActions, StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
@@ -8,8 +8,10 @@ import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 
 import './SplitBillingStep.scss';
 import { AllocateToBuyer } from '../components/allocate-to-buyer/AllocateToBuyer';
-import { Order, SplitBillingAgreementAllocation } from '../model';
-import { AgreementSplit, Subscription } from '../../shared/model';
+import { SplitBillingAllocations } from '../components/split-billing-allocations/SplitBillingAllocations';
+import { SplitBillingOption, SplitBillingOptionValue } from '../components/split-billing-option/SplitBillingOption';
+import { Order } from '../model';
+import { AgreementSplit, AgreementSplitAllocation, Subscription } from '../../shared/model';
 
 export function SplitBillingStep({
   subscription,
@@ -23,29 +25,43 @@ export function SplitBillingStep({
   splitAgreement: AgreementSplit | null;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
-  selectedBuyer: SplitBillingAgreementAllocation;
-  onChange: (buyer: SplitBillingAgreementAllocation) => void;
+  selectedBuyer: AgreementSplitAllocation | null;
+  onChange: (buyer: AgreementSplitAllocation) => void;
 }) {
   const { registerOnNextCallback } = useStepActions();
 
-  const [selectedBuyer, setSelectedBuyer] =
-    useState<SplitBillingAgreementAllocation>(selectedBuyerFromParent);
+  const [option, setOption] = useState<SplitBillingOptionValue | null>(null);
+  const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(
+    selectedBuyerFromParent
+  );
   const [error, setError] = useState('');
+
+  const agreementBuyerId = subscription?.buyer?.id ?? '';
+  const allocations = splitAgreement?.allocations ?? [];
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      const buyerId = option === 'buyer' ? selectedBuyer?.buyer?.id : undefined;
+      if (option === null) {
+        setError('Select a split billing option.');
+        return currentStepIndex;
+      }
+      if (option === 'buyer' && !buyerId) {
+        setError('Select a buyer to allocate billing to.');
+        return currentStepIndex;
+      }
       try {
-        await addBuyerToOrder({ id: selectedBuyer?.id });
+        await addBuyerToOrder({ id: buyerId });
       } catch (submitError) {
         setError(
-          submitError instanceof Error ? submitError.message : 'Failed to save the selected buyer.'
+          submitError instanceof Error ? submitError.message : 'Failed to save the split billing option.'
         );
         return currentStepIndex;
       }
       setError('');
       return targetStepIndex;
     },
-    [addBuyerToOrder, selectedBuyer?.id]
+    [addBuyerToOrder, option, selectedBuyer?.buyer?.id]
   );
 
   useEffect(() => {
@@ -53,36 +69,42 @@ export function SplitBillingStep({
   }, [onNext, registerOnNextCallback]);
 
   const changeSelectedBuyer = useCallback(
-    (buyer: SplitBillingAgreementAllocation) => {
+    (buyer: AgreementSplitAllocation) => {
       setSelectedBuyer(buyer);
       onChange(buyer);
     },
     [onChange]
-  )
+  );
 
   return (
     <div className="split-billing-step">
       <div className="split-billing-step__header">
         <RegularText as="h2" size={4}>
-          Split Billing
+          Split billing
         </RegularText>
       </div>
       <div className="split-billing-step__highlights">
         <WizardHighlights subscription={subscription} />
       </div>
       {error && (
-        <InlineNotification status="error" isStandalone>
-          {error}
-        </InlineNotification>
+        <div className="split-billing-step__error">
+          <InlineNotification status="error" isStandalone>
+            {error}
+          </InlineNotification>
+        </div>
       )}
-      <div className="split-billing-step__allocate-to-buyer">
+      {option === null && <SplitBillingOption onSelect={setOption} />}
+      {option === 'percentages' && (
+        <SplitBillingAllocations allocations={allocations} agreementBuyerId={agreementBuyerId} />
+      )}
+      {option === 'buyer' && (
         <AllocateToBuyer
-          agreementBuyerId={subscription?.buyer?.id ?? ''}
+          agreementBuyerId={agreementBuyerId}
           selectedBuyerId={order?.billTo?.id ?? ''}
           onChange={changeSelectedBuyer}
-          allocations={splitAgreement?.allocations ?? []}
+          allocations={allocations}
         />
-      </div>
+      )}
     </div>
-  )
+  );
 }

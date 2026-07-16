@@ -11,7 +11,7 @@ import {
   useRadioPlugin,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
@@ -193,8 +193,17 @@ export function TargetSubscriptionGrid({
     [offerPaths, sourceQuantity, updateQuantity],
   );
 
-  const { plugin: radioPlugin } = useRadioPlugin<TargetSubscription>(isEqual);
+  const { plugin: radioPlugin, selectedItem, setSelectedItem } = useRadioPlugin<TargetSubscription>(isEqual);
   const plugins = useMemo(() => [radioPlugin], [radioPlugin]);
+
+  useEffect(() => {
+    const selectionStillExists = selectedItem
+      ? subscriptions.some((s) => isEqual(s, selectedItem))
+      : false;
+    if (subscriptions.length > 0 && !selectionStillExists) {
+      setSelectedItem(subscriptions.find((s) => s.recommended) ?? subscriptions[0]);
+    }
+  }, [subscriptions, selectedItem, setSelectedItem]);
   const gridProps = useGridInMemory(subscriptions, {
     id: 'components__request-midterm-upgrade-action__target-subscription-grid',
     columns: cols,
