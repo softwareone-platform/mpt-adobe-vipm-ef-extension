@@ -12,6 +12,10 @@ import {
 } from './TargetSubscriptionGrid';
 import { AdobeOfferSwitchPath } from '../../../shared/model';
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
+  LinkPopover: ({ target }: { target: ReactNode }) => <div data-testid="link-popover">{target}</div>,
+}));
+
 interface CapturedConfig {
   id: string;
   columns: { name: string; title?: string }[];
@@ -67,7 +71,10 @@ function makeSubscription(overrides: Partial<Subscription> = {}): Subscription {
   };
 }
 
-const subscriptions = [makeSubscription(), makeSubscription({ id: null, name: null })];
+const subscriptions = [
+  makeSubscription({ targetBaseOfferId: 'AO03.25470.MN | 30002000CB' }),
+  makeSubscription({ id: null, name: null, targetBaseOfferId: 'AO03.25471.MN | 30002000CC' }),
+];
 
 const offerPaths: AdobeOfferSwitchPath[] = [
   {
@@ -316,10 +323,10 @@ describe('getDeltaCell', () => {
 });
 
 describe('getNewQuantityCell', () => {
-  it('enables the input and forwards changes for a PARTIAL_ALLOWED target', () => {
+  it('enables the input and forwards changes for a selected PARTIAL_ALLOWED target', () => {
     const onChange = jest.fn();
     const subscription = makeSubscription({ recommended: true, newQuantity: 7 });
-    const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, onChange)}</>);
+    const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, onChange, true)}</>);
 
     const input = getByRole('spinbutton');
     expect(input).toBeEnabled();
@@ -329,12 +336,19 @@ describe('getNewQuantityCell', () => {
     expect(onChange).toHaveBeenCalledWith(subscription, '12');
   });
 
+  it('disables the input for a PARTIAL_ALLOWED target that is not selected', () => {
+    const subscription = makeSubscription({ recommended: true, newQuantity: 7 });
+    const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), false)}</>);
+
+    expect(getByRole('spinbutton')).toBeDisabled();
+  });
+
   it('disables the input when the target is not in the offer paths', () => {
     const subscription = makeSubscription({
       item: { id: 'ITM-3', name: 'Photoshop', externalId: 'AO03.99999' },
     });
     const { getByRole } = render(
-      <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn())}</>,
+      <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), true)}</>,
     );
 
     expect(getByRole('spinbutton')).toBeDisabled();
@@ -346,7 +360,7 @@ describe('getNewQuantityCell', () => {
       item: { id: 'ITM-2', name: 'Creative Cloud', externalId: 'AO03.25471' },
     });
     const { getByRole } = render(
-      <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn())}</>,
+      <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), true)}</>,
     );
 
     expect(getByRole('spinbutton')).toBeDisabled();

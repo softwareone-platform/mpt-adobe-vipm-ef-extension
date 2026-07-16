@@ -50,7 +50,6 @@ export function WizardHighlights({
 
   const agreementInfoCard = (
     <InfoCard
-      title="Agreement"
       items={[
         { title: 'Name', content: <LinkReference text={agreement?.name} url={agreementUrl} /> },
         { title: 'ID', content: agreement?.id },
@@ -76,7 +75,6 @@ export function WizardHighlights({
 
   const licenseeInfoCard = (
     <InfoCard
-      title="Licensee"
       items={[
         { title: 'Name', content: <LinkReference text={licensee?.name} url={licenseeUrl} /> },
         { title: 'ID', content: licensee?.id },
@@ -97,7 +95,6 @@ export function WizardHighlights({
 
   const buyerInfoCard = (
     <InfoCard
-      title="Buyer"
       items={[
         { title: 'Name', content: <LinkReference text={buyer?.name} url={buyerUrl} /> },
         { title: 'ID', content: buyer?.id },
@@ -115,7 +112,6 @@ export function WizardHighlights({
   const seller = subscription.seller;
   const sellerInfoCard = (
     <InfoCard
-      title="Seller"
       items={[
         { title: 'Name', content: <LinkReference text={seller?.name} url={sellerUrl} /> },
         { title: 'ID', content: seller?.id },
@@ -156,7 +152,8 @@ export function WizardHighlights({
               url={agreementUrl ?? undefined}
               statusLabel={agreementStatus}
               statusColor={agreementStatusColor}
-              infoCard={agreementInfoCard}
+              cardTitle="Agreement"
+              card={agreementInfoCard}
             />
           }
           secondaryContent={subscription.agreement?.id ?? undefined}
@@ -167,7 +164,8 @@ export function WizardHighlights({
           text={subscription.licensee?.name ?? undefined}
           secondaryContent={subscription.licensee?.id ?? undefined}
           url={licenseeUrl ?? undefined}
-          infoCard={licenseeInfoCard}
+          cardTitle="Licensee"
+          card={licenseeInfoCard}
         />
       </Highlights.Item>
       <Highlights.Item label="Buyer">
@@ -175,7 +173,8 @@ export function WizardHighlights({
           text={subscription.buyer?.name ?? undefined}
           secondaryContent={subscription.buyer?.id ?? undefined}
           url={buyerUrl ?? undefined}
-          infoCard={buyerInfoCard}
+          cardTitle="Buyer"
+          card={buyerInfoCard}
         />
       </Highlights.Item>
       <Highlights.Item label="Seller">
@@ -183,7 +182,8 @@ export function WizardHighlights({
           text={subscription.seller?.name ?? undefined}
           secondaryContent={subscription.seller?.id ?? undefined}
           url={sellerUrl ?? undefined}
-          infoCard={sellerInfoCard}
+          cardTitle="Seller"
+          card={sellerInfoCard}
         />
       </Highlights.Item>
       <Highlights.Item label="Base currency">

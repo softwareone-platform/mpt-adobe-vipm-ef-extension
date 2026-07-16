@@ -1,19 +1,20 @@
 import { ReactNode } from 'react';
 
 import { EntityReference } from '@softwareone-platform/sdk-react-ui-v0/entity-reference';
+import { LinkPopover } from '@softwareone-platform/sdk-react-ui-v0/link-popover';
 
 import { getPortalOrigin } from '../../../utils/link';
-import { InfoCardPopover } from '../info-card-popover/InfoCardPopover';
 
 export interface LinkReferenceProps {
   text?: string;
   secondaryContent?: ReactNode;
   url?: string | null;
   icon?: ReactNode;
-  infoCard?: ReactNode;
+  cardTitle?: string;
+  card?: ReactNode;
 }
 
-export function LinkReference({ text, secondaryContent, url, icon, infoCard }: LinkReferenceProps) {
+export function LinkReference({ text, secondaryContent, url, icon, cardTitle, card }: LinkReferenceProps) {
   const href = url ? `${getPortalOrigin()}${url}` : undefined;
 
   const primaryContent = href ? (
@@ -28,9 +29,9 @@ export function LinkReference({ text, secondaryContent, url, icon, infoCard }: L
     <EntityReference primaryContent={primaryContent} secondaryContent={secondaryContent} icon={icon} />
   );
 
-  if (!infoCard) {
+  if (!card) {
     return reference;
   }
 
-  return <InfoCardPopover card={infoCard}>{reference}</InfoCardPopover>;
+  return <LinkPopover title={cardTitle ?? ''} target={reference}>{card}</LinkPopover>;
 }

@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { render } from '@testing-library/react';
@@ -5,6 +6,10 @@ import { render } from '@testing-library/react';
 import { WizardHighlights } from './WizardHighlights';
 import type { Subscription } from '../../../shared/model';
 import type { Order } from '../../model';
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
+  LinkPopover: ({ target }: { target: ReactNode }) => <div data-testid="link-popover">{target}</div>,
+}));
 
 const subscription: Subscription = {
   id: 'SUB-1',

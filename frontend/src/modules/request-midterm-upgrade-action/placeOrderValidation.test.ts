@@ -43,7 +43,7 @@ function makeOfferPaths(switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY'): AdobeOffer
 describe('getPlaceOrderValidationError', () => {
   it('requires a selected target', () => {
     expect(getPlaceOrderValidationError(null, [], 10)).toBe(
-      'Select the item to upgrade to before placing the order.',
+      'Select an item to continue.',
     );
   });
 
