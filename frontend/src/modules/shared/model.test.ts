@@ -76,12 +76,12 @@ describe('subscription model helpers', () => {
 
 describe('readParameter', () => {
   const parameters: CommerceParameter[] = [
-    { externalId: '3YCEnrollStatus', value: 'Enrolled' },
-    { externalId: '3YCMinLicenses', value: 100 },
+    { id: 'PAR-1', externalId: 'paramA', value: 'valueA' },
+    { id: 'PAR-2', externalId: 'paramB', value: 100 },
   ];
 
   it('returns the value of the matching parameter', () => {
-    expect(readParameter(parameters, '3YCMinLicenses')).toBe(100);
+    expect(readParameter(parameters, 'paramB')).toBe(100);
   });
 
   it('returns undefined when no parameter matches', () => {
@@ -89,7 +89,7 @@ describe('readParameter', () => {
   });
 
   it('returns undefined when parameters are not provided', () => {
-    expect(readParameter(undefined, '3YCEnrollStatus')).toBeUndefined();
+    expect(readParameter(undefined, 'paramA')).toBeUndefined();
   });
 });
 

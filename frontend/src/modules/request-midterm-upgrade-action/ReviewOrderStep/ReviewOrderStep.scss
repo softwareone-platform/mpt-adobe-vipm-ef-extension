@@ -35,4 +35,17 @@
   &__tab {
     padding-top: $var-spacing-3;
   }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    gap: $var-spacing-3;
+  }
+
+  &__details-item {
+    h5,
+    p {
+      margin: 0;
+    }
+  }
 }
