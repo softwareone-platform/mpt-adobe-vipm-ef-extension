@@ -1,5 +1,6 @@
 import { ReactElement, useState, useCallback, useEffect } from 'react';
 
+import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { Tabs, Tab } from '@softwareone-platform/sdk-react-ui-v0/tabs';
 import { useStepActions, StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -26,16 +27,6 @@ type ReviewRow = TargetSubscription & {
   summaryTitle?: string;
   summarySubtitle?: string;
 };
-
-function saveOrder(
-  order: Order,
-  subscriptions: TargetSubscription[],
-  recommendationTrackerId: string | undefined,
-): void {
-  void order;
-  void subscriptions;
-  void recommendationTrackerId;
-}
 
 function getSummaryRow(subscriptions: TargetSubscription[]): ReviewRow {
   return {
@@ -199,24 +190,31 @@ interface ReviewOrderStepProps {
   subscription: Subscription;
   order: Order;
   subscriptions: TargetSubscription[];
-  recommendationTrackerId?: string;
+  onPlaceOrder?: () => Promise<boolean>;
+  errorMessage?: string;
+  isSubmitting?: boolean;
 }
 
 export function ReviewOrderStep({
   subscription,
   order,
   subscriptions,
-  recommendationTrackerId,
+  onPlaceOrder,
+  errorMessage,
+  isSubmitting,
 }: ReviewOrderStepProps): ReactElement | null {
   const [tabId, setTabId] = useState('items');
   const { registerOnNextCallback } = useStepActions();
 
   const onNext = useCallback(
-    ({ targetStepIndex }: StepNavigationProperties) => {
-      saveOrder(order, subscriptions, recommendationTrackerId);
-      return targetStepIndex;
+    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      if (!onPlaceOrder) {
+        return targetStepIndex;
+      }
+      const placed = await onPlaceOrder();
+      return placed ? targetStepIndex : currentStepIndex;
     },
-    [order, subscriptions, recommendationTrackerId],
+    [onPlaceOrder],
   );
 
   useEffect(() => {
@@ -232,8 +230,22 @@ export function ReviewOrderStep({
           Review order
         </RegularText>
       </div>
+      {errorMessage ? (
+        <div className="review-order-step__error" data-testid="review-order-step-error">
+          <InlineNotification status="error" isStandalone>
+            {errorMessage}
+          </InlineNotification>
+        </div>
+      ) : null}
+      {isSubmitting ? (
+        <div className="review-order-step__submitting" data-testid="review-order-step-submitting">
+          <RegularText as="p" size={2} color="grey-4">
+            Placing your order…
+          </RegularText>
+        </div>
+      ) : null}
       <div className="review-order-step__highlights">
-        <WizardHighlights subscription={subscription} />
+        <WizardHighlights subscription={subscription} order={order} />
       </div>
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title="Items">

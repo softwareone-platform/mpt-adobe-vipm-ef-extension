@@ -72,6 +72,34 @@ def test_preview_switch_order_sends_preview_switch_body(
 
 
 @responses.activate
+def test_preview_switch_order_forwards_the_recommendation_tracker_header(
+    adobe_client, preview_switch_data, line_items, cancelling_items
+):
+    responses.post(_ORDERS_URL, json=preview_switch_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_switch_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", line_items, cancelling_items, "TRACKER-1"
+    )
+
+    request = responses.calls[0].request
+    assert request.headers["x-recommendation-tracker-id"] == "TRACKER-1"
+
+
+@responses.activate
+def test_preview_switch_order_omits_the_tracker_header_when_empty(
+    adobe_client, preview_switch_data, line_items, cancelling_items
+):
+    responses.post(_ORDERS_URL, json=preview_switch_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_switch_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", line_items, cancelling_items
+    )
+
+    request = responses.calls[0].request
+    assert "x-recommendation-tracker-id" not in request.headers
+
+
+@responses.activate
 def test_preview_switch_order_raises_adobe_api_error_on_http_error_with_json(
     adobe_client, line_items, cancelling_items
 ):

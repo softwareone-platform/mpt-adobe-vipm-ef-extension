@@ -48,6 +48,7 @@ export type TargetSubscription = {
   name: string | null;
   status: string;
   item: SubscriptionItem;
+  targetBaseOfferId?: string;
   recommended: boolean;
   currentQuantity: number;
   newQuantity: number | null;

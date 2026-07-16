@@ -7,6 +7,8 @@ from adobe.transport import AdobeTransport
 
 logger = logging.getLogger(__name__)
 
+RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"
+
 
 class OrderClient:
     """Client for Adobe VIPM order endpoints.
@@ -26,11 +28,15 @@ class OrderClient:
         currency_code: str,
         line_items: list[dict[str, Any]],
         cancelling_items: list[dict[str, Any]],
+        recommendation_tracker_id: str = "",
     ) -> dict[str, Any]:
         """Request a PREVIEW_SWITCH quote validating a mid-term upgrade before ordering.
 
         Adobe validates the switch (path validity, quantities, single-item rule)
-        and returns pro-rated pricing without placing an order.
+        and returns pro-rated pricing without placing an order. When the
+        selection came from Adobe's recommendations, the tracker id is forwarded
+        as the ``x-recommendation-tracker-id`` header so Adobe can attribute the
+        order to the recommendation.
         """
         logger.info(
             "preview_switch_order: customer=%s authorization=%s targets=%d",
@@ -38,11 +44,17 @@ class OrderClient:
             authorization_id,
             len(line_items),
         )
+        extra_headers = (
+            {RECOMMENDATION_TRACKER_HEADER: recommendation_tracker_id}
+            if recommendation_tracker_id
+            else None
+        )
         authorization = self._transport.settings.get_authorization(authorization_id)
         return self._transport.request(
             "POST",
             authorization,
             f"/v3/customers/{customer_id}/orders",
+            extra_headers=extra_headers,
             json={
                 "orderType": AdobeOrderType.PREVIEW_SWITCH.value,
                 "currencyCode": currency_code,
