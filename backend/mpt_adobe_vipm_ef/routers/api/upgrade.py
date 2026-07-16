@@ -37,6 +37,8 @@ from mpt_adobe_vipm_ef.services.switch_order import (
     build_change_order_lines,
     create_switch_change_order,
     find_agreement_line_by_sku,
+    mpt_order_error_detail,
+    require_active_agreement,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,10 +59,12 @@ async def create_upgrade_order(  # noqa: WPS210
     """Submit a mid-term upgrade as a switch-driven change order.
 
     Validates the customer's selection, gates it through an Adobe
-    ``PREVIEW_SWITCH`` quote, and only then creates and processes the change
-    order carrying the hidden ``switchPayload`` DataObject parameter.
+    ``PREVIEW_SWITCH`` quote, and only then creates the change order (directly
+    in Processing status) carrying the hidden ``switchPayload`` DataObject
+    parameter.
     """
     agreement = await load_agreement(ctx, agreement_id)
+    require_active_agreement(agreement)
     source_line, adobe_subscription_id = await _load_switch_source(ctx, agreement, subscription_id)
     _validate_quantity(body.quantity, source_line.quantity)
 
@@ -172,6 +176,7 @@ async def _preview_switch(
             switch_payload.currency_code,
             payload["lineItems"],
             payload["cancellingItems"],
+            switch_payload.recommendation_tracker_id,
         )
     except AdobeAPIError as error:
         logger.warning("Adobe rejected the switch preview: %s", error)
@@ -208,4 +213,4 @@ async def _create_change_order(
             error.status_code,
             error,
         )
-        raise UpstreamServiceError(detail="MPT service request failed")
+        raise UpstreamServiceError(detail=mpt_order_error_detail(error))

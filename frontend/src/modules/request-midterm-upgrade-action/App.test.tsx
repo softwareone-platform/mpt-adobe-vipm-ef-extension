@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -15,8 +15,37 @@ jest.mock('@mpt-extension/sdk-react', () => ({
 }), { virtual: true });
 
 jest.mock('@mpt-extension/sdk', () => ({
-  http: { post: jest.fn().mockResolvedValue({ data: { data: { id: 'SUB-1', splitStatus: 'Active' } } }) },
+  http: {
+    post: jest.fn().mockResolvedValue({
+      data: {
+        data: {
+          id: 'SUB-1',
+          splitStatus: 'Active',
+          agreement: { id: 'AGR-1' },
+          lines: [{ quantity: 10 }],
+        },
+      },
+    }),
+  },
 }), { virtual: true });
+
+const mockOfferResult = {
+  status: 'success',
+  error: null,
+  data: {
+    productUpgrades: [
+      {
+        targetList: [
+          { targetBaseOfferId: '65322651CA02A12', sequence: 1, switchType: 'PARTIAL_ALLOWED' },
+        ],
+      },
+    ],
+  },
+  refresh: () => {},
+};
+jest.mock('../shared/hooks/useAdobeOffer', () => ({
+  useAdobeOffer: () => mockOfferResult,
+}));
 
 let mockRecommendation: { status: string; error: string | null; data: unknown; refresh: () => void } = {
   status: 'idle',
@@ -83,6 +112,8 @@ jest.mock('./UpgradeFromStep', () => ({
 
 interface UpgradeToProps {
   subscriptions: unknown;
+  onSubscriptionsChange: (subscriptions: unknown[]) => void;
+  onSelectedTargetChange: (target: unknown) => void;
 }
 let upgradeToProps: UpgradeToProps;
 
@@ -123,7 +154,9 @@ jest.mock('./DetailsStep', () => ({
 interface ReviewOrderProps {
   order: unknown;
   subscriptions: unknown;
-  recommendationTrackerId: string;
+  onPlaceOrder: () => Promise<boolean>;
+  errorMessage?: string;
+  isSubmitting?: boolean;
 }
 let reviewOrderProps: ReviewOrderProps;
 
@@ -172,6 +205,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/notification', () => ({
 describe('request-midterm-upgrade-action App', () => {
   beforeEach(() => {
     mockClose.mockReset();
+    (http.post as jest.Mock).mockClear();
     mockActiveStepIndex = 0;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
     mockSplit = splitWithAllocations;
@@ -232,18 +266,125 @@ describe('request-midterm-upgrade-action App', () => {
     expect(reviewOrderProps.subscriptions).toBeDefined();
   });
 
-  it('captures the recommendation tracker id and forwards it to the review-order step', async () => {
+  it('places the upgrade order with the selection and the recommendation tracker id', async () => {
     mockRecommendation = {
       status: 'success',
       error: null,
       data: { productRecommendations: { upsells: [], crossSells: [], addOns: [] }, xRecommendationTrackerId: 'TRACKER-1' },
       refresh: jest.fn(),
     };
-    mockActiveStepIndex = 4;
-    render(<App />);
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
 
+    const selectedTarget = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: true,
+      currentQuantity: 0,
+      newQuantity: 6,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
-    expect(reviewOrderProps.recommendationTrackerId).toBe('TRACKER-1');
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewOrderProps.onPlaceOrder();
+    });
+
+    expect(placed).toBe(true);
+    expect(http.post).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
+      { targetOfferId: '65322651CA02A12', quantity: 6, recommendationTrackerId: 'TRACKER-1' },
+    );
+  });
+
+  it('blocks placing the order and surfaces an error when no target is selected', async () => {
+    mockActiveStepIndex = 4;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewOrderProps.onPlaceOrder();
+    });
+    rerender(<App />);
+
+    expect(placed).toBe(false);
+    expect(reviewOrderProps.errorMessage).toBe(
+      'Select the item to upgrade to before placing the order.',
+    );
+    const upgradeOrderCalls = (http.post as jest.Mock).mock.calls.filter(([url]) =>
+      String(url).includes('/upgrade-order'),
+    );
+    expect(upgradeOrderCalls).toHaveLength(0);
+  });
+
+  it('surfaces the backend error detail when order creation fails', async () => {
+    (http.post as jest.Mock)
+      .mockResolvedValueOnce({
+        data: {
+          data: {
+            id: 'SUB-1',
+            splitStatus: 'Active',
+            agreement: { id: 'AGR-1' },
+            lines: [{ quantity: 10 }],
+          },
+        },
+      })
+      .mockRejectedValueOnce({
+        response: { data: { detail: 'Adobe rejected the switch preview.' } },
+      });
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+
+    const selectedTarget = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: false,
+      currentQuantity: 0,
+      newQuantity: 6,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewOrderProps.onPlaceOrder();
+    });
+    rerender(<App />);
+
+    expect(placed).toBe(false);
+    expect(reviewOrderProps.errorMessage).toBe('Adobe rejected the switch preview.');
   });
 
   it('renders the summary step on the sixth step and wires its order', async () => {

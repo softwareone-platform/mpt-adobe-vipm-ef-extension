@@ -52,7 +52,7 @@ export function SummaryStep({ subscription, order }: SummaryStepProps): ReactEle
         </RegularText>
       </div>
       <div className="summary-step__highlights">
-        <WizardHighlights subscription={subscription} />
+        <WizardHighlights subscription={subscription} order={order} />
       </div>
       <div
         className="summary-step__template"

@@ -1,4 +1,5 @@
 import datetime as dt
+import http
 
 import pytest
 
@@ -38,6 +39,50 @@ def test_get_headers_uses_provided_correlation_id(adobe_transport, authorization
     headers = adobe_transport._get_headers(authorization, correlation_id="fixed-id")  # act
 
     assert headers["x-correlation-id"] == "fixed-id"
+
+
+def test_request_adds_permitted_extra_headers_without_touching_auth(
+    mocker, adobe_transport, authorization, valid_token
+):
+    request_mock = mocker.patch.object(adobe_transport._session, "request")
+    request_mock.return_value = mocker.Mock(status_code=http.HTTPStatus.OK, json=dict)
+
+    adobe_transport.request(  # act
+        "POST",
+        authorization,
+        "/v3/customers/CUST-000/orders",
+        extra_headers={"x-recommendation-tracker-id": "TRACKER-1"},
+    )
+
+    _, call_kwargs = request_mock.call_args
+    headers = call_kwargs["headers"]
+    assert headers["x-recommendation-tracker-id"] == "TRACKER-1"
+    assert headers["Authorization"] == f"Bearer {valid_token.token}"
+
+
+def test_request_ignores_extra_headers_that_override_transport_headers(
+    mocker, adobe_transport, authorization, valid_token
+):
+    request_mock = mocker.patch.object(adobe_transport._session, "request")
+    request_mock.return_value = mocker.Mock(status_code=http.HTTPStatus.OK, json=dict)
+
+    adobe_transport.request(  # act
+        "POST",
+        authorization,
+        "/v3/customers/CUST-000/orders",
+        extra_headers={
+            "Authorization": "Bearer spoofed",
+            "x-api-key": "spoofed-key",
+            "x-recommendation-tracker-id": "TRACKER-1",
+        },
+    )
+
+    _, call_kwargs = request_mock.call_args
+    headers = call_kwargs["headers"]
+    assert headers["Authorization"] == f"Bearer {valid_token.token}"
+    assert headers["X-Api-Key"] == authorization.client_id
+    assert "x-api-key" not in headers
+    assert headers["x-recommendation-tracker-id"] == "TRACKER-1"
 
 
 def test_refresh_auth_token_fetches_token_and_is_not_expired(

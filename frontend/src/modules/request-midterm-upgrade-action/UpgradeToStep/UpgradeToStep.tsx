@@ -15,9 +15,10 @@ interface UpgradeToStepProps {
   sourceQuantity: number;
   offerStatus: Status;
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
+  onSelectedTargetChange?: (target: TargetSubscription | null) => void;
 }
 
-export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQuantity, offerStatus, onSubscriptionsChange }: UpgradeToStepProps) {
+export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQuantity, offerStatus, onSubscriptionsChange, onSelectedTargetChange }: UpgradeToStepProps) {
   const showEmptyState = subscriptions.length === 0 && offerStatus !== 'idle' && offerStatus !== 'loading';
 
   return (
@@ -42,6 +43,7 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
           offerPaths={offerPaths}
           sourceQuantity={sourceQuantity}
           onSubscriptionsChange={onSubscriptionsChange}
+          onSelectedTargetChange={onSelectedTargetChange}
         />
         {showEmptyState && (
           <div className="upgrade-to-step__empty-overlay">

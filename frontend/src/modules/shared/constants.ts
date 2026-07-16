@@ -11,6 +11,7 @@ export enum EntityDomain {
 
 export enum EntityType {
   Agreements = 'agreements',
+  Orders = 'orders',
   Products = 'products',
   Accounts = 'accounts',
   Sellers = 'sellers',
