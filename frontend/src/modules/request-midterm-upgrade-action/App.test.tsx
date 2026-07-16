@@ -326,7 +326,7 @@ describe('request-midterm-upgrade-action App', () => {
 
     expect(placed).toBe(false);
     expect(reviewOrderProps.errorMessage).toBe(
-      'Select the item to upgrade to before placing the order.',
+      'Select an item to continue.',
     );
     const upgradeOrderCalls = (http.post as jest.Mock).mock.calls.filter(([url]) =>
       String(url).includes('/upgrade-order'),

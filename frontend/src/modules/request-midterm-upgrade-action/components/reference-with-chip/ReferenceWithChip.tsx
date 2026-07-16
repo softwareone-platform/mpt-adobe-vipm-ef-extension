@@ -2,9 +2,9 @@ import { ReactNode, useMemo } from 'react';
 
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { Ellipsis } from '@softwareone-platform/sdk-react-ui-v0/ellipsis';
+import { LinkPopover } from '@softwareone-platform/sdk-react-ui-v0/link-popover';
 
 import { getPortalOrigin } from '../../../utils/link';
-import { InfoCardPopover } from '../info-card-popover/InfoCardPopover';
 
 import './ReferenceWithChip.scss';
 
@@ -13,25 +13,26 @@ export interface ReferenceWithChipProps {
   url?: string | null;
   statusLabel: string;
   statusColor?: ChipColor;
-  infoCard?: ReactNode;
+  cardTitle?: string;
+  card?: ReactNode;
 }
 
-export function ReferenceWithChip({ text, url, statusLabel, statusColor, infoCard }: ReferenceWithChipProps) {
+export function ReferenceWithChip({ text, url, statusLabel, statusColor, cardTitle, card }: ReferenceWithChipProps) {
   const href = url ? `${getPortalOrigin()}${url}` : undefined;
 
   const referenceElement = (
     <span className="entity-reference-with-chip__text">
-      <Ellipsis isToHideTooltip={!!infoCard}>{text}</Ellipsis>
+      <Ellipsis isToHideTooltip={!!card}>{text}</Ellipsis>
     </span>
   );
 
   const className = useMemo(() => {
     const result = ['entity-reference-with-chip'];
-    if (infoCard) {
+    if (card) {
       result.push('entity-reference-with-chip--with-info-card');
     }
     return result.join(' ');
-  }, [infoCard]);
+  }, [card]);
 
   const reference = (
     <div className={className}>
@@ -40,9 +41,9 @@ export function ReferenceWithChip({ text, url, statusLabel, statusColor, infoCar
     </div>
   );
 
-  if (!infoCard) {
+  if (!card) {
     return reference;
   }
 
-  return <InfoCardPopover card={infoCard}>{reference}</InfoCardPopover>;
+  return <LinkPopover title={cardTitle ?? ''} target={reference}>{card}</LinkPopover>;
 }

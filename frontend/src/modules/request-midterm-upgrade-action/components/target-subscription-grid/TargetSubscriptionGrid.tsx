@@ -175,6 +175,9 @@ export function TargetSubscriptionGrid({
     [subscriptions, onSubscriptionsChange],
   );
 
+  const { plugin: radioPlugin, selectedItem, setSelectedItem } = useRadioPlugin<TargetSubscription>(isEqual);
+  const plugins = useMemo(() => [radioPlugin], [radioPlugin]);
+
   const cols = useMemo<GridColumnDefinition<TargetSubscription>[]>(
     () => [
       ...columns,
@@ -182,7 +185,14 @@ export function TargetSubscriptionGrid({
         name: 'newQuantity',
         title: 'New Quantity',
         fields: ['newQuantity'],
-        cell: (item) => getNewQuantityCell(item, offerPaths, sourceQuantity, updateQuantity),
+        cell: (item) =>
+          getNewQuantityCell(
+            item,
+            offerPaths,
+            sourceQuantity,
+            updateQuantity,
+            selectedItem ? isEqual(item, selectedItem) : false,
+          ),
       },
       {
         name: 'delta',
@@ -192,11 +202,8 @@ export function TargetSubscriptionGrid({
       },
       ...priceColumns,
     ],
-    [offerPaths, sourceQuantity, updateQuantity],
+    [offerPaths, sourceQuantity, updateQuantity, selectedItem],
   );
-
-  const { plugin: radioPlugin, selectedItem, setSelectedItem } = useRadioPlugin<TargetSubscription>(isEqual);
-  const plugins = useMemo(() => [radioPlugin], [radioPlugin]);
 
   useEffect(() => {
     const selectionStillExists = selectedItem
@@ -208,10 +215,10 @@ export function TargetSubscriptionGrid({
   }, [subscriptions, selectedItem, setSelectedItem]);
 
   useEffect(() => {
-    const selectionStillExists = selectedItem
-      ? subscriptions.some((s) => isEqual(s, selectedItem))
-      : false;
-    onSelectedTargetChange?.(selectionStillExists ? selectedItem : null);
+    const freshSelected = selectedItem
+      ? subscriptions.find((s) => isEqual(s, selectedItem)) ?? null
+      : null;
+    onSelectedTargetChange?.(freshSelected);
   }, [subscriptions, selectedItem, onSelectedTargetChange]);
 
   const gridProps = useGridInMemory(subscriptions, {
@@ -283,10 +290,12 @@ export function getNewQuantityCell(
   offerPaths: AdobeOfferSwitchPath[],
   sourceQuantity: number,
   onChange: (subscription: TargetSubscription, value: string) => void,
+  isSelected: boolean,
 ): React.ReactNode {
   const rule = getOfferRule(offerPaths, subscription, sourceQuantity);
-  const enabled = rule?.switchType === 'PARTIAL_ALLOWED';
-  const errorMessage = rule ? validateNewQuantity(subscription.newQuantity, rule) ?? undefined : undefined;
+  const enabled = isSelected && rule?.switchType === 'PARTIAL_ALLOWED';
+  const errorMessage =
+    isSelected && rule ? validateNewQuantity(subscription.newQuantity, rule) ?? undefined : undefined;
 
   return (
     <TextInputCell
