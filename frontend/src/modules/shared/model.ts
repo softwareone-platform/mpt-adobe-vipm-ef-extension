@@ -387,6 +387,7 @@ export interface AgreementSplitPrice {
 
 export interface AgreementSplitAllocation {
   buyer: { id: string; name: string };
+  externalIds?: { client?: string };
   percentage: number;
   price: AgreementSplitPrice;
 }

@@ -3,15 +3,15 @@ import { ReactNode } from 'react';
 import { render } from '@testing-library/react';
 
 import { AllocateToBuyer } from './AllocateToBuyer';
-import type { SplitBillingAgreementAllocation } from '../../model';
+import type { AgreementSplitAllocation } from '../../../shared/model';
 
-type CellData = { id?: string; buyer?: { id?: string; name?: string } };
+type Row = AgreementSplitAllocation & { id: string };
 
 interface ListProps {
-  columns: { name: string; cell: (row: { data: CellData }) => ReactNode }[];
-  data: { id?: string }[];
+  columns: { name: string; cell: (row: { data: Row }) => ReactNode }[];
+  data: Row[];
   selectedRows: { data: { id?: string }; selected: boolean }[];
-  onRowSelectionChange: (rows: CellData[]) => void;
+  onRowSelectionChange: (rows: Row[]) => void;
 }
 
 let capturedListProps: ListProps;
@@ -24,19 +24,15 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/list', () => ({
   useListInMemory: (model: { columns: unknown }) => ({ columns: model.columns }),
 }));
 
-jest.mock('../link-reference/LinkReference', () => ({
-  LinkReference: ({ text }: { text?: string }) => <div data-testid="link-reference">{text}</div>,
-}));
-
-jest.mock('../reference-with-chip/ReferenceWithChip', () => ({
-  ReferenceWithChip: ({ text, statusLabel }: { text?: string; statusLabel: string }) => (
-    <div data-testid="reference-with-chip">{`${text} ${statusLabel}`}</div>
+jest.mock('../buyer-reference/BuyerReference', () => ({
+  BuyerReference: ({ allocation, isOwner }: { allocation: AgreementSplitAllocation; isOwner: boolean }) => (
+    <div data-testid="buyer-reference">{`${allocation.buyer.name} ${isOwner ? 'owner' : 'member'}`}</div>
   ),
 }));
 
-const allocations: SplitBillingAgreementAllocation[] = [
-  { id: 'ALL-1', buyer: { id: 'BUY-1', name: 'Buyer One' }, percentage: 60 },
-  { id: 'ALL-2', buyer: { id: 'BUY-2', name: 'Buyer Two' }, percentage: 40 },
+const allocations: AgreementSplitAllocation[] = [
+  { buyer: { id: 'BUY-1', name: 'Buyer One' }, percentage: 60, price: { currency: 'USD', SPxY: 1, SPxM: 1 } },
+  { buyer: { id: 'BUY-2', name: 'Buyer Two' }, percentage: 40, price: { currency: 'USD', SPxY: 1, SPxM: 1 } },
 ];
 
 function renderComponent(overrides: Partial<Parameters<typeof AllocateToBuyer>[0]> = {}) {
@@ -51,44 +47,19 @@ function renderComponent(overrides: Partial<Parameters<typeof AllocateToBuyer>[0
 }
 
 describe('AllocateToBuyer', () => {
-  it('renders nothing when there are no allocations', () => {
-    const { container } = render(
-      <AllocateToBuyer
-        agreementBuyerId="BUY-1"
-        selectedBuyerId="BUY-1"
-        onChange={jest.fn()}
-        allocations={undefined as unknown as SplitBillingAgreementAllocation[]}
-      />,
-    );
-
-    expect(container.querySelector('[data-testid="allocate-to-buyer"]')).toBeNull();
-  });
-
   it('renders the info text and the list', () => {
     const { getByTestId, getByText } = renderComponent();
 
     expect(getByTestId('allocate-to-buyer')).toBeTruthy();
     expect(getByTestId('list')).toBeTruthy();
-    expect(getByText(/Allocate order billing to a specific buyer/)).toBeTruthy();
+    expect(getByText(/Billing for subscription changes will be allocated between buyers/)).toBeTruthy();
   });
 
-  it('hides the title by default', () => {
-    const { queryByText } = renderComponent();
-
-    expect(queryByText('Split billing')).toBeNull();
-  });
-
-  it('shows the title when isTitle is set', () => {
-    const { getByText } = renderComponent({ isTitle: true });
-
-    expect(getByText('Split billing')).toBeTruthy();
-  });
-
-  it('feeds the list each allocation plus a None row', () => {
+  it('feeds the list one row per allocation with no None row', () => {
     renderComponent();
 
-    expect(capturedListProps.data).toHaveLength(3);
-    expect(capturedListProps.data.map((row) => row.id)).toEqual(['BUY-1', 'BUY-2', '0']);
+    expect(capturedListProps.data).toHaveLength(2);
+    expect(capturedListProps.data.map((row) => row.id)).toEqual(['BUY-1', 'BUY-2']);
   });
 
   it('preselects the row matching the selected buyer', () => {
@@ -97,57 +68,49 @@ describe('AllocateToBuyer', () => {
     expect(capturedListProps.selectedRows).toEqual([{ data: { id: 'BUY-2' }, selected: true }]);
   });
 
-  it('preselects the None row when no buyer is selected', () => {
+  it('selects nothing when no buyer is selected', () => {
     renderComponent({ selectedBuyerId: '' });
 
-    expect(capturedListProps.selectedRows).toEqual([{ data: { id: '0' }, selected: true }]);
+    expect(capturedListProps.selectedRows).toEqual([]);
   });
 
   it('forwards the first selected row to onChange', () => {
     const onChange = jest.fn();
-    const selected = { id: 'BUY-2', buyer: { id: 'BUY-2', name: 'Buyer Two' } };
     renderComponent({ onChange });
 
-    capturedListProps.onRowSelectionChange([selected, { id: 'BUY-1' }]);
+    capturedListProps.onRowSelectionChange([allocations[1] as Row, allocations[0] as Row]);
 
-    expect(onChange).toHaveBeenCalledWith(selected);
+    expect(onChange).toHaveBeenCalledWith(allocations[1]);
   });
 
-  it('forwards an empty selection when the None row is selected', () => {
+  it('ignores an empty selection', () => {
     const onChange = jest.fn();
     renderComponent({ onChange });
 
-    capturedListProps.onRowSelectionChange([{ id: '0' }]);
+    capturedListProps.onRowSelectionChange([]);
 
-    expect(onChange).toHaveBeenCalledWith({});
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   describe('buyer column cell', () => {
     const getCell = () => capturedListProps.columns[0].cell;
 
-    it('renders the owner buyer with an Owner chip', () => {
+    it('marks the agreement owner as owner', () => {
       renderComponent();
       const { getByTestId } = render(
-        <>{getCell()({ data: { id: 'BUY-1', buyer: { id: 'BUY-1', name: 'Buyer One' } } })}</>,
+        <>{getCell()({ data: allocations[0] as Row })}</>,
       );
 
-      expect(getByTestId('reference-with-chip').textContent).toBe('Buyer One Owner');
+      expect(getByTestId('buyer-reference').textContent).toBe('Buyer One owner');
     });
 
-    it('renders a non-owner buyer as a link reference', () => {
+    it('marks a non-owner buyer as member', () => {
       renderComponent();
       const { getByTestId } = render(
-        <>{getCell()({ data: { id: 'BUY-2', buyer: { id: 'BUY-2', name: 'Buyer Two' } } })}</>,
+        <>{getCell()({ data: allocations[1] as Row })}</>,
       );
 
-      expect(getByTestId('link-reference').textContent).toBe('Buyer Two');
-    });
-
-    it('renders the None row label', () => {
-      renderComponent();
-      const { getByText } = render(<>{getCell()({ data: { id: '0' } })}</>);
-
-      expect(getByText('None')).toBeTruthy();
+      expect(getByTestId('buyer-reference').textContent).toBe('Buyer Two member');
     });
   });
 });
