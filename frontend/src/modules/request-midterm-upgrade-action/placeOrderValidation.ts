@@ -11,7 +11,7 @@ export function getPlaceOrderValidationError(
   sourceQuantity: number,
 ): string | null {
   if (!target) {
-    return 'Select the item to upgrade to before placing the order.';
+    return 'Select an item to continue.';
   }
   if (!target.targetBaseOfferId) {
     return 'The selected item is missing its Adobe offer and cannot be ordered.';

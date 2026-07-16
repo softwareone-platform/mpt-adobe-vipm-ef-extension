@@ -16,13 +16,6 @@ interface DetailsStepProps {
   isSplitBillingStepSkip?: boolean;
 }
 
-export function useUpdateOrder(orderId?: string | null) {
-  return useCallback(
-    async (payload: Partial<Order>): Promise<Order> => ({ id: orderId, ...payload }),
-    [orderId]
-  );
-}
-
 export function DetailsStep({
   subscription,
   order,
@@ -31,7 +24,6 @@ export function DetailsStep({
 }: DetailsStepProps) {
   const [externalId, setExternalId] = useState(order?.externalIds?.client ?? '');
   const [notes, setNotes] = useState(order?.notes ?? '');
-  const handleUpdateOrder = useUpdateOrder(order?.id);
   const { registerOnNextCallback, registerOnBackCallback } = useStepActions();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -49,16 +41,16 @@ export function DetailsStep({
       }
       setIsSaving(true);
       try {
-        const updatedOrder = await handleUpdateOrder({
+        setOrder({
+          ...order,
           externalIds: { ...order?.externalIds, client: externalId },
           notes,
         });
-        setOrder({ ...order, ...updatedOrder });
       } finally {
         setIsSaving(false);
       }
     },
-    [order, externalId, notes, isOrderChanged, isSaving, handleUpdateOrder, setOrder]
+    [order, externalId, notes, isOrderChanged, isSaving, setOrder]
   );
 
   const onBack = useCallback(

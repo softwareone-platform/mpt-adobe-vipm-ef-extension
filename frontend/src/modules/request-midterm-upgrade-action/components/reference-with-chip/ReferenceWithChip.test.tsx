@@ -5,6 +5,16 @@ import { render } from '@testing-library/react';
 
 import { ReferenceWithChip } from './ReferenceWithChip';
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
+  LinkPopover: ({ title, target, children }: { title: string; target: ReactNode; children: ReactNode }) => (
+    <div data-testid="link-popover">
+      <div data-testid="link-popover-title">{title}</div>
+      <div>{target}</div>
+      {children}
+    </div>
+  ),
+}));
+
 const renderWithRouter = (ui: ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('ReferenceWithChip', () => {
@@ -42,19 +52,22 @@ describe('ReferenceWithChip', () => {
     expect(queryByRole('link')).toBeNull();
   });
 
-  it('wraps the reference in a popover with the info-card modifier when an info card is provided', () => {
-    const { container } = renderWithRouter(
-      <ReferenceWithChip text="Acme" statusLabel="Active" infoCard={<div>card</div>} />
+  it('wraps the reference in a link popover with the info-card modifier when a card is provided', () => {
+    const { getByTestId, container } = renderWithRouter(
+      <ReferenceWithChip text="Acme" statusLabel="Active" cardTitle="Customer" card={<div>card</div>} />
     );
 
-    expect(container.querySelector('[data-testid="popover"]')).toBeTruthy();
+    expect(getByTestId('link-popover')).toBeTruthy();
+    expect(getByTestId('link-popover-title').textContent).toBe('Customer');
     expect(container.querySelector('.entity-reference-with-chip--with-info-card')).toBeTruthy();
   });
 
-  it('renders without a popover when no info card is provided', () => {
-    const { container } = renderWithRouter(<ReferenceWithChip text="Acme" statusLabel="Active" />);
+  it('renders without a popover when no card is provided', () => {
+    const { queryByTestId, container } = renderWithRouter(
+      <ReferenceWithChip text="Acme" statusLabel="Active" />
+    );
 
-    expect(container.querySelector('[data-testid="popover"]')).toBeNull();
+    expect(queryByTestId('link-popover')).toBeNull();
     expect(container.querySelector('.entity-reference-with-chip--with-info-card')).toBeNull();
   });
 });
