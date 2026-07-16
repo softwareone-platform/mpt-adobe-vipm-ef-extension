@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 
 import { WizardHighlights } from './WizardHighlights';
 import type { Subscription } from '../../../shared/model';
+import type { Order } from '../../model';
 
 const subscription: Subscription = {
   id: 'SUB-1',
@@ -14,10 +15,10 @@ const subscription: Subscription = {
   price: { currency: 'USD' },
 };
 
-const renderHighlights = () =>
+const renderHighlights = (order?: Order | null) =>
   render(
     <MemoryRouter>
-      <WizardHighlights subscription={subscription} />
+      <WizardHighlights subscription={subscription} order={order} />
     </MemoryRouter>
   );
 
@@ -56,5 +57,27 @@ describe('WizardHighlights', () => {
     const { getAllByText } = renderHighlights();
 
     expect(getAllByText('USD')).toHaveLength(2);
+  });
+
+  it('shows the order status without a link before the order is created', () => {
+    const { getByText, queryByText } = renderHighlights({ id: null, status: 'New', type: 'Change' });
+
+    expect(getByText('New')).toBeTruthy();
+    expect(getByText('Change order')).toBeTruthy();
+    expect(queryByText(/^ORD-/)).toBeNull();
+  });
+
+  it('links the created order id to the order route', () => {
+    const { getByText } = renderHighlights({
+      id: 'ORD-2222-2222',
+      status: 'Processing',
+      type: 'Change',
+    });
+
+    const orderLink = getByText('ORD-2222-2222').closest('a');
+    expect(orderLink?.getAttribute('href')).toBe(
+      `${window.location.origin}/commerce/orders/ORD-2222-2222`,
+    );
+    expect(getByText('Processing')).toBeTruthy();
   });
 });

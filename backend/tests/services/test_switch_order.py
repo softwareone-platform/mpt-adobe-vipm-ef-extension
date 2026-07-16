@@ -1,4 +1,7 @@
+import http
+
 import pytest
+from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
 from mpt_extension_sdk.models import Agreement
 
 from mpt_adobe_vipm_ef.models.switch import UpgradeOrderRequest, build_switch_payload
@@ -6,6 +9,7 @@ from mpt_adobe_vipm_ef.services.switch_order import (
     build_change_order_lines,
     create_switch_change_order,
     find_agreement_line_by_sku,
+    mpt_order_error_detail,
 )
 
 _AGREEMENT_ID = "AGR-1234-5678"
@@ -109,16 +113,14 @@ def switch_payload():
 @pytest.fixture
 def orders_service(mocker):
     created = mocker.Mock()
-    created.to_dict.return_value = {"id": "ORD-0001"}
-    processed = mocker.Mock()
-    processed.to_dict.return_value = {"id": "ORD-0001", "status": "Processing"}
+    created.to_dict.return_value = {"id": "ORD-0001", "status": "Processing"}
     return mocker.Mock(
         create=mocker.AsyncMock(return_value=created),
-        process=mocker.AsyncMock(return_value=processed),
+        process=mocker.AsyncMock(),
     )
 
 
-async def test_create_switch_change_order_creates_and_processes(
+async def test_create_switch_change_order_creates_in_processing_status(
     mocker, orders_service, switch_payload
 ):
     client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
@@ -128,6 +130,7 @@ async def test_create_switch_change_order_creates_and_processes(
 
     assert result == {"id": "ORD-0001", "status": "Processing"}
     orders_service.create.assert_awaited_once_with({
+        "status": "Processing",
         "type": "Change",
         "agreement": {"id": _AGREEMENT_ID},
         "lines": lines,
@@ -135,4 +138,55 @@ async def test_create_switch_change_order_creates_and_processes(
             "ordering": [{"externalId": "switchPayload", "value": switch_payload.to_dict()}],
         },
     })
-    orders_service.process.assert_awaited_once_with("ORD-0001")
+    orders_service.process.assert_not_awaited()
+
+
+def test_mpt_order_error_detail_returns_the_platform_detail():
+    error = MPTAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        "Bad Request",
+        {
+            "title": "Bad Request",
+            "detail": "Cannot create order because the associated agreement is in status Updating.",
+            "traceId": "00-trace-01",
+        },
+    )
+
+    result = mpt_order_error_detail(error)
+
+    assert result == "Cannot create order because the associated agreement is in status Updating."
+
+
+def test_mpt_order_error_detail_flattens_field_errors():
+    error = MPTAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        "Bad Request",
+        {
+            "title": "One or more validation errors occurred.",
+            "errors": {"status": ["Property must be provided"]},
+        },
+    )
+
+    result = mpt_order_error_detail(error)
+
+    assert result == "One or more validation errors occurred. status: Property must be provided"
+
+
+def test_mpt_order_error_detail_keeps_server_errors_generic():
+    error = MPTAPIError(
+        http.HTTPStatus.INTERNAL_SERVER_ERROR,
+        "Server Error",
+        {"title": "Internal failure", "detail": "stack trace details"},
+    )
+
+    result = mpt_order_error_detail(error)
+
+    assert result == "MPT service request failed"
+
+
+def test_mpt_order_error_detail_falls_back_for_plain_http_errors():
+    error = MPTHttpError(http.HTTPStatus.BAD_REQUEST, "Bad Request", "not json")
+
+    result = mpt_order_error_detail(error)
+
+    assert result == "MPT service request failed"

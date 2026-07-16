@@ -25,6 +25,7 @@ let capturedData: { id: string | null }[];
 let capturedConfig: CapturedConfig;
 const radioPlugin = { id: 'radio' };
 const setSelectedItem = jest.fn();
+let mockSelectedItem: unknown = null;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: () => <div data-testid="grid" />,
@@ -38,7 +39,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
     capturedConfig = config;
     return { data, config };
   },
-  useRadioPlugin: () => ({ plugin: radioPlugin, selectedItem: null, setSelectedItem }),
+  useRadioPlugin: () => ({ plugin: radioPlugin, selectedItem: mockSelectedItem, setSelectedItem }),
 }));
 
 type Subscription = Parameters<typeof getRecommendedCell>[0];
@@ -91,6 +92,7 @@ const onSubscriptionsChange = jest.fn();
 beforeEach(() => {
   onSubscriptionsChange.mockReset();
   setSelectedItem.mockClear();
+  mockSelectedItem = null;
 });
 
 describe('TargetSubscriptionGrid', () => {
@@ -167,6 +169,56 @@ describe('TargetSubscriptionGrid', () => {
     expect(setSelectedItem).toHaveBeenCalledWith(expect.objectContaining({ item: expect.objectContaining({ id: 'ITM-A' }) }));
   });
 
+  it('propagates the radio selection to the parent', () => {
+    mockSelectedItem = subscriptions[1];
+    const onSelectedTargetChange = jest.fn();
+
+    render(
+      <TargetSubscriptionGrid
+        subscriptions={subscriptions}
+        offerPaths={offerPaths}
+        sourceQuantity={7}
+        onSubscriptionsChange={onSubscriptionsChange}
+        onSelectedTargetChange={onSelectedTargetChange}
+      />,
+    );
+
+    expect(onSelectedTargetChange).toHaveBeenCalledWith(subscriptions[1]);
+  });
+
+  it('reports a null selection when the grid empties out with a stale selection', () => {
+    mockSelectedItem = subscriptions[0];
+    const onSelectedTargetChange = jest.fn();
+
+    render(
+      <TargetSubscriptionGrid
+        subscriptions={[]}
+        offerPaths={offerPaths}
+        sourceQuantity={7}
+        onSubscriptionsChange={onSubscriptionsChange}
+        onSelectedTargetChange={onSelectedTargetChange}
+      />,
+    );
+
+    expect(onSelectedTargetChange).toHaveBeenCalledWith(null);
+  });
+
+  it('reports a null selection when nothing is selected yet', () => {
+    const onSelectedTargetChange = jest.fn();
+
+    render(
+      <TargetSubscriptionGrid
+        subscriptions={subscriptions}
+        offerPaths={offerPaths}
+        sourceQuantity={7}
+        onSubscriptionsChange={onSubscriptionsChange}
+        onSelectedTargetChange={onSelectedTargetChange}
+      />,
+    );
+
+    expect(onSelectedTargetChange).toHaveBeenCalledWith(null);
+  });
+
   it('propagates quantity changes to the parent instead of keeping local state', () => {
     render(<TargetSubscriptionGrid subscriptions={subscriptions} offerPaths={offerPaths} sourceQuantity={7} onSubscriptionsChange={onSubscriptionsChange} />);
 
@@ -178,6 +230,25 @@ describe('TargetSubscriptionGrid', () => {
 
     expect(onSubscriptionsChange).toHaveBeenCalledTimes(1);
     expect(onSubscriptionsChange.mock.calls[0][0][0]).toMatchObject({ newQuantity: 10, delta: 3 });
+  });
+
+  it('keeps rows sharing an item id distinct via targetBaseOfferId when updating quantity', () => {
+    const sharedId = 'ITM-DUP-0000-0000';
+    const rows = [
+      makeSubscription({ item: { id: sharedId, name: 'A', externalId: 'AO03.25470' }, targetBaseOfferId: 'OFFER-A', newQuantity: 7, delta: 0 }),
+      makeSubscription({ item: { id: sharedId, name: 'B', externalId: 'AO03.25470' }, targetBaseOfferId: 'OFFER-B', newQuantity: 7, delta: 0 }),
+    ];
+    render(<TargetSubscriptionGrid subscriptions={rows} offerPaths={offerPaths} sourceQuantity={7} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    const column = capturedConfig.columns.find((c) => c.name === 'newQuantity') as unknown as {
+      cell: (item: Subscription) => ReactNode;
+    };
+    const { getByRole } = render(<>{column.cell(rows[1])}</>);
+    fireEvent.change(getByRole('spinbutton'), { target: { value: '3' } });
+
+    const updated = onSubscriptionsChange.mock.calls[0][0];
+    expect(updated[0]).toMatchObject({ targetBaseOfferId: 'OFFER-A', newQuantity: 7 });
+    expect(updated[1]).toMatchObject({ targetBaseOfferId: 'OFFER-B', newQuantity: 3 });
   });
 });
 
