@@ -1,0 +1,11 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.split-billing-option {
+  display: flex;
+  flex-direction: column;
+  gap: $var-spacing-3;
+
+  &__label {
+    margin: 0;
+  }
+}

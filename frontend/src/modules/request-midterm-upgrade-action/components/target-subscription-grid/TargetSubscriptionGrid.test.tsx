@@ -24,6 +24,7 @@ interface CapturedConfig {
 let capturedData: { id: string | null }[];
 let capturedConfig: CapturedConfig;
 const radioPlugin = { id: 'radio' };
+const setSelectedItem = jest.fn();
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: () => <div data-testid="grid" />,
@@ -37,7 +38,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
     capturedConfig = config;
     return { data, config };
   },
-  useRadioPlugin: () => ({ plugin: radioPlugin }),
+  useRadioPlugin: () => ({ plugin: radioPlugin, selectedItem: null, setSelectedItem }),
 }));
 
 type Subscription = Parameters<typeof getRecommendedCell>[0];
@@ -89,6 +90,7 @@ const onSubscriptionsChange = jest.fn();
 
 beforeEach(() => {
   onSubscriptionsChange.mockReset();
+  setSelectedItem.mockClear();
 });
 
 describe('TargetSubscriptionGrid', () => {
@@ -143,6 +145,26 @@ describe('TargetSubscriptionGrid', () => {
 
     expect(capturedConfig.paging).toEqual({ page: 1, pageSize: 2, total: 2 });
     expect(capturedConfig.plugins).toEqual([radioPlugin]);
+  });
+
+  it('preselects the first recommended row', () => {
+    const rows = [
+      makeSubscription({ item: { id: 'ITM-A', name: 'A', externalId: 'A' }, recommended: false }),
+      makeSubscription({ item: { id: 'ITM-B', name: 'B', externalId: 'B' }, recommended: true }),
+    ];
+    render(<TargetSubscriptionGrid subscriptions={rows} offerPaths={offerPaths} sourceQuantity={7} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    expect(setSelectedItem).toHaveBeenCalledWith(expect.objectContaining({ item: expect.objectContaining({ id: 'ITM-B' }) }));
+  });
+
+  it('falls back to the first row when none are recommended', () => {
+    const rows = [
+      makeSubscription({ item: { id: 'ITM-A', name: 'A', externalId: 'A' }, recommended: false }),
+      makeSubscription({ item: { id: 'ITM-B', name: 'B', externalId: 'B' }, recommended: false }),
+    ];
+    render(<TargetSubscriptionGrid subscriptions={rows} offerPaths={offerPaths} sourceQuantity={7} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    expect(setSelectedItem).toHaveBeenCalledWith(expect.objectContaining({ item: expect.objectContaining({ id: 'ITM-A' }) }));
   });
 
   it('propagates quantity changes to the parent instead of keeping local state', () => {

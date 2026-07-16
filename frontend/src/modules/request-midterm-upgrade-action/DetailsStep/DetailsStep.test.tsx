@@ -1,4 +1,4 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 
 import { DetailsStep } from './DetailsStep';
 import type { Order } from '../model';
@@ -66,14 +66,13 @@ describe('DetailsStep', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the heading, highlights, inputs, and save button', () => {
+  it('renders the heading, highlights, and inputs', () => {
     const { getByText, getByTestId } = renderStep();
 
     expect(getByText('Order')).toBeTruthy();
     expect(getByTestId('wizard-highlights')).toBeTruthy();
     expect(getByTestId('order-additional-id')).toBeTruthy();
     expect(getByTestId('order-notes')).toBeTruthy();
-    expect(getByText('Save Order')).toBeTruthy();
   });
 
   it('registers onNext and onBack callbacks', () => {
@@ -127,14 +126,5 @@ describe('DetailsStep', () => {
       })
     );
     expect(result).toBe(4);
-  });
-
-  it('saves when the Save Order button is clicked', async () => {
-    const { props, getByText, getByTestId } = renderStep();
-
-    fireEvent.change(getByTestId('order-additional-id'), { target: { value: 'CL-ADD-123' } });
-    fireEvent.click(getByText('Save Order'));
-
-    await waitFor(() => expect(props.setOrder).toHaveBeenCalled());
   });
 });

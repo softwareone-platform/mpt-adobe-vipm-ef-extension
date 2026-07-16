@@ -25,12 +25,11 @@ import { SummaryStep } from './SummaryStep';
 
 import type {
   Order,
-  SplitBillingAgreementAllocation,
   TargetSubscription,
 } from './model';
 
 import './App.scss';
-import { AdobeOfferSwitchPath, getRecommendedOfferIds } from '../shared/model';
+import { AdobeOfferSwitchPath, AgreementSplitAllocation, getRecommendedOfferIds } from '../shared/model';
 
 const initialOrder: Order = {
   id: 'ORD-1111-1111',
@@ -57,7 +56,7 @@ export default function App() {
   const hasSplit = subscription?.splitStatus === 'Active';
   const { data: splitAgreement } = useAgreementSplit(hasSplit ? (subscription?.agreement?.id ?? '') : '');
   const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [selectedBuyer, setSelectedBuyer] = useState<SplitBillingAgreementAllocation>({});
+  const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
   const [recommendationTrackerId, setRecommendationTrackerId] = useState<string>('');

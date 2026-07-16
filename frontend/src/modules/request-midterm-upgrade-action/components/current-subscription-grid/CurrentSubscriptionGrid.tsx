@@ -9,7 +9,7 @@ import {
   useGridInMemory,
   useRadioPlugin,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { Subscription } from '../../../shared/model';
 
@@ -148,10 +148,17 @@ export function CurrentSubscriptionGrid({
 }: {
   subscription: Subscription;
 }) {
-  const { plugin: radioPlugin } = useRadioPlugin<Row>(isEqual);
+  const { plugin: radioPlugin, selectedItem, setSelectedItem } = useRadioPlugin<Row>(isEqual);
   const plugins = useMemo(() => [radioPlugin], [radioPlugin]);
 
   const rows = useMemo(() => toRows(subscription), [subscription]);
+
+  useEffect(() => {
+    const selectionStillExists = selectedItem ? rows.some((row) => isEqual(row, selectedItem)) : false;
+    if (rows[0] && !selectionStillExists) {
+      setSelectedItem(rows[0]);
+    }
+  }, [rows, selectedItem, setSelectedItem]);
 
   const gridProps = useGridInMemory(rows, {
     id: 'components__request-midterm-upgrade__current-subscription--client',
