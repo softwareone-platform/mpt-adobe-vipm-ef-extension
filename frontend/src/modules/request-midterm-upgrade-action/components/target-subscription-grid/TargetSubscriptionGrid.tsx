@@ -103,12 +103,12 @@ const fields: GridFieldDefinition[] = [
 const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];
 
 function isEqual(a: TargetSubscription, b: TargetSubscription): boolean {
-  return a.item.id === b.item.id;
+  return a.item.id === b.item.id && a.targetBaseOfferId === b.targetBaseOfferId;
 }
 
 type SwitchType = 'PARTIAL_ALLOWED' | 'FULL_ONLY';
 
-interface OfferRule {
+export interface OfferRule {
   switchType: SwitchType;
   sourceQuantity: number;
 }
@@ -117,7 +117,7 @@ function getPartialSku(offerId: string): string {
   return offerId.slice(0, 10);
 }
 
-function getOfferRule(
+export function getOfferRule(
   offerPaths: AdobeOfferSwitchPath[],
   target: TargetSubscription,
   sourceQuantity: number,
@@ -135,7 +135,7 @@ function getOfferRule(
   return undefined;
 }
 
-function validateNewQuantity(newQuantity: number | null, rule: OfferRule): string | null {
+export function validateNewQuantity(newQuantity: number | null, rule: OfferRule): string | null {
   if (newQuantity === null) return 'Quantity is required';
   if (rule.switchType === 'FULL_ONLY') {
     return newQuantity === rule.sourceQuantity ? null : `Quantity must be ${rule.sourceQuantity}`;
@@ -150,6 +150,7 @@ interface TargetSubscriptionGridProps {
   offerPaths: AdobeOfferSwitchPath[];
   sourceQuantity: number;
   onSubscriptionsChange: (subscriptions: TargetSubscription[]) => void;
+  onSelectedTargetChange?: (target: TargetSubscription | null) => void;
 }
 
 export function TargetSubscriptionGrid({
@@ -157,6 +158,7 @@ export function TargetSubscriptionGrid({
   offerPaths,
   sourceQuantity,
   onSubscriptionsChange,
+  onSelectedTargetChange,
 }: TargetSubscriptionGridProps) {
   const updateQuantity = useCallback(
     (target: TargetSubscription, value: string) => {
@@ -204,6 +206,14 @@ export function TargetSubscriptionGrid({
       setSelectedItem(subscriptions.find((s) => s.recommended) ?? subscriptions[0]);
     }
   }, [subscriptions, selectedItem, setSelectedItem]);
+
+  useEffect(() => {
+    const selectionStillExists = selectedItem
+      ? subscriptions.some((s) => isEqual(s, selectedItem))
+      : false;
+    onSelectedTargetChange?.(selectionStillExists ? selectedItem : null);
+  }, [subscriptions, selectedItem, onSelectedTargetChange]);
+
   const gridProps = useGridInMemory(subscriptions, {
     id: 'components__request-midterm-upgrade-action__target-subscription-grid',
     columns: cols,

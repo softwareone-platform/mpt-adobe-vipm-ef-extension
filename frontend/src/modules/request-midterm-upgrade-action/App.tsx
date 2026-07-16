@@ -10,6 +10,8 @@ import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
 import { useAgreementSplit } from '../shared/hooks/useAgreementSplit';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
+import { useUpgradeOrderRequest } from '../shared/hooks/useUpgradeOrderRequest';
+import { getPlaceOrderValidationError } from './placeOrderValidation';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
@@ -32,7 +34,7 @@ import './App.scss';
 import { AdobeOfferSwitchPath, AgreementSplitAllocation, getRecommendedOfferIds } from '../shared/model';
 
 const initialOrder: Order = {
-  id: 'ORD-1111-1111',
+  id: null,
   status: 'New',
   type: 'Change',
 };
@@ -60,12 +62,60 @@ export default function App() {
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
   const [recommendationTrackerId, setRecommendationTrackerId] = useState<string>('');
+  const [selectedTarget, setSelectedTarget] = useState<TargetSubscription | null>(null);
+  const [placeOrderValidationError, setPlaceOrderValidationError] = useState<string>('');
+  const {
+    submitOrder,
+    error: submitError,
+    status: submitStatus,
+  } = useUpgradeOrderRequest(subscription?.agreement?.id ?? '', subscriptionId);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
+
+  // Quantity edits rebuild the rows, so read the selected row fresh from the list.
+  const currentSelectedTarget = selectedTarget
+    ? (targetSubscriptions.find(
+        (row) =>
+          row.item.id === selectedTarget.item.id &&
+          row.targetBaseOfferId === selectedTarget.targetBaseOfferId,
+      ) ?? null)
+    : null;
 
   const onClose = useCallback(() => {
     close();
   }, [close]);
+
+  const placeOrder = useCallback(async (): Promise<boolean> => {
+    if (submitStatus === 'loading') {
+      return false;
+    }
+    const validationError = getPlaceOrderValidationError(
+      currentSelectedTarget,
+      offerPaths,
+      sourceQuantity,
+    );
+    setPlaceOrderValidationError(validationError ?? '');
+    if (validationError || !currentSelectedTarget) {
+      return false;
+    }
+    const result = await submitOrder({
+      targetOfferId: currentSelectedTarget.targetBaseOfferId ?? '',
+      quantity: currentSelectedTarget.newQuantity ?? 0,
+      recommendationTrackerId,
+    });
+    if (!result) {
+      return false;
+    }
+    setOrder((prev) => ({ ...prev, ...result }));
+    return true;
+  }, [
+    submitStatus,
+    currentSelectedTarget,
+    offerPaths,
+    sourceQuantity,
+    recommendationTrackerId,
+    submitOrder,
+  ]);
 
   const viewOrder = useCallback(() => {
     if (order?.id) {
@@ -105,6 +155,7 @@ export default function App() {
           name: target.item?.name ?? 'Item Name',
           externalId: target.item?.externalId ?? '1234567890',
         },
+        targetBaseOfferId: target.targetBaseOfferId,
         recommended: recommendedOfferIds.has(target.targetBaseOfferId),
         currentQuantity: 0,
         newQuantity: sourceQuantity,
@@ -153,6 +204,7 @@ export default function App() {
           subscription={subscription}
           subscriptions={targetSubscriptions}
           onSubscriptionsChange={setTargetSubscriptions}
+          onSelectedTargetChange={setSelectedTarget}
           offerPaths={offerPaths}
           sourceQuantity={sourceQuantity}
           offerStatus={offerStatus}
@@ -182,13 +234,15 @@ export default function App() {
     },
     {
       title: 'Review order',
-      nextButton: { label: 'Place order' },
+      nextButton: { label: 'Place order', isDisabled: submitStatus === 'loading' },
       render: () => (
         <ReviewOrderStep
           subscription={subscription}
           order={order}
-          subscriptions={targetSubscriptions}
-          recommendationTrackerId={recommendationTrackerId}
+          subscriptions={currentSelectedTarget ? [currentSelectedTarget] : []}
+          onPlaceOrder={placeOrder}
+          errorMessage={placeOrderValidationError || submitError}
+          isSubmitting={submitStatus === 'loading'}
         />
       ),
     },

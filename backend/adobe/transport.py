@@ -67,18 +67,36 @@ class AdobeTransport:
         """The extension settings backing this transport."""
         return self._settings
 
-    def request(
+    def request(  # noqa: WPS210 WPS211
         self,
         method: str,
         authorization: Authorization,
         path: str,
         *,
         correlation_id: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Perform an authenticated request against the Adobe VIPM API."""
+        """Perform an authenticated request against the Adobe VIPM API.
+
+        ``extra_headers`` add caller headers (e.g. the
+        ``x-recommendation-tracker-id`` attribution header on order calls). Keys
+        that collide with a transport-owned header (``Authorization``,
+        ``X-Api-Key``, etc.) are ignored so a caller cannot override
+        authentication.
+        """
         url = urljoin(self._settings.adobe_api_base_url, path)
         headers = self._get_headers(authorization, correlation_id)
+        if extra_headers:
+            owned = {name.lower() for name in headers}
+            for name, value in extra_headers.items():  # noqa: WPS110
+                if name.lower() in owned:
+                    logger.warning(
+                        "Ignoring caller header %r: it would override a transport-owned header",
+                        name,
+                    )
+                    continue
+                headers[name] = value
         logger.info("Adobe API request: %s %s", method, url)
         response = self._session.request(
             method, url, headers=headers, timeout=self._TIMEOUT, **kwargs

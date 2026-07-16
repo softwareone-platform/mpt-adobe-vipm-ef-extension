@@ -28,3 +28,5 @@ AGREEMENT_CACHE_KEY = "agreements_by_id"
 RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"
 
 CHANGE_ORDER_TYPE = "Change"
+PROCESSING_ORDER_STATUS = "Processing"
+ACTIVE_AGREEMENT_STATUS = "Active"

@@ -1,5 +1,6 @@
 import { EntityDomain, EntityType } from '../../../shared/constants';
 import { OrderStatus, Subscription } from '../../../shared/model';
+import { Order } from '../../model';
 import { getEntityLink } from '../../../utils/link';
 
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
@@ -14,11 +15,14 @@ import { formatDate, formatTime } from '../../../utils/date';
 
 export function WizardHighlights({
   subscription,
+  order,
 }: {
   subscription: Subscription;
+  order?: Order | null;
 }) {
-  const orderStatus: OrderStatus = 'New';
-  const orderType = 'Change';
+  const orderStatus = (order?.status ?? 'New') as OrderStatus;
+  const orderType = order?.type ?? 'Change';
+  const orderUrl = getEntityLink(EntityDomain.Commerce, EntityType.Orders, order?.id ?? undefined);
   const agreementStatus = subscription.agreement?.status ?? '';
   const agreementStatusColor: ChipColor | undefined =
     agreementStatus === 'Active' ? 'success' : undefined;
@@ -126,10 +130,23 @@ export function WizardHighlights({
   return (
     <Highlights>
       <Highlights.Item label="Order">
-        <EntityReference
-          primaryContent={<Chip label={orderStatus} />}
-          secondaryContent={`${orderType} order`}
-        />
+        {order?.id ? (
+          <EntityReference
+            primaryContent={
+              <ReferenceWithChip
+                text={order.id}
+                url={orderUrl ?? undefined}
+                statusLabel={orderStatus}
+              />
+            }
+            secondaryContent={`${orderType} order`}
+          />
+        ) : (
+          <EntityReference
+            primaryContent={<Chip label={orderStatus} />}
+            secondaryContent={`${orderType} order`}
+          />
+        )}
       </Highlights.Item>
       <Highlights.Item label="Agreement">
         <EntityReference

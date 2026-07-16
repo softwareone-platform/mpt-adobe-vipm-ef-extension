@@ -14,7 +14,9 @@ interface CapturedConfig {
 
 let capturedRows: TargetSubscription[];
 let capturedConfig: CapturedConfig;
-let registeredOnNext: ((properties: { currentStepIndex: number; targetStepIndex: number }) => number) | undefined;
+let registeredOnNext:
+  | ((properties: { currentStepIndex: number; targetStepIndex: number }) => Promise<number> | number)
+  | undefined;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: () => <div data-testid="grid" />,
@@ -50,6 +52,12 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/tabs', () => {
 
 jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
+}));
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/notification', () => ({
+  InlineNotification: ({ status, children }: { status: string; children?: ReactNode }) => (
+    <div data-testid={`notification-${status}`}>{children}</div>
+  ),
 }));
 
 const order: Order = { id: 'ORD-1111-1111' };
@@ -138,10 +146,74 @@ describe('ReviewOrderStep', () => {
     expect(capturedConfig.paging).toEqual({ page: 1, pageSize: 3, total: 3 });
   });
 
-  it('advances to the next step when placing the order', () => {
-    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
+  it('advances to the next step when the order is placed successfully', async () => {
+    const onPlaceOrder = jest.fn().mockResolvedValue(true);
+    render(
+      <ReviewOrderStep
+        subscription={{ id: 'SUB-1' }}
+        order={order}
+        subscriptions={subscriptions}
+        onPlaceOrder={onPlaceOrder}
+      />,
+    );
 
     expect(registeredOnNext).toBeDefined();
-    expect(registeredOnNext!({ currentStepIndex: 4, targetStepIndex: 5 })).toBe(5);
+    await expect(registeredOnNext!({ currentStepIndex: 4, targetStepIndex: 5 })).resolves.toBe(5);
+    expect(onPlaceOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays on the review step when placing the order fails', async () => {
+    const onPlaceOrder = jest.fn().mockResolvedValue(false);
+    render(
+      <ReviewOrderStep
+        subscription={{ id: 'SUB-1' }}
+        order={order}
+        subscriptions={subscriptions}
+        onPlaceOrder={onPlaceOrder}
+      />,
+    );
+
+    await expect(registeredOnNext!({ currentStepIndex: 4, targetStepIndex: 5 })).resolves.toBe(4);
+  });
+
+  it('advances without submitting when no place-order handler is wired', async () => {
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
+
+    await expect(registeredOnNext!({ currentStepIndex: 4, targetStepIndex: 5 })).resolves.toBe(5);
+  });
+
+  it('shows the error notification when an error message is provided', () => {
+    const { getByTestId, getByText } = render(
+      <ReviewOrderStep
+        subscription={{ id: 'SUB-1' }}
+        order={order}
+        subscriptions={subscriptions}
+        errorMessage="Adobe rejected the switch preview."
+      />,
+    );
+
+    expect(getByTestId('notification-error')).toBeTruthy();
+    expect(getByText('Adobe rejected the switch preview.')).toBeTruthy();
+  });
+
+  it('hides the error notification when there is no error message', () => {
+    const { queryByTestId } = render(
+      <ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />,
+    );
+
+    expect(queryByTestId('notification-error')).toBeNull();
+  });
+
+  it('shows the submitting indicator while the order is being placed', () => {
+    const { getByTestId } = render(
+      <ReviewOrderStep
+        subscription={{ id: 'SUB-1' }}
+        order={order}
+        subscriptions={subscriptions}
+        isSubmitting
+      />,
+    );
+
+    expect(getByTestId('review-order-step-submitting')).toBeTruthy();
   });
 });

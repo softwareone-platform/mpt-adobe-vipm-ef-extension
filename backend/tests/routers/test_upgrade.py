@@ -1,7 +1,7 @@
 import http
 
 import pytest
-from mpt_api_client.exceptions import MPTHttpError
+from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
 from mpt_extension_sdk.api.errors import (
     ForbiddenError,
     NotFoundError,
@@ -44,10 +44,11 @@ def _line_payload(line_id, vendor_sku, quantity):
     }
 
 
-def _agreement_payload(product_id="PRD-1111-1111", lines=None):
+def _agreement_payload(product_id="PRD-1111-1111", lines=None, status="Active"):
     return {
         "id": _AGREEMENT_ID,
         "name": "Dummy Agreement",
+        "status": status,
         "client": {"id": "ACC-0000-0001", "name": "Dummy Client"},
         "licensee": {"id": "LCE-0000-0001", "name": "Dummy Licensee", "status": "active"},
         "product": {"id": product_id, "name": "Dummy Product"},
@@ -188,6 +189,7 @@ async def test_create_upgrade_order_previews_the_switch_snapshot(fake_ctx, submi
                 "quantity": 6,
             },
         ],
+        "TRACKER-1",
     )
 
 
@@ -300,6 +302,40 @@ async def test_create_upgrade_order_maps_mpt_order_errors(fake_ctx, submit_deps,
 
     with pytest.raises(UpstreamServiceError):
         await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+
+async def test_create_upgrade_order_surfaces_the_platform_rejection_detail(
+    fake_ctx, submit_deps, create_order_mock
+):
+    create_order_mock.side_effect = MPTAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        "Bad Request",
+        {
+            "title": "Bad Request",
+            "detail": (
+                "Cannot create order because the associated agreement is in status "
+                "Updating. Orders can only be created for Active agreements"
+            ),
+            "traceId": "00-6432cdd6f8c311b506817951a3ac5454-9bb3540d6e1ca195-01",
+        },
+    )
+
+    with pytest.raises(UpstreamServiceError) as exc_info:
+        await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+    assert "agreement is in status Updating" in exc_info.value.detail
+
+
+async def test_create_upgrade_order_rejects_non_active_agreement(
+    fake_ctx, patch_agreement, submit_deps, create_order_mock
+):
+    patch_agreement(Agreement.from_payload(_agreement_payload(status="Updating")))
+
+    with pytest.raises(ValidationError) as exc_info:
+        await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+    assert "The agreement is currently Updating." in exc_info.value.detail
+    create_order_mock.assert_not_awaited()
 
 
 async def test_create_upgrade_order_raises_forbidden_when_product_not_allowed(
