@@ -5,6 +5,16 @@ import { render } from '@testing-library/react';
 
 import { LinkReference } from './LinkReference';
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
+  LinkPopover: ({ title, target, children }: { title: string; target: ReactNode; children: ReactNode }) => (
+    <div data-testid="link-popover">
+      <div data-testid="link-popover-title">{title}</div>
+      <div>{target}</div>
+      {children}
+    </div>
+  ),
+}));
+
 const renderWithRouter = (ui: ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
 
 describe('LinkReference', () => {
@@ -30,17 +40,18 @@ describe('LinkReference', () => {
     expect(getByText('AGR-1234')).toBeTruthy();
   });
 
-  it('wraps the reference in a popover when an info card is provided', () => {
-    const { container } = renderWithRouter(
-      <LinkReference text="My Agreement" infoCard={<div>card</div>} />
+  it('wraps the reference in a link popover when a card is provided', () => {
+    const { getByTestId } = renderWithRouter(
+      <LinkReference text="My Agreement" cardTitle="Agreement" card={<div>card</div>} />
     );
 
-    expect(container.querySelector('[data-testid="popover"]')).toBeTruthy();
+    expect(getByTestId('link-popover')).toBeTruthy();
+    expect(getByTestId('link-popover-title').textContent).toBe('Agreement');
   });
 
-  it('renders without a popover when no info card is provided', () => {
-    const { container } = renderWithRouter(<LinkReference text="My Agreement" />);
+  it('renders without a popover when no card is provided', () => {
+    const { queryByTestId } = renderWithRouter(<LinkReference text="My Agreement" />);
 
-    expect(container.querySelector('[data-testid="popover"]')).toBeNull();
+    expect(queryByTestId('link-popover')).toBeNull();
   });
 });

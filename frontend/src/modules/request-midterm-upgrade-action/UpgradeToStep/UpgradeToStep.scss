@@ -47,6 +47,9 @@
       background-color: $var-brand-primary;
     }
   }
+  &__validation {
+    margin-top: $var-spacing-3;
+  }
   &__footer-text {
     margin-top: $var-spacing-3;
     color: $var-gray-4;

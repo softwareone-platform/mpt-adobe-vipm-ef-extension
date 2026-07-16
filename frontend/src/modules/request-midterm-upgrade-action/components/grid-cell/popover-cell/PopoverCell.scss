@@ -3,7 +3,7 @@
   overflow: hidden;
   padding: var(--spacing-1) var(--spacing-2);
 
-  .info-card-popover__target {
+  &__trigger {
     display: inline;
     color: var(--brand-primary);
     cursor: pointer;
