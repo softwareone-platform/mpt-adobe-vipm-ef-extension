@@ -5,11 +5,11 @@ migrations:
     image: nlpapp0336cre.azurecr.io/mpt-extension-adobe
     command: ["mpt-service-cli"]
     args: ["migrate", "--data"]
-dbup:
-  enabled: true
-  image: nlpapp0336cre.azurecr.io/mpt-extension-adobe
-  command: ["mpt-service-cli"]
-  args: ["migrate", "--schema"]
+  schema:
+    enabled: true
+    image: nlpapp0336cre.azurecr.io/mpt-extension-adobe
+    command: ["mpt-service-cli"]
+    args: ["migrate", "--schema"]
 api:
   enabled: true
   probesEnabled: false
