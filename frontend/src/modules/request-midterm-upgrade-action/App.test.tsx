@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -264,6 +264,115 @@ describe('request-midterm-upgrade-action App', () => {
     expect(await screen.findByText('Review order step')).toBeTruthy();
     expect(reviewOrderProps.order).toBeDefined();
     expect(reviewOrderProps.subscriptions).toBeDefined();
+  });
+
+  it('applies the subscription terms to the target rows', async () => {
+    (http.post as jest.Mock).mockResolvedValueOnce({
+      data: {
+        data: {
+          id: 'SUB-1',
+          splitStatus: 'Active',
+          agreement: { id: 'AGR-1' },
+          terms: { period: '1y', commitment: '1y' },
+          lines: [{ quantity: 10 }],
+        },
+      },
+    });
+    mockActiveStepIndex = 1;
+    render(<App />);
+
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    await waitFor(() => {
+      const rows = upgradeToProps.subscriptions as { terms: string; commitment: string }[];
+      expect(rows[0]).toMatchObject({ terms: 'Yearly billing', commitment: '1 year commitment' });
+    });
+  });
+
+  it('falls back to an em dash for missing or unknown term codes', async () => {
+    (http.post as jest.Mock).mockResolvedValueOnce({
+      data: {
+        data: {
+          id: 'SUB-1',
+          splitStatus: 'Active',
+          agreement: { id: 'AGR-1' },
+          terms: { period: 'unknown', commitment: null },
+          lines: [{ quantity: 10 }],
+        },
+      },
+    });
+    mockActiveStepIndex = 1;
+    render(<App />);
+
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    await waitFor(() => {
+      const rows = upgradeToProps.subscriptions as { terms: string; commitment: string }[];
+      expect(rows[0]).toMatchObject({ terms: '—', commitment: '—' });
+    });
+  });
+
+  it('prepends a source subscription row decremented by the moved quantity', async () => {
+    (http.post as jest.Mock).mockResolvedValueOnce({
+      data: {
+        data: {
+          id: 'SUB-1',
+          name: 'Source Subscription',
+          status: 'Active',
+          splitStatus: 'Active',
+          agreement: { id: 'AGR-1' },
+          terms: { period: '1y', commitment: '1y' },
+          lines: [
+            {
+              quantity: 10,
+              item: { id: 'ITM-1', name: 'Source Item', externalIds: { vendor: 'SKU-1' } },
+              price: { unitSP: 100 },
+            },
+          ],
+        },
+      },
+    });
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+
+    const target = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-2', name: 'Target Item', externalId: 'SKU-2' },
+      targetBaseOfferId: 'OFFER-1',
+      recommended: false,
+      currentQuantity: 0,
+      newQuantity: 8,
+      delta: 8,
+      unitSP: '200.00',
+      spxM: '133.33',
+      spxY: '1,600.00',
+      terms: 'Yearly billing',
+      commitment: '1 year commitment',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([target]);
+      upgradeToProps.onSelectedTargetChange(target);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    const rows = reviewOrderProps.subscriptions as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: 'SUB-1',
+      item: { id: 'ITM-1', name: 'Source Item', externalId: 'SKU-1' },
+      currentQuantity: 10,
+      newQuantity: 2,
+      delta: -8,
+      unitSP: '100.00',
+      spxM: '-66.67',
+      spxY: '-800.00',
+      terms: 'Yearly billing',
+      commitment: '1 year commitment',
+    });
+    expect(rows[1]).toMatchObject({ item: { id: 'ITM-2' }, delta: 8 });
   });
 
   it('places the upgrade order with the selection and the recommendation tracker id', async () => {
