@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 
 import { useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
@@ -254,7 +254,7 @@ export default function App() {
   ];
 
   return (
-    <MemoryRouter>
+    <BrowserRouter>
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Wizard
           stepsProps={wizardSteps.map((step) => ({ title: step.title, nextButton: step.nextButton }))}
@@ -273,6 +273,6 @@ export default function App() {
           <Wizard.Actions />
         </Wizard>
       </div>
-    </MemoryRouter>
+    </BrowserRouter>
   );
 }
