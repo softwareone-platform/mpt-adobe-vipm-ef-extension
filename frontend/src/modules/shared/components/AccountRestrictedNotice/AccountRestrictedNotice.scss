@@ -1,0 +1,17 @@
+.account-restricted-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.account-restricted-notice__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 480px;
+  padding: 3rem;
+  text-align: center;
+}

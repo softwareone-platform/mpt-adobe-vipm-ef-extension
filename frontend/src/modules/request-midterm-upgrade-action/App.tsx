@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 
-import { useMPTModal } from '@mpt-extension/sdk-react';
+import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 
+import { useSettingsResult } from '../shared/hooks/useSettings';
+import type { AccountType } from '../shared/three-year-commitment';
+import { canRequestMidtermUpgradeAction } from '../utils/security';
+import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
 import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
 import { useAgreementSplit } from '../shared/hooks/useAgreementSplit';
@@ -41,6 +45,9 @@ const initialOrder: Order = {
 };
 
 export default function App() {
+  const context = useMPTContext<{ auth?: { account?: { type?: AccountType } } }>();
+  const accountType = context.auth?.account?.type;
+  const { data: settings, status: settingsStatus, refetch: refetchSettings } = useSettingsResult();
   const { close } = useMPTModal();
   const subscriptionId = useSubscriptionId();
   const { subscription, syncSubscription, error, status } = useSubscriptionSync(subscriptionId);
@@ -212,10 +219,34 @@ export default function App() {
     );
   }
 
-  if (!subscription) {
+  if (settingsStatus === 'error') {
+    return (
+      <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <InlineNotification status="error" isStandalone>
+          Settings could not be loaded.
+        </InlineNotification>
+        <Button onClick={refetchSettings}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (!subscription || settingsStatus === 'loading') {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Loader />
+      </div>
+    );
+  }
+
+  if (!canRequestMidtermUpgradeAction(accountType, settings?.products, subscription.product?.id)) {
+    return (
+      <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <AccountRestrictedNotice
+          title="Not available"
+          message="The mid-term upgrade is available to client accounts only."
+        />
       </div>
     );
   }
