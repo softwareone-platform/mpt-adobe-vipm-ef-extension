@@ -24,3 +24,19 @@ export const INITIAL_SPLIT_STATE: AgreementSplitState = {
   error: null,
   data: null,
 };
+
+export const TERM_PERIOD_LABELS: Record<string, string> = {
+  '1m': 'Monthly billing',
+  '1y': 'Yearly billing',
+  '3y': '3-yearly billing',
+  'one-time': 'One-time',
+};
+
+export const TERM_COMMITMENT_LABELS: Record<string, string> = {
+  '1m': '1 month commitment',
+  '1y': '1 year commitment',
+  '2y': '2 year commitment',
+  '3y': '3 year commitment',
+  '4y': '4 year commitment',
+  '5y': '5 year commitment',
+};

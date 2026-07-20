@@ -113,6 +113,59 @@ describe('ReviewOrderStep', () => {
     expect(getByText('No parameters to display.')).toBeTruthy();
   });
 
+  it('shows the order additional id and notes in the Details tab', () => {
+    const detailedOrder: Order = {
+      id: 'ORD-1111-1111',
+      externalIds: { client: 'PO-12345' },
+      notes: 'Please expedite',
+    };
+    const { getByText } = render(
+      <ReviewOrderStep subscription={{ id: 'SUB-1' }} order={detailedOrder} subscriptions={subscriptions} />,
+    );
+
+    expect(getByText('Additional ID')).toBeTruthy();
+    expect(getByText('PO-12345')).toBeTruthy();
+    expect(getByText('Notes')).toBeTruthy();
+    expect(getByText('Please expedite')).toBeTruthy();
+  });
+
+  it('falls back to an em dash when the order has no additional id or notes', () => {
+    const { getAllByText } = render(
+      <ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />,
+    );
+
+    expect(getAllByText('—')).toHaveLength(2);
+  });
+
+  it('lists the non-hidden agreement ordering parameters in the Parameters tab', () => {
+    const subscription = {
+      id: 'SUB-1',
+      agreement: {
+        id: 'AGR-1',
+        parameters: {
+          ordering: [
+            { id: 'PAR-1', name: 'Company Name', displayValue: 'Dummy Company', constraints: { hidden: false } },
+            { id: 'PAR-2', name: 'Agreement type', displayValue: 'New' },
+            { id: 'PAR-3', name: '3-year commitment' },
+            { id: 'PAR-4', name: 'MembershipId', displayValue: 'MEM-9', constraints: { hidden: true } },
+          ],
+        },
+      },
+    };
+    const { getByText, queryByText, getAllByText } = render(
+      <ReviewOrderStep subscription={subscription} order={order} subscriptions={subscriptions} />,
+    );
+
+    expect(getByText('Company Name')).toBeTruthy();
+    expect(getByText('Dummy Company')).toBeTruthy();
+    expect(getByText('Agreement type')).toBeTruthy();
+    expect(getByText('New')).toBeTruthy();
+    expect(getByText('3-year commitment')).toBeTruthy();
+    expect(getAllByText('—').length).toBeGreaterThan(0);
+    expect(queryByText('MembershipId')).toBeNull();
+    expect(queryByText('No parameters to display.')).toBeNull();
+  });
+
   it('feeds the grid the subscriptions followed by an order price total row', () => {
     render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 

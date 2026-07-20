@@ -14,7 +14,16 @@ MONTHLY_FACTOR: Mapping[str | None, float] = MappingProxyType({
 })
 PRICE_PRECISION = 2
 
-AGREEMENT_SELECT = ("audit", "buyer", "client", "licensee", "product", "seller", "vendor")
+AGREEMENT_SELECT = (
+    "audit",
+    "buyer",
+    "client",
+    "licensee",
+    "parameters",
+    "product",
+    "seller",
+    "vendor",
+)
 LICENSEE_SELECT = ("account", "audit", "buyer", "seller")
 BUYER_SELECT = ("account", "audit")
 SELLER_SELECT = ("audit",)
