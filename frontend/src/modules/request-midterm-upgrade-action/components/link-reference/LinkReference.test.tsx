@@ -5,6 +5,12 @@ import { render } from '@testing-library/react';
 
 import { LinkReference } from './LinkReference';
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/avatar', () => ({
+  Avatar: ({ jdenticonValue }: { jdenticonValue?: string }) => (
+    <span data-testid="avatar" data-jdenticon-value={jdenticonValue} />
+  ),
+}));
+
 jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
   LinkPopover: ({ title, target, children }: { title: string; target: ReactNode; children: ReactNode }) => (
     <div data-testid="link-popover">
@@ -38,6 +44,29 @@ describe('LinkReference', () => {
     );
 
     expect(getByText('AGR-1234')).toBeTruthy();
+  });
+
+  it('renders an avatar keyed on the id when a string secondary content is provided', () => {
+    const { getByTestId } = renderWithRouter(
+      <LinkReference text="Licensee Name" secondaryContent="LIC-1234" />
+    );
+
+    expect(getByTestId('avatar')).toHaveAttribute('data-jdenticon-value', 'LIC-1234');
+  });
+
+  it('does not render an avatar when no secondary content is provided', () => {
+    const { queryByTestId } = renderWithRouter(<LinkReference text="Licensee Name" />);
+
+    expect(queryByTestId('avatar')).toBeNull();
+  });
+
+  it('prefers an explicit icon over the generated avatar', () => {
+    const { getByTestId, queryByTestId } = renderWithRouter(
+      <LinkReference text="Licensee Name" secondaryContent="LIC-1234" icon={<span data-testid="custom-icon" />} />
+    );
+
+    expect(getByTestId('custom-icon')).toBeTruthy();
+    expect(queryByTestId('avatar')).toBeNull();
   });
 
   it('wraps the reference in a link popover when a card is provided', () => {
