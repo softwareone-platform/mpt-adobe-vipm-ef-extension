@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 
+import { Avatar } from '@softwareone-platform/sdk-react-ui-v0/avatar';
 import { EntityReference } from '@softwareone-platform/sdk-react-ui-v0/entity-reference';
 import { LinkPopover } from '@softwareone-platform/sdk-react-ui-v0/link-popover';
 
@@ -25,8 +26,22 @@ export function LinkReference({ text, secondaryContent, url, icon, cardTitle, ca
     text
   );
 
+  const resolvedIcon =
+    icon ??
+    (typeof secondaryContent === 'string' && secondaryContent ? (
+      <Avatar
+        type="logo"
+        shape="circle"
+        size={24}
+        imageSrc=""
+        text={text ?? null}
+        isToUseJdenticon
+        jdenticonValue={secondaryContent}
+      />
+    ) : undefined);
+
   const reference = (
-    <EntityReference primaryContent={primaryContent} secondaryContent={secondaryContent} icon={icon} />
+    <EntityReference primaryContent={primaryContent} secondaryContent={secondaryContent} icon={resolvedIcon} />
   );
 
   if (!card) {
