@@ -1,7 +1,10 @@
 import pytest
+from mpt_extension_sdk.api.auth.context import Account, AccountType, AuthContext
 
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
 from mpt_adobe_vipm_ef.models.recommendation import RecommendationRequest
+
+_FAKE_JWT = "fake-token"
 
 
 @pytest.fixture
@@ -93,11 +96,19 @@ class FakeExtSettings:
 class FakeContext:
     """Fake request context mirroring the fields the router handlers read."""
 
-    def __init__(self, agreements, adobe, product_ids, subscriptions=None):
+    def __init__(
+        self, agreements, adobe, product_ids, subscriptions=None, account_type=AccountType.CLIENT
+    ):
         self.mpt_api_service = FakeMPTApiService(agreements, subscriptions)
         self.ext_settings = FakeExtSettings(product_ids)
         self.adobe_client = adobe
         self.state = {}
+        self.auth = AuthContext(
+            token=_FAKE_JWT,
+            account=Account(id="ACC-0001", type=account_type),
+            permissions={},
+            extension_id="EXT-0001",
+        )
 
 
 class AgreementSetter:
@@ -144,6 +155,19 @@ def fake_ctx(fake_agreements, fake_subscriptions, adobe_call, allowed_product_id
         product_ids=(allowed_product_id,),
         subscriptions=fake_subscriptions,
     )
+
+
+@pytest.fixture
+def auth_context_factory():
+    def factory(account_type):
+        return AuthContext(
+            token=_FAKE_JWT,
+            account=Account(id="ACC-0001", type=account_type),
+            permissions={},
+            extension_id="EXT-0001",
+        )
+
+    return factory
 
 
 @pytest.fixture

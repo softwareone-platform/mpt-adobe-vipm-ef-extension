@@ -20,6 +20,15 @@ function canRequestAdobeAction(
   return isRequestAccountType && product != null;
 }
 
+export function canRequestMidtermUpgradeAction(
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  const product = getProduct(products, agreementProductId ?? '');
+  return accountType === 'Client' && product != null;
+}
+
 export function canRequestThreeYearCommitment(
   accountType: AccountType | undefined,
   products: ProductSegment[] | undefined,

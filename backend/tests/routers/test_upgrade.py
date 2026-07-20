@@ -2,6 +2,7 @@ import http
 
 import pytest
 from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
+from mpt_extension_sdk.api.auth.context import AccountType
 from mpt_extension_sdk.api.errors import (
     ForbiddenError,
     NotFoundError,
@@ -285,6 +286,16 @@ async def test_create_upgrade_order_maps_preview_errors_and_skips_order(
         await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
 
     create_order_mock.assert_not_awaited()
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_create_upgrade_order_rejects_non_client_account(
+    fake_ctx, submit_deps, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
 
 
 async def test_create_upgrade_order_requires_caller_auth(fake_ctx, submit_deps, mocker):
