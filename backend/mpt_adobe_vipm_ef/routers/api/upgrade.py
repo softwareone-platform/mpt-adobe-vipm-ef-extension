@@ -13,8 +13,8 @@ from mpt_extension_sdk.api import (
     UpstreamServiceError,
     ValidationError,
 )
-from mpt_extension_sdk.models import Agreement, Subscription
-from mpt_extension_sdk.models.subscription import SubscriptionLine
+from mpt_extension_sdk.api.auth import AuthContext
+from mpt_extension_sdk.models import Agreement, Subscription, SubscriptionLine
 from mpt_extension_sdk.routing import APIRouter
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
@@ -63,6 +63,8 @@ async def create_upgrade_order(  # noqa: WPS210
     in Processing status) carrying the hidden ``switchPayload`` DataObject
     parameter.
     """
+    if not cast(AuthContext, ctx.auth).account.is_client():
+        raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
     source_line, adobe_subscription_id = await _load_switch_source(ctx, agreement, subscription_id)
