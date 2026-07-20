@@ -11,7 +11,10 @@ let mockActiveStepIndex = 0;
 
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTModal: () => ({ open: jest.fn(), close: mockClose }),
-  useMPTContext: () => ({ data: { subscription: { id: 'SUB-1' } } }),
+  useMPTContext: () => ({
+    auth: { account: { type: 'Client' } },
+    data: { subscription: { id: 'SUB-1' } },
+  }),
 }), { virtual: true });
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -22,9 +25,13 @@ jest.mock('@mpt-extension/sdk', () => ({
           id: 'SUB-1',
           splitStatus: 'Active',
           agreement: { id: 'AGR-1' },
+          product: { id: 'PRD-1' },
           lines: [{ quantity: 10 }],
         },
       },
+    }),
+    get: jest.fn().mockResolvedValue({
+      data: { data: { products: [{ id: 'PRD-1', segment: 'COM' }] } },
     }),
   },
 }), { virtual: true });
@@ -239,7 +246,7 @@ describe('request-midterm-upgrade-action App', () => {
 
   it('skips the split-billing step when split billing is disabled', async () => {
     (http.post as jest.Mock).mockResolvedValueOnce({
-      data: { data: { id: 'SUB-1', splitStatus: 'Disabled' } },
+      data: { data: { id: 'SUB-1', splitStatus: 'Disabled', product: { id: 'PRD-1' } } },
     });
     mockActiveStepIndex = 2;
     render(<App />);
@@ -273,6 +280,7 @@ describe('request-midterm-upgrade-action App', () => {
           id: 'SUB-1',
           splitStatus: 'Active',
           agreement: { id: 'AGR-1' },
+          product: { id: 'PRD-1' },
           terms: { period: '1y', commitment: '1y' },
           lines: [{ quantity: 10 }],
         },
@@ -295,6 +303,7 @@ describe('request-midterm-upgrade-action App', () => {
           id: 'SUB-1',
           splitStatus: 'Active',
           agreement: { id: 'AGR-1' },
+          product: { id: 'PRD-1' },
           terms: { period: 'unknown', commitment: null },
           lines: [{ quantity: 10 }],
         },
@@ -319,6 +328,7 @@ describe('request-midterm-upgrade-action App', () => {
           status: 'Active',
           splitStatus: 'Active',
           agreement: { id: 'AGR-1' },
+          product: { id: 'PRD-1' },
           terms: { period: '1y', commitment: '1y' },
           lines: [
             {
@@ -451,6 +461,7 @@ describe('request-midterm-upgrade-action App', () => {
             id: 'SUB-1',
             splitStatus: 'Active',
             agreement: { id: 'AGR-1' },
+            product: { id: 'PRD-1' },
             lines: [{ quantity: 10 }],
           },
         },
@@ -545,5 +556,18 @@ describe('request-midterm-upgrade-action App', () => {
 
     expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
     expect(screen.queryByTestId('notification-error')).toBeNull();
+  });
+
+  it('shows an error state when settings fail to load and recovers on retry', async () => {
+    (http.get as jest.Mock).mockRejectedValueOnce(new Error('Settings boom'));
+    render(<App />);
+
+    expect(await screen.findByText('Settings could not be loaded.')).toBeTruthy();
+    expect(screen.getByText('Retry')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Retry'));
+
+    expect(await screen.findByText('Upgrade subscription')).toBeTruthy();
+    expect(screen.queryByText('Settings could not be loaded.')).toBeNull();
   });
 });

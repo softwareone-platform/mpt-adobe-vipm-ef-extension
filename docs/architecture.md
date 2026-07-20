@@ -28,6 +28,8 @@ frontend/                    TypeScript plug UI (esbuild)
   routers below on the SDK app (`ext_app.routes`).
 - `mpt_adobe_vipm_ef/routers/` — route definitions:
   - `api/agreements.py`, `api/customer.py`, `api/settings.py` — API routes
+  - `api/upgrade.py` — mid-term upgrade order route; restricted to client
+    accounts (non-client callers are rejected with `403`)
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend
 - `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order
