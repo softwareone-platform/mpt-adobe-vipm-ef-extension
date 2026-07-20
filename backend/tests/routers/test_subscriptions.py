@@ -1,6 +1,7 @@
 from mpt_api_client.exceptions import MPTError
 from mpt_extension_sdk.api.context import APIContext
 
+from mpt_adobe_vipm_ef.constants import AGREEMENT_SELECT
 from mpt_adobe_vipm_ef.routers.api import subscriptions
 
 sync_subscription = subscriptions.sync_subscription
@@ -67,6 +68,16 @@ async def test_sync_enriches_related_entities(mocker):
     assert result.payload["licensee"] == {"id": "LCE-1", "status": "Enabled"}
     assert result.payload["buyer"] == {"id": "BUY-1", "taxId": "VAT1"}
     assert result.payload["seller"] == {"id": "SEL-1", "status": "Active"}
+
+
+async def test_sync_requests_agreement_parameters(mocker):
+    payload = {"id": "SUB-1", "agreement": {"id": "AGR-1", "name": "stub"}}
+    ctx, client = _build_ctx(mocker, payload, related={"agreement": {"id": "AGR-1"}})
+
+    await sync_subscription("SUB-1", ctx)  # act
+
+    _, kwargs = client.commerce.agreements.get.call_args
+    assert kwargs["select"] == AGREEMENT_SELECT
 
 
 async def test_sync_skips_entities_without_id(mocker):

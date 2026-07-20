@@ -32,6 +32,7 @@ import type {
 
 import './App.scss';
 import { AdobeOfferSwitchPath, AgreementSplitAllocation, getRecommendedOfferIds } from '../shared/model';
+import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../shared/constants';
 
 const initialOrder: Order = {
   id: null,
@@ -80,6 +81,33 @@ export default function App() {
           row.targetBaseOfferId === selectedTarget.targetBaseOfferId,
       ) ?? null)
     : null;
+
+  const sourceUnitSP = subscription?.lines?.[0]?.price?.unitSP;
+  const movedQuantity = currentSelectedTarget?.delta ?? 0;
+  const sourceTerms = TERM_PERIOD_LABELS[subscription?.terms?.period ?? ''] ?? '—';
+  const sourceCommitment = TERM_COMMITMENT_LABELS[subscription?.terms?.commitment ?? ''] ?? '—';
+  const sourceReviewRow: TargetSubscription = {
+    id: subscription?.id ?? null,
+    name: subscription?.name ?? null,
+    status: subscription?.status ?? '',
+    item: {
+      id: subscription?.lines?.[0]?.item?.id ?? '',
+      name: subscription?.lines?.[0]?.item?.name ?? '',
+      externalId: subscription?.lines?.[0]?.item?.externalIds?.vendor ?? '',
+    },
+    recommended: false,
+    currentQuantity: sourceQuantity,
+    newQuantity: sourceQuantity - movedQuantity,
+    delta: -movedQuantity,
+    unitSP: sourceUnitSP != null ? sourceUnitSP.toFixed(2) : '',
+    spxM: sourceUnitSP != null ? (-(sourceUnitSP * movedQuantity) / 12).toFixed(2) : '',
+    spxY: sourceUnitSP != null ? (-(sourceUnitSP * movedQuantity)).toFixed(2) : '',
+    terms: sourceTerms,
+    commitment: sourceCommitment,
+  };
+  const reviewSubscriptions = currentSelectedTarget
+    ? [sourceReviewRow, currentSelectedTarget]
+    : [sourceReviewRow];
 
   const onClose = useCallback(() => {
     close();
@@ -163,13 +191,13 @@ export default function App() {
         unitSP: unitSP != null ? unitSP.toFixed(2) : '',
         spxM: unitSP != null ? (unitSP * sourceQuantity / 12).toFixed(2) : '',
         spxY: unitSP != null ? (unitSP * sourceQuantity).toFixed(2) : '',
-        terms: '',
-        commitment: '',
+        terms: sourceTerms,
+        commitment: sourceCommitment,
         };
       }),
     );
     setTargetSubscriptions(rows);
-  }, [offerSwitchPaths, sourceQuantity, recommendations]);
+  }, [offerSwitchPaths, sourceQuantity, recommendations, sourceTerms, sourceCommitment]);
 
   if (status === 'error' || (status === 'success' && !subscription)) {
     return (
@@ -239,7 +267,7 @@ export default function App() {
         <ReviewOrderStep
           subscription={subscription}
           order={order}
-          subscriptions={currentSelectedTarget ? [currentSelectedTarget] : []}
+          subscriptions={reviewSubscriptions}
           onPlaceOrder={placeOrder}
           errorMessage={placeOrderValidationError || submitError}
           isSubmitting={submitStatus === 'loading'}

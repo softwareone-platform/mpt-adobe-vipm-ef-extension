@@ -206,6 +206,10 @@ export function ReviewOrderStep({
   const [tabId, setTabId] = useState('items');
   const { registerOnNextCallback } = useStepActions();
 
+  const orderingParameters = (subscription.agreement?.parameters?.ordering ?? []).filter(
+    (parameter) => !parameter.constraints?.hidden,
+  );
+
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
       if (!onPlaceOrder) {
@@ -255,19 +259,47 @@ export function ReviewOrderStep({
         </Tab>
         <Tab id="parameters" title="Parameters">
           <Tab.Content>
-            <div className="review-order-step__tab">
-              <RegularText as="p" size={2} color="grey-4">
-                No parameters to display.
-              </RegularText>
-            </div>
+            {orderingParameters.length ? (
+              <div className="review-order-step__tab review-order-step__details">
+                {orderingParameters.map((parameter) => (
+                  <div key={parameter.id} className="review-order-step__details-item">
+                    <RegularText as="h5" size={2}>
+                      {parameter.name}
+                    </RegularText>
+                    <RegularText as="p" size={2} color="grey-4">
+                      {parameter.displayValue || '—'}
+                    </RegularText>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="review-order-step__tab">
+                <RegularText as="p" size={2} color="grey-4">
+                  No parameters to display.
+                </RegularText>
+              </div>
+            )}
           </Tab.Content>
         </Tab>
         <Tab id="details" title="Details">
           <Tab.Content>
-            <div className="review-order-step__tab">
-              <RegularText as="p" size={2} color="grey-4">
-                No details to display.
-              </RegularText>
+            <div className="review-order-step__tab review-order-step__details">
+              <div className="review-order-step__details-item">
+                <RegularText as="h5" size={2}>
+                  Additional ID
+                </RegularText>
+                <RegularText as="p" size={2} color="grey-4">
+                  {order.externalIds?.client || '—'}
+                </RegularText>
+              </div>
+              <div className="review-order-step__details-item">
+                <RegularText as="h5" size={2}>
+                  Notes
+                </RegularText>
+                <RegularText as="p" size={2} color="grey-4">
+                  {order.notes || '—'}
+                </RegularText>
+              </div>
             </div>
           </Tab.Content>
         </Tab>

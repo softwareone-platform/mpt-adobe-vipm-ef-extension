@@ -85,16 +85,23 @@ export interface SubscriptionContext {
   };
 }
 
+export interface CommerceParameterConstraints {
+  required?: boolean;
+  hidden?: boolean;
+  readonly?: boolean;
+}
+
 export interface CommerceParameter {
+  id: string;
   displayValue?: string;
   externalId?: string;
-  id?: string;
   name?: string;
   phase?: string;
   scope?: string;
   value?: unknown;
   type?: string;
   multiple?: boolean;
+  constraints?: CommerceParameterConstraints;
 }
 
 export interface AuditEvent {
@@ -112,6 +119,7 @@ export interface Agreement {
   name?: string;
   status?: string;
   parameters?: {
+    ordering?: CommerceParameter[];
     fulfillment?: CommerceParameter[];
   };
   product?: Product;
@@ -123,12 +131,18 @@ export interface Agreement {
   audit?: Audit;
 }
 
+export interface Terms {
+  period?: string | null;
+  commitment?: string | null;
+}
+
 export interface Subscription {
   id: string;
   name?: string;
   status?: string;
   splitStatus?: string;
   externalIds?: ExternalIds;
+  terms?: Terms;
   agreement?: Agreement;
   parameters?: {
     fulfillment?: CommerceParameter[];
