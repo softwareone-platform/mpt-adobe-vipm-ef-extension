@@ -7,6 +7,12 @@ import { WizardHighlights } from './WizardHighlights';
 import type { Subscription } from '../../../shared/model';
 import type { Order } from '../../model';
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/avatar', () => ({
+  Avatar: ({ jdenticonValue }: { jdenticonValue?: string }) => (
+    <span data-testid="avatar" data-jdenticon-value={jdenticonValue} />
+  ),
+}));
+
 jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
   LinkPopover: ({ target }: { target: ReactNode }) => <div data-testid="link-popover">{target}</div>,
 }));
@@ -44,6 +50,13 @@ describe('WizardHighlights', () => {
     expect(getByText('Licensee Name')).toBeTruthy();
     expect(getByText('Buyer Name')).toBeTruthy();
     expect(getByText('Seller Name')).toBeTruthy();
+  });
+
+  it('renders a person avatar keyed on the id for the licensee, buyer, and seller', () => {
+    const { getAllByTestId } = renderHighlights();
+
+    const avatarValues = getAllByTestId('avatar').map((el) => el.getAttribute('data-jdenticon-value'));
+    expect(avatarValues).toEqual(['LIC-1111-1111', 'BUY-1111-1111', 'SEL-1111-1111']);
   });
 
   it('links the agreement and account references to their routes', () => {
