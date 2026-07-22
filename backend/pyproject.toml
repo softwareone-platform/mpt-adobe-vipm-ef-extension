@@ -8,6 +8,7 @@ license = { text = "Apache-2.0 license" }
 dependencies = [
     "mpt-extension-sdk[azure-monitor]==6.5.*",
     "mpt-tool==6.0.*",
+    "pyairtable==3.4.*",
 ]
 
 [tool.uv]
@@ -82,7 +83,10 @@ per-file-ignores = [
   "*migrations/**:WPS102",
   "*tests/**: WPS118 WPS202 WPS204",
   "adobe/config.py: WPS121 WPS122 WPS214 WPS420",
-  "mpt_adobe_vipm_ef/routers/api/customer.py: WPS202 WPS238"
+  "mpt_adobe_vipm_ef/routers/api/customer.py: WPS202 WPS238",
+  "mpt_adobe_vipm_ef/services/discount_codes.py: WPS202",
+  "mpt_adobe_vipm_ef/services/discount_mapping.py: WPS202",
+  "mpt_adobe_vipm_ef/services/discounts.py: WPS214"
 ]
 
 [tool.ruff]
