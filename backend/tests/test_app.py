@@ -23,6 +23,8 @@ def test_app_registers_event_routes():
     [
         "/api/v2/agreements/{agreement_id}/sync",
         "/api/v2/settings",
+        "/api/v2/discount-codes",
+        "/api/v2/discount-codes/{discount_id}",
     ],
 )
 def test_app_registers_api_route(path):
