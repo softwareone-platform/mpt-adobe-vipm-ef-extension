@@ -1,7 +1,16 @@
+import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/utils';
+
 import type { AgreementSplitState } from './model';
 
 export const SCREEN_HEIGHT_FACTOR = 0.85;
 export const SCREEN_WIDTH_FACTOR = 0.90;
+
+export const DESIGN_SYSTEM_OPTIONS: Partial<DesignSystemOptions> = {
+  dateFormat: 'dd MMM yyyy',
+  inputDateFormat: 'P',
+  languageCode: 'en-US',
+  timeFormat: 'HH:mm',
+};
 
 export enum EntityDomain {
   Commerce = 'commerce',

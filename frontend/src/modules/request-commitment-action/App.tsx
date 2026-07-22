@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '../../i18n/translations';
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { Select } from '@softwareone-platform/sdk-react-ui-v0/select';
@@ -43,7 +45,7 @@ function validateAtLeastOneQuantity(
 ): string | null {
   const hasLicenses = licenses != null && licenses > 0;
   const hasConsumables = consumables != null && consumables > 0;
-  return hasLicenses || hasConsumables ? null : 'At least one quantity is required.';
+  return hasLicenses || hasConsumables ? null : i18n.t('Commitment:Validation:AtLeastOne');
 }
 
 function validateAboveMinimum(
@@ -53,7 +55,7 @@ function validateAboveMinimum(
 ): string | null {
   if (currentMinimum == null || value == null) return null;
   if (value <= currentMinimum) {
-    return `${label} must be greater than the current minimum (${currentMinimum}).`;
+    return i18n.t('Commitment:Validation:AboveMinimum', { label, minimum: currentMinimum });
   }
   return null;
 }
@@ -63,12 +65,13 @@ function validateRequestType(
   currentEnrollStatus: string | null,
 ): string | null {
   if (currentEnrollStatus === 'COMMITTED' && requestType === 'commitment') {
-    return 'The customer is already committed. Select recommitment instead.';
+    return i18n.t('Commitment:Validation:AlreadyCommitted');
   }
   return null;
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const { close } = useMPTModal();
   const settings = useSettings();
   const context = useMPTContext<{
@@ -118,8 +121,8 @@ export default function App() {
     const validationError =
       validateRequestType(requestType, currentEnrollStatus) ??
       validateAtLeastOneQuantity(effectiveLicenses, effectiveConsumables) ??
-      validateAboveMinimum('Licenses', effectiveLicenses, currentMinimumLicenses) ??
-      validateAboveMinimum('Consumables', effectiveConsumables, currentMinimumConsumables);
+      validateAboveMinimum(t('Commitment:Licenses'), effectiveLicenses, currentMinimumLicenses) ??
+      validateAboveMinimum(t('Commitment:Consumables'), effectiveConsumables, currentMinimumConsumables);
 
     if (validationError) {
       setLocalError(validationError);
@@ -149,47 +152,45 @@ export default function App() {
     <div className="request-commitment-modal">
       <div className="request-commitment-modal__header">
         <MediumText as="h2" size={4}>
-          Request 3-year commitment
+          {t('Commitment:Title')}
         </MediumText>
       </div>
 
       <div className="request-commitment-modal__content">
         <RegularText as="p" size={2} color="grey-5">
-        Provide the minimum quantities that the customer commits to over the next three years. You
-        can submit licenses, consumables, or both.
+        {t('Commitment:Description')}
       </RegularText>
 
       <Switcher
         name="request-type"
-        label="Request type"
+        label={t('Commitment:Request type')}
         value={requestType}
         onChange={(e) => setRequestType(e.target.value as 'commitment' | 'recommitment')}
         options={[
-          { label: 'commitment', value: 'commitment', disabled: disableCommitmentOption },
-          { label: 'recommitment', value: 'recommitment' },
+          { label: t('Commitment:RequestType:commitment'), value: 'commitment', disabled: disableCommitmentOption },
+          { label: t('Commitment:RequestType:recommitment'), value: 'recommitment' },
         ]}
       />
       <RegularText as="span" size={1} color="grey-5" className="request-commitment-modal__hint">
-        If the customer already has a three year commitment, then choosing the "commitment" option
-        above will update the existing commitment. In this scenario, only increases are allowed.
+        {t('Commitment:RequestTypeHint')}
       </RegularText>
 
       <MediumText as="h3" size={3}>
-        Licenses
+        {t('Commitment:Licenses')}
       </MediumText>
 
       <Select
         positions={{ position: 'bottom-start' }}
-        controlLabel="Discount level"
-        placeholder="Select the desired discount level."
+        controlLabel={t('Commitment:Discount level')}
+        placeholder={t('Commitment:Discount level placeholder')}
         value={discountLevel}
         onChange={setDiscountLevel}
         options={[
-          { label: 'Not required', value: '' },
-          { label: 'Level 12 (10 licenses)', value: '10' },
-          { label: 'Level 13 (50 licenses)', value: '50' },
-          { label: 'Level 14 (100 licenses)', value: '100' },
-          { label: 'Custom', value: 'custom' },
+          { label: t('Commitment:Not required'), value: '' },
+          { label: t('Commitment:LicenseLevels:Level 12'), value: '10' },
+          { label: t('Commitment:LicenseLevels:Level 13'), value: '50' },
+          { label: t('Commitment:LicenseLevels:Level 14'), value: '100' },
+          { label: t('Commitment:Custom'), value: 'custom' },
         ]}
       />
 
@@ -197,40 +198,40 @@ export default function App() {
         <Input
           htmlInputType="number"
           isDisabled={isBusy || discountLevel !== 'custom'}
-          label="Custom license count"
+          label={t('Commitment:Custom license count')}
           min="0"
           name="customLicenses"
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             setCustomLicenses(event.target.value)
           }
-          placeholder="Enter a minimum license quantity"
+          placeholder={t('Commitment:Custom license placeholder')}
           value={customLicenses}
         />
       </div>
 
       <RegularText as="span" size={1} color="grey-5" className="request-commitment-modal__hint">
-        Select custom under the discount level to use this option.
+        {t('Commitment:Custom level hint')}
       </RegularText>
 
       <MediumText as="h3" size={3}>
-        Consumables
+        {t('Commitment:Consumables')}
       </MediumText>
 
       <Select
         positions={{ position: 'bottom-start' }}
-        controlLabel="Discount tier"
-        placeholder="Not required"
+        controlLabel={t('Commitment:Discount tier')}
+        placeholder={t('Commitment:Discount tier placeholder')}
         value={discountTier}
         onChange={setDiscountTier}
         options={[
-          { label: 'Not required', value: '' },
-          { label: 'Tier TB (1,000 transactions)', value: '1000' },
-          { label: 'Tier TC (2,500 transactions)', value: '2500' },
-          { label: 'Tier TD (5,000 transactions)', value: '5000' },
-          { label: 'Tier TE (15,000 transactions)', value: '15000' },
-          { label: 'Tier TF (50,000 transactions)', value: '50000' },
-          { label: 'Tier TG (100,000 transactions)', value: '100000' },
-          { label: 'Custom', value: 'custom' },
+          { label: t('Commitment:Not required'), value: '' },
+          { label: t('Commitment:ConsumableTiers:TB'), value: '1000' },
+          { label: t('Commitment:ConsumableTiers:TC'), value: '2500' },
+          { label: t('Commitment:ConsumableTiers:TD'), value: '5000' },
+          { label: t('Commitment:ConsumableTiers:TE'), value: '15000' },
+          { label: t('Commitment:ConsumableTiers:TF'), value: '50000' },
+          { label: t('Commitment:ConsumableTiers:TG'), value: '100000' },
+          { label: t('Commitment:Custom'), value: 'custom' },
         ]}
       />
 
@@ -238,19 +239,19 @@ export default function App() {
         <Input
           htmlInputType="number"
           isDisabled={isBusy || discountTier !== 'custom'}
-          label="Custom consumable count"
+          label={t('Commitment:Custom consumable count')}
           min="0"
           name="customConsumables"
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             setCustomConsumables(event.target.value)
           }
-          placeholder="Enter a minimum consumable quantity"
+          placeholder={t('Commitment:Custom consumable placeholder')}
           value={customConsumables}
         />
       </div>
 
       <RegularText as="span" size={1} color="grey-5" className="request-commitment-modal__hint">
-        Select custom under the discount tier to use this option.
+        {t('Commitment:Custom tier hint')}
       </RegularText>
 
       {(localError || (status === 'error' && error)) && (
@@ -261,17 +262,17 @@ export default function App() {
 
         {status === 'success' && (
           <InlineNotification status="success" isStandalone>
-            The 3YC request has been submitted to Adobe.
+            {t('Commitment:Success')}
           </InlineNotification>
         )}
       </div>
 
       <div className="request-commitment-modal__actions">
         <Button isDisabled={isBusy} onClick={() => close()} type="secondary">
-          Close
+          {t('Common:Close')}
         </Button>
         <Button isBusy={isBusy} onClick={handleSubmit} type="primary">
-          Send invitation
+          {t('Commitment:Send invitation')}
         </Button>
       </div>
     </div>

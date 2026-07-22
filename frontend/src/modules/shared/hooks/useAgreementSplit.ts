@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
+import { i18n } from '../../../i18n/translations';
 
 import { INITIAL_SPLIT_STATE } from '../constants';
 import type { AgreementSplit, AgreementSplitState } from '../model';
@@ -32,7 +33,7 @@ export function useAgreementSplit(agreementId: string): AgreementSplitState & {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const error = err instanceof Error ? err.message : 'Failed to load agreement split.';
+        const error = err instanceof Error ? err.message : i18n.t('Errors:LoadAgreementSplit');
         setState({ status: 'error', error, data: null });
       });
 

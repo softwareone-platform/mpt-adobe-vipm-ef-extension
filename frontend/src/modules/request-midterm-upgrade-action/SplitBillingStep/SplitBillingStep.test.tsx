@@ -126,7 +126,7 @@ describe('SplitBillingStep', () => {
     expect(getByText('Select a split billing option.')).toBeTruthy();
   });
 
-  it('advances without a buyer id when percentages is chosen', async () => {
+  it('advances without calling addBuyerToOrder when percentages is chosen', async () => {
     const addBuyerToOrder = jest.fn().mockResolvedValue(undefined);
     const { getByTestId } = renderStep({ addBuyerToOrder });
     fireEvent.click(getByTestId('pick-percentages'));
@@ -136,7 +136,7 @@ describe('SplitBillingStep', () => {
       result = await registeredOnNext!({ currentStepIndex: 3, targetStepIndex: 4 });
     });
 
-    expect(addBuyerToOrder).toHaveBeenCalledWith({ id: undefined });
+    expect(addBuyerToOrder).not.toHaveBeenCalled();
     expect(result).toBe(4);
   });
 
