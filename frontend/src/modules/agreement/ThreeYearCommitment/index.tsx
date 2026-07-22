@@ -1,5 +1,6 @@
 import { BoldText, MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
+import { Trans, useTranslation } from "react-i18next";
 import { useAgreementId } from "../../shared/hooks/useAgreementId";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
@@ -38,24 +39,25 @@ function CommitmentGroup({
   detail?: AdobeCommitmentDetail | null;
   showDates?: boolean;
 }) {
+  const { t } = useTranslation();
   const sections = [
-    <DetailsSection key="status" label="Status" content={toContent(detail?.status)} />,
+    <DetailsSection key="status" label={t('Common:Status')} content={toContent(detail?.status)} />,
     <DetailsSection
       key="licenses"
-      label="Minimum licenses"
+      label={t('Agreement:ThreeYear:Minimum licenses')}
       content={toContent(readMinimumQuantity(detail, 'LICENSE'))}
     />,
     <DetailsSection
       key="consumables"
-      label="Minimum consumables"
+      label={t('Agreement:ThreeYear:Minimum consumables')}
       content={toContent(readMinimumQuantity(detail, 'CONSUMABLES'))}
     />,
   ];
 
   if (showDates) {
     sections.push(
-      <DetailsSection key="startDate" label="Start date" content={toContent(detail?.startDate)} />,
-      <DetailsSection key="endDate" label="End date" content={toContent(detail?.endDate)} />,
+      <DetailsSection key="startDate" label={t('Agreement:ThreeYear:Start date')} content={toContent(detail?.startDate)} />,
+      <DetailsSection key="endDate" label={t('Agreement:ThreeYear:End date')} content={toContent(detail?.endDate)} />,
     );
   }
 
@@ -63,6 +65,7 @@ function CommitmentGroup({
 }
 
 export function ThreeYearCommitment() {
+  const { t } = useTranslation();
   const settings = useSettings();
   const context = useMPTContext<{
     auth?: { account?: { type?: AccountType } };
@@ -92,19 +95,19 @@ export function ThreeYearCommitment() {
       <div className="three-year-commitment__main">
         <header className="extension__content-header">
           <MediumText as="h2" size={4} className="extension__content-title">
-            3-year commitment
+            {t('Agreement:ThreeYear:Title')}
           </MediumText>
         </header>
 
         <div className="three-year-commitment__description">
           <RegularText as="p" size={2} color="grey-5">
-            The details of this customer&apos;s current commitment and requests are below.
+            {t('Agreement:ThreeYear:Description')}
           </RegularText>
         </div>
 
         {adobeCustomer.status === 'loading' && (
           <InlineNotification status="info" isStandalone>
-            Loading Adobe customer details…
+            {t('Agreement:Loading')}
           </InlineNotification>
         )}
         {adobeCustomer.status === 'error' && (
@@ -113,10 +116,10 @@ export function ThreeYearCommitment() {
           </InlineNotification>
         )}
         <div className="three-year-commitment__groups">
-          <CommitmentGroup title="Current commitment" detail={currentCommitment} />
-          <CommitmentGroup title="Commitment request" detail={commitmentRequest} />
+          <CommitmentGroup title={t('Agreement:ThreeYear:Current commitment')} detail={currentCommitment} />
+          <CommitmentGroup title={t('Agreement:ThreeYear:Commitment request')} detail={commitmentRequest} />
           <CommitmentGroup
-            title="Recommitment request"
+            title={t('Agreement:ThreeYear:Recommitment request')}
             detail={recommitmentRequest}
             showDates={false}
           />
@@ -126,11 +129,9 @@ export function ThreeYearCommitment() {
       {canRequestCommitment && (
         <aside className="three-year-commitment__aside">
           <RegularText as="p" size={2} color="grey-5">
-            To request a commitment or recommitment, click{" "}
-            <BoldText as="span" size={2}>
-              Request commitment
-            </BoldText>
-            .
+            <Trans i18nKey="Agreement:ThreeYear:AsidePrompt">
+              To request a commitment or recommitment, click <BoldText as="span" size={2}>Request commitment</BoldText>.
+            </Trans>
           </RegularText>
           <Button
             isDisabled={!agreementId}
@@ -144,7 +145,7 @@ export function ThreeYearCommitment() {
               })
             }
           >
-            Request commitment
+            {t('Agreement:ThreeYear:Request commitment')}
           </Button>
         </aside>
       )}

@@ -1,6 +1,7 @@
 import { MediumText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 
+import { i18n } from '../../i18n/translations';
 import { ThreeYearCommitment } from './ThreeYearCommitment';
 import { LinkedMembership } from './LinkedMembership';
 import { GlobalCustomer } from './GlobalCustomer';
@@ -8,9 +9,9 @@ import { GlobalCustomer } from './GlobalCustomer';
 const DEFAULT_PATH = '/3-year-commitment';
 
 const NAV_ITEMS: Array<{ label: string; path: string }> = [
-  { label: '3-year commitment', path: DEFAULT_PATH },
-  { label: 'Linked membership', path: '/linked-membership' },
-  { label: 'Global customer', path: '/global-customer' },
+  { label: i18n.t('Agreement:Nav:3-year commitment'), path: DEFAULT_PATH },
+  { label: i18n.t('Agreement:Nav:Linked membership'), path: '/linked-membership' },
+  { label: i18n.t('Agreement:Nav:Global customer'), path: '/global-customer' },
 ];
 
 export default function App() {
@@ -26,7 +27,7 @@ export default function App() {
           reuses design-system pieces (the `person` icon and the `brand-primary`
           active color) to match the design-system "Side navigation" look.
         */}
-        <aside className="extension__sidebar" aria-label="Manage account">
+        <aside className="extension__sidebar" aria-label={i18n.t('Agreement:Manage account')}>
           <div className="extension__sidebar-heading">
             <svg
               width="1em"
@@ -41,7 +42,7 @@ export default function App() {
               />
             </svg>
             <MediumText as="h3" size={2}>
-              Manage account
+              {i18n.t('Agreement:Manage account')}
             </MediumText>
           </div>
           <nav>

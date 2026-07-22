@@ -13,6 +13,7 @@ import {
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { useCallback, useEffect, useMemo } from 'react';
 
+import { i18n } from '../../../../i18n/translations';
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
@@ -31,36 +32,36 @@ const columns: GridColumnDefinition<TargetSubscription>[] = [
   },
   {
     name: 'name',
-    title: 'Name',
+    title: i18n.t('Common:Name'),
     fields: ['name'],
     cell: (item) => (
       <PopoverCell
-        title="Item"
+        title={i18n.t('Common:Item')}
         text={item.item.name}
         secondaryContent={`${item.item.id} | ${item.item.externalId}`}
         items={[
-          { title: 'ID', content: item.item.id },
-          { title: 'Name', content: item.item.name },
-          { title: 'External ID', content: item.item.externalId },
+          { title: i18n.t('Common:ID'), content: item.item.id },
+          { title: i18n.t('Common:Name'), content: item.item.name },
+          { title: i18n.t('Common:External ID'), content: item.item.externalId },
         ]}
       />
     ),
   },
   {
     name: 'subscription',
-    title: 'Subscription',
+    title: i18n.t('Common:Subscription'),
     fields: ['subscription'],
     cell: (item) => getSubscriptionCell(item),
   },
   {
     name: 'recommended',
-    title: 'Recommended',
+    title: i18n.t('MidtermUpgrade:Grid:Recommended'),
     fields: ['recommended'],
     cell: (item) => getRecommendedCell(item),
   },
   {
     name: 'currentQuantity',
-    title: 'Current Quantity',
+    title: i18n.t('MidtermUpgrade:Grid:Current Quantity'),
     fields: ['currentQuantity'],
     cell: (item) => getCurrentQuantityCell(item),
   },
@@ -69,21 +70,21 @@ const columns: GridColumnDefinition<TargetSubscription>[] = [
 const priceColumns: GridColumnDefinition<TargetSubscription>[] = [
   {
     name: 'unitSP',
-    title: 'Unit SP',
+    title: i18n.t('MidtermUpgrade:Grid:Unit SP'),
     fields: ['unitSP'],
     initialWidth: 120,
-    cell: (item) => <TextCell text={item.unitSP} secondaryContent="user/year" />,
+    cell: (item) => <TextCell text={item.unitSP} secondaryContent={i18n.t('MidtermUpgrade:Grid:user/year')} />,
   },
   {
     name: 'spxM',
-    title: 'SPxM',
+    title: i18n.t('MidtermUpgrade:Grid:SPxM'),
     fields: ['spxM'],
     initialWidth: 120,
     cell: (item) => <TextCell text={item.spxM} />,
   },
   {
     name: 'spxY',
-    title: 'SPxY',
+    title: i18n.t('MidtermUpgrade:Grid:SPxY'),
     fields: ['spxY'],
     initialWidth: 120,
     cell: (item) => <TextCell text={item.spxY} />,
@@ -91,13 +92,13 @@ const priceColumns: GridColumnDefinition<TargetSubscription>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'name', title: 'Name' },
-  { name: 'subscription', title: 'Subscription' },
-  { name: 'recommended', title: 'Recommended' },
-  { name: 'currentQuantity', title: 'Current Quantity' },
-  { name: 'unitSP', title: 'Unit SP' },
-  { name: 'spxM', title: 'SPxM' },
-  { name: 'spxY', title: 'SPxY' },
+  { name: 'name', title: i18n.t('Common:Name') },
+  { name: 'subscription', title: i18n.t('Common:Subscription') },
+  { name: 'recommended', title: i18n.t('MidtermUpgrade:Grid:Recommended') },
+  { name: 'currentQuantity', title: i18n.t('MidtermUpgrade:Grid:Current Quantity') },
+  { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP') },
+  { name: 'spxM', title: i18n.t('MidtermUpgrade:Grid:SPxM') },
+  { name: 'spxY', title: i18n.t('MidtermUpgrade:Grid:SPxY') },
 ];
 
 const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];
@@ -139,14 +140,18 @@ export function getOfferRule(
 export function validateNewQuantity(newQuantity: number | null, rule: OfferRule): string | null {
   // newQuantity is the target line's final quantity: seats already held on the
   // agreement (currentQuantity) plus the seats switched from the source.
-  if (newQuantity === null) return 'Quantity is required';
+  if (newQuantity === null) return i18n.t('MidtermUpgrade:Grid:Validation:Required');
   const maxQuantity = rule.currentQuantity + rule.sourceQuantity;
   if (rule.switchType === 'FULL_ONLY') {
-    return newQuantity === maxQuantity ? null : `Quantity must be ${maxQuantity}`;
+    return newQuantity === maxQuantity
+      ? null
+      : i18n.t('MidtermUpgrade:Grid:Validation:MustBe', { quantity: maxQuantity });
   }
   const minQuantity = rule.currentQuantity + 1;
-  if (newQuantity < minQuantity) return `Quantity must be at least ${minQuantity}`;
-  if (newQuantity > maxQuantity) return `Quantity cannot exceed ${maxQuantity}`;
+  if (newQuantity < minQuantity)
+    return i18n.t('MidtermUpgrade:Grid:Validation:AtLeast', { quantity: minQuantity });
+  if (newQuantity > maxQuantity)
+    return i18n.t('MidtermUpgrade:Grid:Validation:CannotExceed', { quantity: maxQuantity });
   return null;
 }
 
@@ -188,7 +193,7 @@ export function TargetSubscriptionGrid({
       ...columns,
       {
         name: 'newQuantity',
-        title: 'New Quantity',
+        title: i18n.t('MidtermUpgrade:Grid:New Quantity'),
         fields: ['newQuantity'],
         cell: (item) =>
           getNewQuantityCell(
@@ -201,7 +206,7 @@ export function TargetSubscriptionGrid({
       },
       {
         name: 'delta',
-        title: 'Delta',
+        title: i18n.t('MidtermUpgrade:Grid:Delta'),
         fields: ['delta'],
         cell: (item) => getDeltaCell(item),
       },
@@ -242,18 +247,18 @@ export function getSubscriptionCell(subscription: TargetSubscription): React.Rea
   if (subscription.id) {
     return (
       <PopoverCell
-        title="Subscription"
+        title={i18n.t('Common:Subscription')}
         text={subscription.name ?? '—'}
         secondaryContent={subscription.id ?? undefined}
         items={[
-          { title: 'ID', content: subscription.id ?? '—' },
-          { title: 'Name', content: subscription.name ?? '—' },
-          { title: 'Status', content: <Chip label={subscription.status || '—'} /> },
+          { title: i18n.t('Common:ID'), content: subscription.id ?? '—' },
+          { title: i18n.t('Common:Name'), content: subscription.name ?? '—' },
+          { title: i18n.t('Common:Status'), content: <Chip label={subscription.status || '—'} /> },
         ]}
       />
     );
   } else {
-    return <ChipCell label="New" color="gray" />;
+    return <ChipCell label={i18n.t('MidtermUpgrade:Grid:New')} color="gray" />;
   }
 }
 
@@ -272,7 +277,7 @@ export function getRecommendedCell(subscription: TargetSubscription): React.Reac
             <path d="m344-60-76-128-144-32 14-148-98-112 98-112-14-148 144-32 76-128 136 58 136-58 76 128 144 32-14 148 98 112-98 112 14 148-144 32-76 128-136-58-136 58Zm34-102 102-44 104 44 56-96 110-26-10-112 74-84-74-86 10-112-110-24-58-96-102 44-104-44-56 96-110 24 10 112-74 86 74 84-10 114 110 24 58 96Zm102-318Zm-42 142 226-226-56-58-170 170-86-84-56 56 142 142Z" />
           </svg>
           <RegularText as="p" size={2}>
-            Yes
+            {i18n.t('MidtermUpgrade:Grid:Yes')}
           </RegularText>
         </span>
       </GridCellSimple>

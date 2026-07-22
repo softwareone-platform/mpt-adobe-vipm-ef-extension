@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
+import { i18n } from '../../../i18n/translations';
 
 import type { AdobeCustomerData } from '../model';
 import type { ThreeYearCommitmentRequestInput } from '../three-year-commitment';
@@ -49,13 +50,13 @@ export function useThreeYearCommitmentRequest(agreementId: string) {
         );
         const customerData = (response.data as { data?: AdobeCustomerData } | undefined)?.data;
         if (!customerData) {
-          throw new Error('Commitment response did not include customer data.');
+          throw new Error(i18n.t('Errors:CommitmentNoData'));
         }
         setState({ error: '', status: 'success' });
         return customerData;
       } catch (submitError) {
         const error =
-          submitError instanceof Error ? submitError.message : 'Commitment request failed.';
+          submitError instanceof Error ? submitError.message : i18n.t('Errors:CommitmentRequest');
         setState({ error, status: 'error' });
         return false;
       }

@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   setupFiles: ['<rootDir>/test/jest.setup.cjs'],
-  setupFilesAfterEnv: ['@testing-library/jest-dom'],
+  setupFilesAfterEnv: ['@testing-library/jest-dom', '<rootDir>/test/i18n.setup.ts'],
   testEnvironment: 'jsdom',
   testMatch: ['<rootDir>/src/**/*.test.{ts,tsx}'],
   moduleNameMapper: {

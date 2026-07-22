@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction, useState, useMemo, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Order } from '../model';
 import { Subscription } from '../../shared/model';
 import { StepNavigationProperties, useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -22,6 +23,7 @@ export function DetailsStep({
   setOrder,
   isSplitBillingStepSkip,
 }: DetailsStepProps) {
+  const { t } = useTranslation();
   const [externalId, setExternalId] = useState(order?.externalIds?.client ?? '');
   const [notes, setNotes] = useState(order?.notes ?? '');
   const { registerOnNextCallback, registerOnBackCallback } = useStepActions();
@@ -78,7 +80,7 @@ export function DetailsStep({
     <div className="details" data-testid='subscription-edit-details-client'>
       <div className="details__section__header">
         <RegularText as="h2" size={4}>
-          Order
+          {t('Common:Order')}
         </RegularText>
       </div>
       <div className="details__section__highlights">
@@ -87,10 +89,10 @@ export function DetailsStep({
       <div className="details__section">
         <div className="details__section__inputs">
           <Input
-            label={"Additional Id"}
+            label={t('MidtermUpgrade:Details:Additional ID')}
             labelType={"optional"}
-            placeholder={"Enter additional ID"}
-            description={"Enter a value that will help you identify this order"}
+            placeholder={t('MidtermUpgrade:Details:Additional ID placeholder')}
+            description={t('MidtermUpgrade:Details:Additional ID description')}
             value={externalId}
             onChange={(e: { target: HTMLInputElement; }) => setExternalId((e.target as HTMLInputElement).value)}
             testId='order-additional-id'
@@ -100,10 +102,10 @@ export function DetailsStep({
             type={"textarea"}
             height={120}
             name={'notes'}
-            label={"Notes"}
+            label={t('MidtermUpgrade:Details:Notes')}
             labelType={"optional"}
             description={' '}
-            placeholder={"Enter notes"}
+            placeholder={t('MidtermUpgrade:Details:Notes placeholder')}
             value={notes}
             onChange={(e: { target: HTMLInputElement; }) => setNotes((e.target as HTMLInputElement).value)}
             testId='order-notes'
