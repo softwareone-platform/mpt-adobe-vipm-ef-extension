@@ -55,12 +55,19 @@ class FakeAgreements:
         self.agreement = None
         self.error = None
         self.get_by_id_calls = []
+        self.update_calls = []
+        self.update_error = None
 
     async def get_by_id(self, agreement_id):
         self.get_by_id_calls.append(agreement_id)
         if self.error is not None:
             raise self.error
         return self.agreement
+
+    async def update(self, agreement_id, attributes):
+        self.update_calls.append((agreement_id, attributes))
+        if self.update_error is not None:
+            raise self.update_error
 
 
 class FakeSubscriptions:
