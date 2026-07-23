@@ -12,7 +12,13 @@ from pydantic import ValidationError as PydanticValidationError
 
 from adobe.enums import LinkedMembershipType
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
-from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
+from mpt_adobe_vipm_ef.constants import (
+    CUSTOMER_ID_PARAM,
+    FULFILLMENT_PHASE,
+    THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_STATUS_REQUESTED,
+)
 from mpt_adobe_vipm_ef.routers.api.customer import (
     LinkedMembershipRequestBody,
     ThreeYCRequestBody,
@@ -278,6 +284,51 @@ async def test_request_three_yc_maps_adobe_errors_to_api_errors(
 
     with pytest.raises(expected):
         await request_three_yc_commitment(_AGREEMENT_ID, fake_ctx, result)
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_param"),
+    [
+        (ThreeYCRequestBody(licenses=10), THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM),
+        (
+            ThreeYCRequestBody(licenses=10, isRecommitment=True),
+            THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM,
+        ),
+    ],
+)
+async def test_request_three_yc_sets_request_status_parameter_to_requested(  # noqa: WPS211
+    fake_ctx, resolve_ids, fake_agreements, adobe_call, body, expected_param
+):
+    adobe_call.returns = {"status": "PENDING"}
+
+    await request_three_yc_commitment(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    assert fake_agreements.update_calls == [
+        (
+            _AGREEMENT_ID,
+            {
+                "parameters": {
+                    FULFILLMENT_PHASE: [
+                        {"externalId": expected_param, "value": THREE_YC_STATUS_REQUESTED},
+                    ],
+                },
+            },
+        )
+    ]
+
+
+async def test_request_three_yc_returns_accepted_even_when_status_update_fails(
+    fake_ctx, resolve_ids, fake_agreements, adobe_call
+):
+    adobe_call.returns = {"status": "PENDING"}
+    fake_agreements.update_error = MPTAPIError(http.HTTPStatus.INTERNAL_SERVER_ERROR, "boom", {})
+
+    result = await request_three_yc_commitment(  # act
+        _AGREEMENT_ID, fake_ctx, ThreeYCRequestBody(licenses=10)
+    )
+
+    assert result.payload == {"status": "PENDING"}
+    assert len(fake_agreements.update_calls) == 1
 
 
 async def test_enable_global_sales_returns_accepted_payload(fake_ctx, resolve_ids, adobe_call):

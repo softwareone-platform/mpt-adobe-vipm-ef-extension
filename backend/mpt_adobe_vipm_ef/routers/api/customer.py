@@ -24,8 +24,12 @@ from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import (
     AGREEMENT_CACHE_KEY,
     CUSTOMER_ID_PARAM,
+    FULFILLMENT_PHASE,
     MAX_LENGTH,
     MIN_LENGTH,
+    THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_STATUS_REQUESTED,
 )
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.routers.api.agreements import agreements_router
@@ -211,6 +215,52 @@ async def get_customer(agreement_id: str, ctx: APIContext) -> APIResponse:
     return APIResponse.ok(payload=customer)
 
 
+async def _mark_three_yc_request_status_requested(
+    ctx: APIContext,
+    agreement_id: str,
+    *,
+    is_recommitment: bool,
+) -> None:
+    """Set the agreement's 3YC (re)commitment request status parameter to ``REQUESTED``.
+
+    Called after Adobe has accepted the request, so the platform agreement reflects
+    the in-flight request until the sync flow refreshes it with Adobe's real status.
+
+    This is best-effort: the Adobe PATCH is already committed and cannot be undone, so
+    a failure to write the parameter is logged but never turned into a request error.
+    A subsequent sync run reconciles the parameter from Adobe.
+    """
+    param_external_id = (
+        THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM
+        if is_recommitment
+        else THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM
+    )
+    agreement_parameters = {
+        "parameters": {
+            FULFILLMENT_PHASE: [
+                {"externalId": param_external_id, "value": THREE_YC_STATUS_REQUESTED},
+            ],
+        },
+    }
+    try:
+        await ctx.mpt_api_service.agreements.update(agreement_id, agreement_parameters)
+    except MPTHttpError as error:
+        logger.warning(
+            "Failed to set %s=%s on agreement %s after Adobe accepted the 3YC request: %s",
+            param_external_id,
+            THREE_YC_STATUS_REQUESTED,
+            agreement_id,
+            error,
+        )
+        return
+    logger.info(
+        "Agreement %s parameter %s set to %s",
+        agreement_id,
+        param_external_id,
+        THREE_YC_STATUS_REQUESTED,
+    )
+
+
 @agreements_router.post(
     path="/{agreement_id}/3yc-request",
     name="agreements-3yc-request",
@@ -279,6 +329,11 @@ async def request_three_yc_commitment(
         raise ValidationError(detail=str(error))
 
     logger.info("3YC: Adobe accepted the request for agreement %s", agreement_id)
+    await _mark_three_yc_request_status_requested(
+        ctx,
+        agreement_id,
+        is_recommitment=body.is_recommitment,
+    )
     return APIResponse.accepted(payload=result)
 
 
