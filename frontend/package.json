@@ -22,8 +22,8 @@
     "@mpt-extension/sdk-react": "^0.0.7",
     "@softwareone-platform/sdk-react-ui-v0": "^0.0.2",
     "esbuild-sass-plugin": "^3.6.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
