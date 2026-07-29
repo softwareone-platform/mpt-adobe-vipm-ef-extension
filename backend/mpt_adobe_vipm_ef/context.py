@@ -8,6 +8,7 @@ de modo que los handlers puedan usar ``ctx.adobe_client`` directamente.
 """
 
 import logging
+from typing import Protocol, cast
 
 from mpt_extension_sdk.api.context import APIContext
 
@@ -28,3 +29,18 @@ def _adobe_client(self: APIContext) -> AdobeClient:
 
 
 APIContext.adobe_client = property(_adobe_client)  # type: ignore[attr-defined]
+
+
+class _SupportsAdobeClient(Protocol):
+    adobe_client: AdobeClient
+
+
+def adobe_client(ctx: APIContext) -> AdobeClient:
+    """Typed accessor for the Adobe client attached to the request context.
+
+    ``adobe_client`` is registered on ``APIContext`` as a property at runtime, so
+    the type checker cannot see it. Viewing the context through the
+    :class:`_SupportsAdobeClient` protocol lets handlers call ``adobe_client(ctx)`` with
+    full typing and no per-call ``type: ignore``.
+    """
+    return cast(_SupportsAdobeClient, ctx).adobe_client

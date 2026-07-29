@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import threading
 from collections import defaultdict
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -27,6 +28,17 @@ _RETRY_STRATEGY = Retry(
     status_forcelist={429, 500, 502, 503, 504},
     allowed_methods={"GET", "POST", "PATCH"},
 )
+
+
+def get_header_value(headers: Mapping[str, str], name: str) -> str:
+    """Return the response header ``name`` or an empty string when it is absent.
+
+    Kept as a module-level function taking the headers rather than a
+    method on AdobeTransport: the transport is shared and used
+    by concurrent requests, so storing a response's headers on it would let one
+    request read another request's headers.
+    """
+    return headers.get(name) or ""
 
 
 class AdobeTransport:
@@ -55,7 +67,45 @@ class AdobeTransport:
         """The extension settings backing this transport."""
         return self._settings
 
-    def request(
+    def request(  # noqa: WPS210 WPS211
+        self,
+        method: str,
+        authorization: Authorization,
+        path: str,
+        *,
+        correlation_id: str | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Perform an authenticated request against the Adobe VIPM API.
+
+        ``extra_headers`` add caller headers (e.g. the
+        ``x-recommendation-tracker-id`` attribution header on order calls). Keys
+        that collide with a transport-owned header (``Authorization``,
+        ``X-Api-Key``, etc.) are ignored so a caller cannot override
+        authentication.
+        """
+        url = urljoin(self._settings.adobe_api_base_url, path)
+        headers = self._get_headers(authorization, correlation_id)
+        if extra_headers:
+            owned = {name.lower() for name in headers}
+            for name, value in extra_headers.items():  # noqa: WPS110
+                if name.lower() in owned:
+                    logger.warning(
+                        "Ignoring caller header %r: it would override a transport-owned header",
+                        name,
+                    )
+                    continue
+                headers[name] = value
+        logger.info("Adobe API request: %s %s", method, url)
+        response = self._session.request(
+            method, url, headers=headers, timeout=self._TIMEOUT, **kwargs
+        )
+        logger.info("Adobe API response: %s %s -> %s", method, url, response.status_code)
+        response.raise_for_status()
+        return response.json()  # type: ignore[no-any-return]
+
+    def request_raw(
         self,
         method: str,
         authorization: Authorization,
@@ -63,8 +113,8 @@ class AdobeTransport:
         *,
         correlation_id: str | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
-        """Perform an authenticated request against the Adobe VIPM API."""
+    ) -> requests.Response:
+        """Like :meth:`request` but return the raw response so callers can read headers."""
         url = urljoin(self._settings.adobe_api_base_url, path)
         headers = self._get_headers(authorization, correlation_id)
         logger.info("Adobe API request: %s %s", method, url)
@@ -73,7 +123,7 @@ class AdobeTransport:
         )
         logger.info("Adobe API response: %s %s -> %s", method, url, response.status_code)
         response.raise_for_status()
-        return response.json()  # type: ignore[no-any-return]
+        return response
 
     def _get_headers(
         self, authorization: Authorization, correlation_id: str | None = None

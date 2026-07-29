@@ -1,0 +1,42 @@
+import type { AgreementSplitState } from './model';
+
+export const SCREEN_HEIGHT_FACTOR = 0.85;
+export const SCREEN_WIDTH_FACTOR = 0.90;
+
+export enum EntityDomain {
+  Commerce = 'commerce',
+  Catalog = 'catalog',
+  Accounts = 'accounts',
+}
+
+export enum EntityType {
+  Agreements = 'agreements',
+  Orders = 'orders',
+  Products = 'products',
+  Accounts = 'accounts',
+  Sellers = 'sellers',
+  Buyers = 'buyers',
+  Licensees = 'licensees',
+}
+
+export const INITIAL_SPLIT_STATE: AgreementSplitState = {
+  status: 'idle',
+  error: null,
+  data: null,
+};
+
+export const TERM_PERIOD_LABELS: Record<string, string> = {
+  '1m': 'Monthly billing',
+  '1y': 'Yearly billing',
+  '3y': '3-yearly billing',
+  'one-time': 'One-time',
+};
+
+export const TERM_COMMITMENT_LABELS: Record<string, string> = {
+  '1m': '1 month commitment',
+  '1y': '1 year commitment',
+  '2y': '2 year commitment',
+  '3y': '3 year commitment',
+  '4y': '4 year commitment',
+  '5y': '5 year commitment',
+};

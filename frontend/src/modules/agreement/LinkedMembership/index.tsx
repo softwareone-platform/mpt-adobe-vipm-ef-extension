@@ -3,13 +3,13 @@ import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 
-import { useAgreementId } from "../hooks/useAgreementId";
-import { useAdobeCustomer } from "../hooks/useAdobeCustomer";
-import { useSettings } from "../hooks/useSettings";
+import { useAgreementId } from "../../shared/hooks/useAgreementId";
+import { useAdobeCustomer } from "../../shared/hooks/useAdobeCustomer";
+import { useSettings } from "../../shared/hooks/useSettings";
 import { DetailsGroup } from "../components/details/details-group/DetailsGroup";
 import { DetailsSection } from "../components/details/details-section/DetailsSection";
-import { findLinkedMembership, hasThreeYearCommitment } from "../model";
-import type { AccountType } from "./model";
+import { findLinkedMembership, hasThreeYearCommitment } from "../../shared/model";
+import type { AccountType } from "../../shared/linked-membership";
 import { canRequestLinkedMembership } from "../../utils/security";
 
 import "./index.scss";

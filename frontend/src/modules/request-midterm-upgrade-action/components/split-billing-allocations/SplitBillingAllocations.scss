@@ -1,0 +1,7 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.split-billing-allocations {
+  &__info {
+    margin: 0 0 $var-spacing-3;
+  }
+}

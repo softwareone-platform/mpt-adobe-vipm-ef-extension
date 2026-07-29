@@ -1,6 +1,6 @@
-import { ProductSegments } from '../agreement/model';
-import type { ProductSegment } from '../agreement/hooks/useSettings';
-import type { AccountType } from '../agreement/ThreeYearCommitment/model';
+import { ProductSegments } from '../shared/model';
+import type { ProductSegment } from '../shared/hooks/useSettings';
+import type { AccountType } from '../shared/three-year-commitment';
 import { getProduct } from './settings';
 
 /**
@@ -18,6 +18,15 @@ function canRequestAdobeAction(
   const isRequestAccountType = accountType === 'Operations' || accountType === 'Vendor';
   const product = getProduct(products, agreementProductId ?? '');
   return isRequestAccountType && product != null;
+}
+
+export function canRequestMidtermUpgradeAction(
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  const product = getProduct(products, agreementProductId ?? '');
+  return accountType === 'Client' && product != null;
 }
 
 export function canRequestThreeYearCommitment(

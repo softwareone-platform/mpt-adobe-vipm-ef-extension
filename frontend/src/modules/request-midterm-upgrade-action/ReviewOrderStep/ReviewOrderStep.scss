@@ -1,0 +1,51 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.review-order-step {
+  &__header {
+    h2 {
+      margin: 0;
+    }
+  }
+  &__highlights {
+    padding: $var-spacing-3 0;
+  }
+
+  &__error {
+    margin-top: $var-spacing-3;
+  }
+
+  &__submitting {
+    margin-top: $var-spacing-3;
+    color: $var-gray-4;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__footer-text {
+    margin-top: $var-spacing-3;
+    color: $var-gray-4;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__tab {
+    padding-top: $var-spacing-3;
+  }
+
+  &__details {
+    display: flex;
+    flex-direction: column;
+    gap: $var-spacing-3;
+  }
+
+  &__details-item {
+    h5,
+    p {
+      margin: 0;
+    }
+  }
+}

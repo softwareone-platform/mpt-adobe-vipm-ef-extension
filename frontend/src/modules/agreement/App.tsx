@@ -1,5 +1,5 @@
 import { MediumText } from '@softwareone-platform/sdk-react-ui-v0/text';
-import { MemoryRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 
 import { ThreeYearCommitment } from './ThreeYearCommitment';
 import { LinkedMembership } from './LinkedMembership';
@@ -15,7 +15,7 @@ const NAV_ITEMS: Array<{ label: string; path: string }> = [
 
 export default function App() {
   return (
-    <MemoryRouter initialEntries={[DEFAULT_PATH]}>
+    <BrowserRouter>
       <div className="extension">
         {/*
           Custom sidebar instead of the SDK's `Navigation.SideNav`.
@@ -68,6 +68,6 @@ export default function App() {
           </Routes>
         </section>
       </div>
-    </MemoryRouter>
+    </BrowserRouter>
   );
 }

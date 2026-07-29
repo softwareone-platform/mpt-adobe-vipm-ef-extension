@@ -141,6 +141,7 @@ async function renderApp() {
 describe('agreement plug app', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.history.pushState({}, '', '/');
     mockBackend();
     mockUseMPTModal.mockReturnValue({ open: mockOpen, close: jest.fn() });
     mockUseMPTContext.mockReturnValue({

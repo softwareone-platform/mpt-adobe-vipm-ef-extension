@@ -3,12 +3,12 @@ import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { BoldText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
-import { useAdobeCustomer } from '../agreement/hooks/useAdobeCustomer';
-import { useAgreementId } from '../agreement/hooks/useAgreementId';
-import { useGlobalSalesRequest } from '../agreement/hooks/useGlobalSalesRequest';
-import { useSettings } from '../agreement/hooks/useSettings';
-import type { AccountType } from '../agreement/ThreeYearCommitment/model';
-import { isGlobalSalesEnabled } from '../agreement/model';
+import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
+import { useAgreementId } from '../shared/hooks/useAgreementId';
+import { useGlobalSalesRequest } from '../shared/hooks/useGlobalSalesRequest';
+import { useSettings } from '../shared/hooks/useSettings';
+import type { AccountType } from '../shared/three-year-commitment';
+import { isGlobalSalesEnabled } from '../shared/model';
 import { canRequestGlobalCustomer } from '../utils/security';
 
 import './App.scss';

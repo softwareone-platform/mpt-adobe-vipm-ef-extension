@@ -21,18 +21,24 @@ from pydantic import Field
 
 from adobe.enums import LinkedMembershipType
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from mpt_adobe_vipm_ef.constants import (
+    AGREEMENT_CACHE_KEY,
+    CUSTOMER_ID_PARAM,
+    FULFILLMENT_PHASE,
+    MAX_LENGTH,
+    MIN_LENGTH,
+    THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM,
+    THREE_YC_STATUS_REQUESTED,
+)
+from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.routers.api.agreements import agreements_router
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
 
 logger = logging.getLogger(__name__)
 
-_CUSTOMER_ID_PARAM = "customerId"
-_MIN_LENGTH = 1
-_MAX_LENGTH = 255
-_AGREEMENT_CACHE_KEY = "agreements_by_id"
 
-
-async def _load_agreement(ctx: APIContext, agreement_id: str) -> Any:
+async def load_agreement(ctx: APIContext, agreement_id: str) -> Any:
     """Fetch the agreement once per request and cache it in ``ctx.state``.
 
     The access guard and the route handlers both need the agreement; caching it
@@ -42,7 +48,7 @@ async def _load_agreement(ctx: APIContext, agreement_id: str) -> Any:
     agreement (or a missing agreement) gets a 404 from MPT. That is mapped to a
     :class:`NotFoundError`; any other MPT HTTP failure becomes an upstream error.
     """
-    cache = ctx.state.setdefault(_AGREEMENT_CACHE_KEY, {})
+    cache = ctx.state.setdefault(AGREEMENT_CACHE_KEY, {})
     agreement = cache.get(agreement_id)
     if agreement is None:
         try:
@@ -62,11 +68,8 @@ async def _load_agreement(ctx: APIContext, agreement_id: str) -> Any:
     return agreement
 
 
-def _resolve_product_id(agreement: Any) -> str | None:
-    product = getattr(agreement, "product", None)
-    if product is None:
-        return None
-    return getattr(product, "id", None)
+def _resolve_product_id(agreement: Any) -> str:
+    return cast(str, agreement.product.id)
 
 
 def _assert_product_allowed(ctx: APIContext, agreement: Any, agreement_id: str) -> None:
@@ -93,7 +96,7 @@ def validate_agreement_access(
     Loads the agreement once (cached in ``ctx.state``) and verifies its product
     is supported by this extension (403) before delegating to the wrapped
     handler. Access control is enforced by the account-scoped MPT client:
-    :func:`_load_agreement` returns a 404 when the caller cannot access the
+    :func:`load_agreement` returns a 404 when the caller cannot access the
     agreement. The SDK injects handler arguments by keyword and inspects the
     original signature through ``functools.wraps``.
     """
@@ -104,7 +107,7 @@ def validate_agreement_access(
         bound = handler_signature.bind(*args, **kwargs)
         ctx = cast(APIContext, bound.arguments.get("ctx") or bound.arguments.get("context"))  # noqa: WPS221
         agreement_id: str = bound.arguments["agreement_id"]
-        agreement = await _load_agreement(ctx, agreement_id)
+        agreement = await load_agreement(ctx, agreement_id)
         _assert_product_allowed(ctx, agreement, agreement_id)
         return await handler(*args, **kwargs)
 
@@ -126,7 +129,7 @@ class ThreeYCRequestBody(BaseSchema):
 class LinkedMembershipRequestBody(BaseSchema):
     """Body schema for the linked membership request endpoint."""
 
-    name: str = Field(min_length=_MIN_LENGTH, max_length=_MAX_LENGTH)
+    name: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     membership_type: LinkedMembershipType = Field(
         default=LinkedMembershipType.STANDARD,
         serialization_alias="type",
@@ -134,51 +137,31 @@ class LinkedMembershipRequestBody(BaseSchema):
     )
 
 
-def _resolve_authorization_id(agreement: Any) -> str | None:
-    authorization = getattr(agreement, "authorization", None)
-    if authorization is None:
-        return None
-    return getattr(authorization, "id", None)
-
-
 def _resolve_customer_id(agreement: Any) -> str | None:
-    agreement_parameters = getattr(agreement, "parameters", None)
-    if agreement_parameters is None:
-        return None
-    agreement_param = agreement_parameters.get_parameter(
-        _CUSTOMER_ID_PARAM, "fulfillment"
-    ) or agreement_parameters.get_parameter(_CUSTOMER_ID_PARAM, "ordering")
+    agreement_param = agreement.parameters.get_parameter(CUSTOMER_ID_PARAM, "fulfillment")
     if agreement_param is None:
         return None
     return agreement_param.value or agreement_param.display_value or None
 
 
-async def _require_authorization_id(ctx: APIContext, agreement_id: str) -> str:
-    """Resolve the agreement's authorization id or raise ValidationError."""
-    agreement = await _load_agreement(ctx, agreement_id)
-    authorization_id = _resolve_authorization_id(agreement)
-    logger.debug("Agreement %s resolved to authorization_id=%r", agreement_id, authorization_id)
-    if not authorization_id:
-        logger.warning("Agreement %s has no authorization", agreement_id)
-        raise ValidationError(
-            detail="Agreement is not linked to an authorization.",
-            errors=[ErrorDetail(pointer="#/authorization", detail="Missing authorization.id")],
-        )
-    return authorization_id
+async def get_authorization_id(ctx: APIContext, agreement_id: str) -> str:
+    """Resolve the agreement's authorization id (a required agreement field)."""
+    agreement = await load_agreement(ctx, agreement_id)
+    return cast(str, agreement.authorization.id)
 
 
-async def _require_customer_id(ctx: APIContext, agreement_id: str) -> str:
+async def require_customer_id(ctx: APIContext, agreement_id: str) -> str:
     """Resolve the agreement's Adobe customer id or raise ValidationError."""
-    agreement = await _load_agreement(ctx, agreement_id)
+    agreement = await load_agreement(ctx, agreement_id)
     customer_id = _resolve_customer_id(agreement)
     logger.debug("Agreement %s resolved to customer_id=%r", agreement_id, customer_id)
     if not customer_id:
         logger.warning(
-            "Agreement %s is missing the '%s' parameter", agreement_id, _CUSTOMER_ID_PARAM
+            "Agreement %s is missing the '%s' parameter", agreement_id, CUSTOMER_ID_PARAM
         )
         raise ValidationError(
             detail="Agreement is missing the Adobe customer identifier.",
-            errors=[ErrorDetail(pointer=f"#/parameters/{_CUSTOMER_ID_PARAM}", detail="Not set")],
+            errors=[ErrorDetail(pointer=f"#/parameters/{CUSTOMER_ID_PARAM}", detail="Not set")],
         )
     return customer_id
 
@@ -191,11 +174,11 @@ async def _require_customer_id(ctx: APIContext, agreement_id: str) -> str:
 async def get_customer(agreement_id: str, ctx: APIContext) -> APIResponse:
     """Fetch the Adobe customer payload for the agreement's customer."""
     logger.info("GET customer for agreement %s", agreement_id)
-    authorization_id = await _require_authorization_id(ctx, agreement_id)
-    customer_id = await _require_customer_id(ctx, agreement_id)
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
     try:
         customer = await asyncio.to_thread(
-            ctx.adobe_client.customer.get_customer,  # type: ignore[attr-defined]
+            adobe_client(ctx).customer.get_customer,
             authorization_id,
             customer_id,
         )
@@ -232,6 +215,52 @@ async def get_customer(agreement_id: str, ctx: APIContext) -> APIResponse:
     return APIResponse.ok(payload=customer)
 
 
+async def _mark_three_yc_request_status_requested(
+    ctx: APIContext,
+    agreement_id: str,
+    *,
+    is_recommitment: bool,
+) -> None:
+    """Set the agreement's 3YC (re)commitment request status parameter to ``REQUESTED``.
+
+    Called after Adobe has accepted the request, so the platform agreement reflects
+    the in-flight request until the sync flow refreshes it with Adobe's real status.
+
+    This is best-effort: the Adobe PATCH is already committed and cannot be undone, so
+    a failure to write the parameter is logged but never turned into a request error.
+    A subsequent sync run reconciles the parameter from Adobe.
+    """
+    param_external_id = (
+        THREE_YC_RECOMMITMENT_REQUEST_STATUS_PARAM
+        if is_recommitment
+        else THREE_YC_COMMITMENT_REQUEST_STATUS_PARAM
+    )
+    agreement_parameters = {
+        "parameters": {
+            FULFILLMENT_PHASE: [
+                {"externalId": param_external_id, "value": THREE_YC_STATUS_REQUESTED},
+            ],
+        },
+    }
+    try:
+        await ctx.mpt_api_service.agreements.update(agreement_id, agreement_parameters)
+    except MPTHttpError as error:
+        logger.warning(
+            "Failed to set %s=%s on agreement %s after Adobe accepted the 3YC request: %s",
+            param_external_id,
+            THREE_YC_STATUS_REQUESTED,
+            agreement_id,
+            error,
+        )
+        return
+    logger.info(
+        "Agreement %s parameter %s set to %s",
+        agreement_id,
+        param_external_id,
+        THREE_YC_STATUS_REQUESTED,
+    )
+
+
 @agreements_router.post(
     path="/{agreement_id}/3yc-request",
     name="agreements-3yc-request",
@@ -262,8 +291,8 @@ async def request_three_yc_commitment(
             ],
         )
 
-    authorization_id = await _require_authorization_id(ctx, agreement_id)
-    customer_id = await _require_customer_id(ctx, agreement_id)
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
 
     commitment_request = {
         "3YCLicenses": str(body.licenses) if body.licenses else "",
@@ -279,7 +308,7 @@ async def request_three_yc_commitment(
 
     try:
         result = await asyncio.to_thread(
-            ctx.adobe_client.customer.create_three_year_request,  # type: ignore[attr-defined]
+            adobe_client(ctx).customer.create_three_year_request,
             authorization_id,
             customer_id,
             commitment_request,
@@ -300,6 +329,11 @@ async def request_three_yc_commitment(
         raise ValidationError(detail=str(error))
 
     logger.info("3YC: Adobe accepted the request for agreement %s", agreement_id)
+    await _mark_three_yc_request_status_requested(
+        ctx,
+        agreement_id,
+        is_recommitment=body.is_recommitment,
+    )
     return APIResponse.accepted(payload=result)
 
 
@@ -313,12 +347,12 @@ async def enable_global_sales(
     ctx: APIContext,
 ) -> APIResponse:
     """Enable global sales on Adobe for the agreement's customer."""
-    authorization_id = await _require_authorization_id(ctx, agreement_id)
-    customer_id = await _require_customer_id(ctx, agreement_id)
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
 
     try:
         result = await asyncio.to_thread(
-            ctx.adobe_client.customer.enable_global_sales,  # type: ignore[attr-defined]
+            adobe_client(ctx).customer.enable_global_sales,
             authorization_id,
             customer_id,
         )
@@ -352,12 +386,12 @@ async def request_linked_membership(
         agreement_id,
         body.membership_type,
     )
-    authorization_id = await _require_authorization_id(ctx, agreement_id)
-    customer_id = await _require_customer_id(ctx, agreement_id)
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
 
     try:
         result = await asyncio.to_thread(
-            ctx.adobe_client.customer.create_linked_membership_request,  # type: ignore[attr-defined]
+            adobe_client(ctx).customer.create_linked_membership_request,
             authorization_id,
             customer_id,
             body.name,

@@ -1,4 +1,7 @@
 from adobe.resources.customer import CustomerClient
+from adobe.resources.offer import OfferClient
+from adobe.resources.order import OrderClient
+from adobe.resources.recommendation import RecommendationClient
 from adobe.transport import AdobeTransport
 
 
@@ -12,6 +15,9 @@ class AdobeClient:
     def __init__(self) -> None:
         self._transport = AdobeTransport()
         self.customer = CustomerClient(self._transport)
+        self.offer = OfferClient(self._transport)
+        self.order = OrderClient(self._transport)
+        self.recommendation = RecommendationClient(self._transport)
 
 
 _ADOBE_CLIENT: "AdobeClient | None" = None

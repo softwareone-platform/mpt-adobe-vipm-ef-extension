@@ -1,6 +1,6 @@
 from mpt_extension_sdk.api.context import APIContext
 
-from mpt_adobe_vipm_ef.models import ProductSegment
+from mpt_adobe_vipm_ef.models.product import ProductSegment
 from mpt_adobe_vipm_ef.routers.api.settings import get_settings
 
 

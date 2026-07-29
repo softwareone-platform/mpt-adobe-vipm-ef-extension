@@ -1,7 +1,8 @@
-import { ProductSegment } from '../agreement/hooks/useSettings';
+import { ProductSegment } from '../shared/hooks/useSettings';
 import {
   canRequestGlobalCustomer,
   canRequestLinkedMembership,
+  canRequestMidtermUpgradeAction,
   canRequestThreeYearCommitment,
 } from './security';
 
@@ -9,6 +10,40 @@ const products: ProductSegment[] = [
   { id: 'PRD-1111-1111', segment: 'COM' },
   { id: 'PRD-2222-2222', segment: 'LGA' },
 ];
+
+describe('canRequestMidtermUpgradeAction', () => {
+  it('returns true for a client account with a matching product', () => {
+    expect(canRequestMidtermUpgradeAction('Client', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true for a client account when the product segment is LGA', () => {
+    expect(canRequestMidtermUpgradeAction('Client', products, 'PRD-2222-2222')).toBe(true);
+  });
+
+  it('returns false for an operations account', () => {
+    expect(canRequestMidtermUpgradeAction('Operations', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false for a vendor account', () => {
+    expect(canRequestMidtermUpgradeAction('Vendor', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the account type is undefined', () => {
+    expect(canRequestMidtermUpgradeAction(undefined, products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canRequestMidtermUpgradeAction('Client', products, 'PRD-9999-9999')).toBe(false);
+  });
+
+  it('returns false when products are not provided', () => {
+    expect(canRequestMidtermUpgradeAction('Client', undefined, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product id is undefined', () => {
+    expect(canRequestMidtermUpgradeAction('Client', products, undefined)).toBe(false);
+  });
+});
 
 describe('canRequestThreeYearCommitment', () => {
   it('returns true for an operations account with a matching non-LGA product', () => {

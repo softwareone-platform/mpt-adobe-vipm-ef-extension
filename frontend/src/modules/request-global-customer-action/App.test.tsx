@@ -3,8 +3,8 @@ import { ReactNode } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import App from './App';
-import type { AdobeCustomerData } from '../agreement/model';
-import type { Status } from '../agreement/hooks/useAgreementSync';
+import type { AdobeCustomerData } from '../shared/model';
+import type { Status } from '../shared/model';
 
 const mockClose = jest.fn();
 let mockStatus: Status = 'idle';
@@ -20,15 +20,15 @@ jest.mock('@mpt-extension/sdk-react', () => ({
   }),
 }), { virtual: true });
 
-jest.mock('../agreement/hooks/useSettings', () => ({
+jest.mock('../shared/hooks/useSettings', () => ({
   useSettings: () => ({ products: [{ id: 'PRD-1', segment: 'COM' }] }),
 }));
 
-jest.mock('../agreement/hooks/useAgreementId', () => ({
+jest.mock('../shared/hooks/useAgreementId', () => ({
   useAgreementId: () => 'AGR-1234-5678-9012',
 }));
 
-jest.mock('../agreement/hooks/useAdobeCustomer', () => ({
+jest.mock('../shared/hooks/useAdobeCustomer', () => ({
   useAdobeCustomer: () => ({
     status: 'success',
     error: null,
@@ -38,7 +38,7 @@ jest.mock('../agreement/hooks/useAdobeCustomer', () => ({
   }),
 }));
 
-jest.mock('../agreement/hooks/useGlobalSalesRequest', () => ({
+jest.mock('../shared/hooks/useGlobalSalesRequest', () => ({
   useGlobalSalesRequest: () => ({
     error: mockError,
     status: mockStatus,

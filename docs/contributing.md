@@ -9,6 +9,8 @@ Shared rules live in `mpt-extension-skills/standards` and should not be duplicat
 - commit message rules: [commit-messages.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/commit-messages.md)
 - dependency management: [packages-and-dependencies.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/packages-and-dependencies.md)
 - extension design guidance: [extensions-best-practices.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/extensions-best-practices.md)
+- frontend UI authoring rules: [extensions-ui-best-practices.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/extensions-ui-best-practices.md)
+- frontend UI testing rules: [extensions-ui-testing-best-practices.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/extensions-ui-testing-best-practices.md)
 - pull request rules: [pull-requests.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/pull-requests.md)
 - Python coding conventions: [python-coding.md](https://github.com/softwareone-platform/mpt-extension-skills/blob/main/standards/python-coding.md)
 

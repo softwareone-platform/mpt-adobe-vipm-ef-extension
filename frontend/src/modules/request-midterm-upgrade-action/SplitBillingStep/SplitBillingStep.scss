@@ -1,0 +1,15 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.split-billing-step {
+  &__header {
+    h2 {
+      margin: 0;
+    }
+  }
+  &__highlights {
+    padding: $var-spacing-3 0;
+  }
+  &__error {
+    padding-bottom: $var-spacing-3;
+  }
+}

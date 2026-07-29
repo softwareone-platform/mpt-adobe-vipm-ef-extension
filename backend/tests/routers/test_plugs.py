@@ -28,6 +28,31 @@ def test_request_commitment_modal_plug_metadata(monkeypatch):
     assert plug.href == "/static/request-commitment-action/index.js"
 
 
+def test_request_midterm_upgrade_plug_metadata(monkeypatch):
+    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
+    get_settings.cache_clear()
+
+    plug = agreement_plugs()[4]  # act
+
+    assert plug.id == "request-midterm-upgrade-action"
+    assert plug.name == "Upgrade"
+    assert plug.socket == "portal.commerce.subscriptions.subscription.actions"
+    assert plug.href == "/static/request-midterm-upgrade-action/index.js"
+
+
+def test_subscription_plug_condition_lists_products(monkeypatch):
+    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+    monkeypatch.setenv(
+        "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
+    )
+    get_settings.cache_clear()
+
+    plug = agreement_plugs()[4]  # act
+
+    assert plug.condition == "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222))"
+
+
 def test_plug_condition_lists_products(monkeypatch):
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
     monkeypatch.setenv(
