@@ -1,8 +1,10 @@
 import { BoldText, MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
+import { Trans, useTranslation } from "react-i18next";
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 
+import { i18n } from "../../../i18n/translations";
 import { useAgreementId } from "../../shared/hooks/useAgreementId";
 import { useAdobeCustomer } from "../../shared/hooks/useAdobeCustomer";
 import { useSettings } from "../../shared/hooks/useSettings";
@@ -18,11 +20,12 @@ function toContent(
   value: string | number | boolean | null | undefined,
 ): string | undefined {
   if (value == null || value === '') return undefined;
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'boolean') return value ? i18n.t('Common:Yes') : i18n.t('Common:No');
   return String(value);
 }
 
 export function LinkedMembership() {
+  const { t } = useTranslation();
   const settings = useSettings();
   const context = useMPTContext<{
     auth?: { account?: { type?: AccountType } };
@@ -52,16 +55,16 @@ export function LinkedMembership() {
       <div className="linked-membership__main">
         <header className="extension__content-header">
           <MediumText as="h2" size={4} className="extension__content-title">
-            Linked membership
+            {t('Agreement:Linked:Title')}
           </MediumText>
           <RegularText as="p" size={2} color="grey-5">
-            The details of this customer&apos;s current linked membership are below.
+            {t('Agreement:Linked:Description')}
           </RegularText>
         </header>
 
         {adobeCustomer.status === 'loading' && (
           <InlineNotification status="info" isStandalone>
-            Loading Adobe customer details…
+            {t('Agreement:Loading')}
           </InlineNotification>
         )}
         {adobeCustomer.status === 'error' && (
@@ -71,19 +74,19 @@ export function LinkedMembership() {
         )}
 
         <div className="linked-membership__groups">
-          <DetailsGroup title="Current linked membership">
+          <DetailsGroup title={t('Agreement:Linked:Current linked membership')}>
             <DetailsSection
-              label="ID"
+              label={t('Common:ID')}
               content={toContent(linkedMembership?.linkedMembershipId ?? linkedMembership?.id)}
             />
-            <DetailsSection label="Name" content={toContent(linkedMembership?.name)} />
-            <DetailsSection label="Type" content={toContent(linkedMembership?.type)} />
+            <DetailsSection label={t('Common:Name')} content={toContent(linkedMembership?.name)} />
+            <DetailsSection label={t('Agreement:Linked:Type')} content={toContent(linkedMembership?.type)} />
             <DetailsSection
-              label="This account"
+              label={t('Agreement:Linked:This account')}
               content={toContent(linkedMembership?.linkedMembershipType)}
             />
             <DetailsSection
-              label="Creation date"
+              label={t('Agreement:Linked:Creation date')}
               content={toContent(linkedMembership?.creationDate)}
             />
           </DetailsGroup>
@@ -94,22 +97,13 @@ export function LinkedMembership() {
         <aside className="linked-membership__aside">
           <RegularText as="p" size={2} color="grey-5">
             {hasCommitment ? (
-              <>
-                This customer has a 3-year commitment and cannot create a linked membership.
-              </>
+              t('Agreement:Linked:HasCommitment')
             ) : hasLinkedMembership ? (
-              <>
-                This customer already has a linked membership applied. A linked membership
-                cannot be modified once it has been created.
-              </>
+              t('Agreement:Linked:AlreadyApplied')
             ) : (
-              <>
-                To create a linked membership with this account as the owner, click{" "}
-                <BoldText as="span" size={2}>
-                  Create linked membership
-                </BoldText>
-                .
-              </>
+              <Trans i18nKey="Agreement:Linked:CreatePrompt">
+                To create a linked membership with this account as the owner, click <BoldText as="span" size={2}>Create linked membership</BoldText>.
+              </Trans>
             )}
           </RegularText>
           <Button
@@ -124,7 +118,7 @@ export function LinkedMembership() {
               })
             }
           >
-            Create linked membership
+            {t('Agreement:Linked:Create linked membership')}
           </Button>
         </aside>
       )}

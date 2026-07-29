@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
+import { i18n } from '../../../i18n/translations';
 
 import type { Status } from '../model';
 
@@ -35,7 +36,7 @@ function toErrorMessage(submitError: unknown): string {
   if (typeof responseData?.title === 'string' && responseData.title) {
     return responseData.title;
   }
-  return submitError instanceof Error ? submitError.message : 'Order submission failed.';
+  return submitError instanceof Error ? submitError.message : i18n.t('Errors:OrderSubmission');
 }
 
 export function useUpgradeOrderRequest(agreementId: string, subscriptionId: string) {
@@ -59,7 +60,7 @@ export function useUpgradeOrderRequest(agreementId: string, subscriptionId: stri
         );
         const order = (response.data as { data?: UpgradeOrderResult } | undefined)?.data;
         if (!order?.id) {
-          throw new Error('Order response did not include the created order.');
+          throw new Error(i18n.t('Errors:OrderNoData'));
         }
         setState({ error: '', status: 'success' });
         return order;

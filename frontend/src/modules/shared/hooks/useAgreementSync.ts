@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
+import { i18n } from '../../../i18n/translations';
 import { INITIAL_SYNC_STATE, SyncState } from '../model';
 
 export function useAgreementSync(agreementId: string) {
@@ -23,7 +24,7 @@ export function useAgreementSync(agreementId: string) {
         status: 'success',
       });
     } catch (syncError) {
-      const error = syncError instanceof Error ? syncError.message : 'Agreement sync failed.';
+      const error = syncError instanceof Error ? syncError.message : i18n.t('Errors:AgreementSync');
       setState({
         error,
         lastCompleted: new Date().toLocaleString(),

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { StepNavigationProperties, useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -23,6 +24,7 @@ interface UpgradeToStepProps {
 }
 
 export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQuantity, offerStatus, onSubscriptionsChange, onSelectedTargetChange }: UpgradeToStepProps) {
+  const { t } = useTranslation();
   const showEmptyState = subscriptions.length === 0 && offerStatus !== 'idle' && offerStatus !== 'loading';
   const { registerOnNextCallback } = useStepActions();
   const [selectedTarget, setSelectedTarget] = useState<TargetSubscription | null>(null);
@@ -52,7 +54,7 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
     <div className="upgrade-to-step">
       <div className="upgrade-to-step__header">
         <RegularText as="h2" size={4}>
-          Upgrade to
+          {t('MidtermUpgrade:Steps:Upgrade to')}
         </RegularText>
       </div>
       <div className="upgrade-to-step__highlights">
@@ -61,7 +63,7 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
       <div className="upgrade-to-step__inline-text">
         <span className="upgrade-to-step__inline-text__pill" />
         <RegularText as="p" size={2}>
-          Select the item to upgrade to. If a new subscription is created, auto-renewal will be enabled by default.
+          {t('MidtermUpgrade:UpgradeTo:Instruction')}
         </RegularText>
       </div>
       <div className="upgrade-to-step__grid">
@@ -75,8 +77,8 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
         {showEmptyState && (
           <div className="upgrade-to-step__empty-overlay">
             <NoDataCard
-              title="No upgrades available"
-              description="Adobe has not published any upgrades for this item"
+              title={t('MidtermUpgrade:UpgradeTo:Empty:Title')}
+              description={t('MidtermUpgrade:UpgradeTo:Empty:Description')}
             />
           </div>
         )}
@@ -90,7 +92,7 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
       )}
       <div className="upgrade-to-step__footer-text">
         <RegularText as="p" size={1}>
-          * These estimated prices include estimates of invoice charges, which are subject to change, and the actual amounts will be reflected on your next bill. Please note that any applicable taxes (e.g., VAT or sales tax) will be calculated and included in the final invoice.
+          {t('MidtermUpgrade:UpgradeTo:PriceDisclaimer')}
         </RegularText>
       </div>
     </div>
