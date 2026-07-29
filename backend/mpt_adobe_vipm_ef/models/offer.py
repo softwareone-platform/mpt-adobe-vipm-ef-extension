@@ -11,11 +11,22 @@ class ProductItem(APIBaseModel):
     unit_sp: float | None = Field(default=None, alias="unitSP")
 
 
+class AgreementSubscription(APIBaseModel):
+    """The agreement subscription (and its line) already holding a target SKU."""
+
+    id: str | None = None
+    name: str | None = None
+    status: str | None = None
+    quantity: int | None = None
+    line_id: str | None = Field(default=None, alias="lineId")
+
+
 class OfferTarget(APIBaseModel):
     """A single offer-switch target, enriched with its resolved catalog item."""
 
     target_base_offer_id: str | None = Field(default=None, alias="targetBaseOfferId")
     product_item: ProductItem | None = Field(default=None, alias="item")
+    subscription: AgreementSubscription | None = None
 
 
 class ProductUpgrade(APIBaseModel):

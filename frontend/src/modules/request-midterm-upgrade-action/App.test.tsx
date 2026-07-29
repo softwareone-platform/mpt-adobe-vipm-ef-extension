@@ -36,18 +36,19 @@ jest.mock('@mpt-extension/sdk', () => ({
   },
 }), { virtual: true });
 
-const mockOfferResult = {
+const defaultOfferData = {
+  productUpgrades: [
+    {
+      targetList: [
+        { targetBaseOfferId: '65322651CA02A12', sequence: 1, switchType: 'PARTIAL_ALLOWED' },
+      ],
+    },
+  ],
+};
+const mockOfferResult: { status: string; error: string | null; data: unknown; refresh: () => void } = {
   status: 'success',
   error: null,
-  data: {
-    productUpgrades: [
-      {
-        targetList: [
-          { targetBaseOfferId: '65322651CA02A12', sequence: 1, switchType: 'PARTIAL_ALLOWED' },
-        ],
-      },
-    ],
-  },
+  data: defaultOfferData,
   refresh: () => {},
 };
 jest.mock('../shared/hooks/useAdobeOffer', () => ({
@@ -214,6 +215,7 @@ describe('request-midterm-upgrade-action App', () => {
     mockClose.mockReset();
     (http.post as jest.Mock).mockClear();
     mockActiveStepIndex = 0;
+    mockOfferResult.data = defaultOfferData;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
     mockSplit = splitWithAllocations;
   });
@@ -317,6 +319,80 @@ describe('request-midterm-upgrade-action App', () => {
       const rows = upgradeToProps.subscriptions as { terms: string; commitment: string }[];
       expect(rows[0]).toMatchObject({ terms: '—', commitment: '—' });
     });
+  });
+
+  it('assigns a target already held on the agreement to its existing subscription', async () => {
+    mockOfferResult.data = {
+      productUpgrades: [
+        {
+          targetList: [
+            {
+              targetBaseOfferId: '65322651CA02A12',
+              sequence: 1,
+              switchType: 'PARTIAL_ALLOWED',
+              item: { id: 'ITM-TARGET', name: 'Target Item', externalId: '65322651CA', unitSP: 200 },
+              subscription: { id: 'SUB-EXISTING', name: 'Existing sub', status: 'Active', quantity: 20 },
+            },
+          ],
+        },
+      ],
+    };
+    mockActiveStepIndex = 1;
+    render(<App />);
+
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    await waitFor(() => {
+      const rows = upgradeToProps.subscriptions as Array<Record<string, unknown>>;
+      expect(rows[0]).toMatchObject({
+        id: 'SUB-EXISTING',
+        name: 'Existing sub',
+        status: 'Active',
+        currentQuantity: 20,
+        newQuantity: 30,
+        delta: 10,
+      });
+    });
+  });
+
+  it('sends the switched quantity, not the topped-up total, when the target subscription exists', async () => {
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+
+    const selectedTarget = {
+      id: 'SUB-EXISTING',
+      name: 'Existing sub',
+      status: 'Active',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: false,
+      currentQuantity: 20,
+      newQuantity: 26,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewOrderProps.onPlaceOrder();
+    });
+
+    expect(placed).toBe(true);
+    expect(http.post).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
+      { targetOfferId: '65322651CA02A12', quantity: 6, recommendationTrackerId: '' },
+    );
   });
 
   it('prepends a source subscription row decremented by the moved quantity', async () => {
