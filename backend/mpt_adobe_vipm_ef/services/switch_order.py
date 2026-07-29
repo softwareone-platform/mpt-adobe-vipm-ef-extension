@@ -1,11 +1,10 @@
 import logging
 from http import HTTPStatus
-from typing import Any
+from typing import Any, NamedTuple
 
 from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
 from mpt_extension_sdk.api import ValidationError
 from mpt_extension_sdk.models import Agreement
-from mpt_extension_sdk.models.agreement import AgreementLine
 from mpt_extension_sdk.models.subscription import SubscriptionLine
 from mpt_extension_sdk.services.api_client_v2.mpt_api_client import AsyncMPTClient
 
@@ -37,29 +36,17 @@ def require_active_agreement(agreement: Agreement) -> None:
         )
 
 
-def find_agreement_line_by_sku(
-    agreement: Agreement, partial_sku: str, source_line_id: str
-) -> AgreementLine | None:
-    """Find the agreement line already holding the target SKU, if any.
+class ExistingTargetLine(NamedTuple):
+    """The agreement line already holding the target SKU, resolved from its subscription."""
 
-    Each SKU has at most one active subscription on an agreement; when a line
-    for the target offer exists, the change order tops up that line instead of
-    creating a new subscription.
-    """
-    return next(
-        (
-            line
-            for line in agreement.lines
-            if line.id != source_line_id and line.product_item.external_ids.vendor == partial_sku
-        ),
-        None,
-    )
+    id: str
+    quantity: int
 
 
 def build_change_order_lines(
     source_line: SubscriptionLine,
     quantity: int,
-    target_line: AgreementLine | None,
+    target_line: ExistingTargetLine | None,
     target_item_id: str,
 ) -> list[Line]:
     """Build the change order lines for the customer's switch selection.
@@ -148,7 +135,7 @@ def _flatten_field_errors(field_errors: Any) -> str:
 
 
 def _build_target_line(
-    quantity: int, target_line: AgreementLine | None, target_item_id: str
+    quantity: int, target_line: ExistingTargetLine | None, target_item_id: str
 ) -> Line:
     if target_line is None:
         return {"item": {"id": target_item_id}, "quantity": quantity}

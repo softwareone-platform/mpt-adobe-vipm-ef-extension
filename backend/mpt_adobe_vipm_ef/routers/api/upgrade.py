@@ -13,7 +13,6 @@ from mpt_extension_sdk.api import (
     UpstreamServiceError,
     ValidationError,
 )
-from mpt_extension_sdk.api.auth import AuthContext
 from mpt_extension_sdk.models import Agreement, Subscription, SubscriptionLine
 from mpt_extension_sdk.routing import APIRouter
 
@@ -33,10 +32,10 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 from mpt_adobe_vipm_ef.services.items import get_partial_sku, resolve_items_by_sku
+from mpt_adobe_vipm_ef.services.subscriptions import find_existing_target_line
 from mpt_adobe_vipm_ef.services.switch_order import (
     build_change_order_lines,
     create_switch_change_order,
-    find_agreement_line_by_sku,
     mpt_order_error_detail,
     require_active_agreement,
 )
@@ -53,7 +52,7 @@ upgrade_router = APIRouter(prefix="/agreements")
 )
 @validate_agreement_access
 @log_inputs
-async def create_upgrade_order(  # noqa: WPS210
+async def create_upgrade_order(  # noqa: WPS210, WPS217
     agreement_id: str, subscription_id: str, ctx: APIContext, body: UpgradeOrderRequest
 ) -> APIResponse:
     """Submit a mid-term upgrade as a switch-driven change order.
@@ -63,7 +62,7 @@ async def create_upgrade_order(  # noqa: WPS210
     in Processing status) carrying the hidden ``switchPayload`` DataObject
     parameter.
     """
-    if not cast(AuthContext, ctx.auth).account.is_client():
+    if ctx.auth is None or not ctx.auth.account.is_client():
         raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
@@ -76,8 +75,8 @@ async def create_upgrade_order(  # noqa: WPS210
 
     await _preview_switch(ctx, agreement_id, switch_payload)
 
-    target_line = find_agreement_line_by_sku(
-        agreement, get_partial_sku(body.target_offer_id), source_line.id
+    target_line = await find_existing_target_line(
+        ctx, agreement_id, adobe_subscription_id, body.target_offer_id
     )
     lines = build_change_order_lines(source_line, body.quantity, target_line, target_item_id)
     order = await _create_change_order(ctx, agreement_id, lines, switch_payload)

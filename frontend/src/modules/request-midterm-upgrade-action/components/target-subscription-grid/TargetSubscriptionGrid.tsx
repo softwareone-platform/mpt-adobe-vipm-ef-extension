@@ -111,6 +111,7 @@ type SwitchType = 'PARTIAL_ALLOWED' | 'FULL_ONLY';
 export interface OfferRule {
   switchType: SwitchType;
   sourceQuantity: number;
+  currentQuantity: number;
 }
 
 function getPartialSku(offerId: string): string {
@@ -128,7 +129,7 @@ export function getOfferRule(
         (t) => getPartialSku(t.targetBaseOfferId) === target.item.externalId,
       );
       if (match) {
-        return { switchType: match.switchType, sourceQuantity };
+        return { switchType: match.switchType, sourceQuantity, currentQuantity: target.currentQuantity };
       }
     }
   }
@@ -136,12 +137,16 @@ export function getOfferRule(
 }
 
 export function validateNewQuantity(newQuantity: number | null, rule: OfferRule): string | null {
+  // newQuantity is the target line's final quantity: seats already held on the
+  // agreement (currentQuantity) plus the seats switched from the source.
   if (newQuantity === null) return 'Quantity is required';
+  const maxQuantity = rule.currentQuantity + rule.sourceQuantity;
   if (rule.switchType === 'FULL_ONLY') {
-    return newQuantity === rule.sourceQuantity ? null : `Quantity must be ${rule.sourceQuantity}`;
+    return newQuantity === maxQuantity ? null : `Quantity must be ${maxQuantity}`;
   }
-  if (newQuantity < 1) return 'Quantity must be at least 1';
-  if (newQuantity > rule.sourceQuantity) return `Quantity cannot exceed ${rule.sourceQuantity}`;
+  const minQuantity = rule.currentQuantity + 1;
+  if (newQuantity < minQuantity) return `Quantity must be at least ${minQuantity}`;
+  if (newQuantity > maxQuantity) return `Quantity cannot exceed ${maxQuantity}`;
   return null;
 }
 

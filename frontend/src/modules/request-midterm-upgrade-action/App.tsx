@@ -133,9 +133,11 @@ export default function App() {
     if (validationError || !currentSelectedTarget) {
       return false;
     }
+    // The upgrade endpoint expects the switched quantity; when the target
+    // subscription already exists, newQuantity also carries its current seats.
     const result = await submitOrder({
       targetOfferId: currentSelectedTarget.targetBaseOfferId ?? '',
-      quantity: currentSelectedTarget.newQuantity ?? 0,
+      quantity: currentSelectedTarget.delta,
       recommendationTrackerId,
     });
     if (!result) {
@@ -181,10 +183,14 @@ export default function App() {
     const rows: TargetSubscription[] = (offerSwitchPaths.productUpgrades ?? []).flatMap((upgrade) =>
       (upgrade.targetList ?? []).map((target) => {
         const unitSP = target.item?.unitSP;
+        // The target SKU may already live on the agreement: the switch then
+        // tops up that subscription's line instead of creating a new one.
+        const existing = target.subscription;
+        const currentQuantity = existing?.quantity ?? 0;
         return {
-        id: null,
-        name: null,
-        status: '',
+        id: existing?.id ?? null,
+        name: existing?.name ?? null,
+        status: existing?.status ?? '',
         item: {
           id: target.item?.id ?? '',
           name: target.item?.name ?? 'Item Name',
@@ -192,8 +198,8 @@ export default function App() {
         },
         targetBaseOfferId: target.targetBaseOfferId,
         recommended: recommendedOfferIds.has(target.targetBaseOfferId),
-        currentQuantity: 0,
-        newQuantity: sourceQuantity,
+        currentQuantity,
+        newQuantity: currentQuantity + sourceQuantity,
         delta: sourceQuantity,
         unitSP: unitSP != null ? unitSP.toFixed(2) : '',
         spxM: unitSP != null ? (unitSP * sourceQuantity / 12).toFixed(2) : '',

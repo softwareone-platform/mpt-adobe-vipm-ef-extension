@@ -1,4 +1,9 @@
-from mpt_adobe_vipm_ef.models.offer import OfferSwitchPaths, OfferTarget, ProductItem
+from mpt_adobe_vipm_ef.models.offer import (
+    AgreementSubscription,
+    OfferSwitchPaths,
+    OfferTarget,
+    ProductItem,
+)
 from tests.models.conftest import OFFER_ID, UNIT_SP
 
 
@@ -55,3 +60,25 @@ def test_offer_target_serializes_nested_product_item(target_payload, product_ite
 
     assert result["item"]["externalId"] == OFFER_ID
     assert result["item"]["unitSP"] == UNIT_SP
+
+
+def test_offer_target_omits_unset_subscription(target_payload):
+    result = OfferTarget.from_payload(target_payload).to_dict()
+
+    assert "subscription" not in result
+
+
+def test_offer_target_serializes_existing_agreement_subscription(target_payload):
+    subscription = AgreementSubscription.from_payload(
+        {"id": "SUB-1111-1111", "name": "Sub A", "status": "Active", "quantity": 20},
+    )
+    target = OfferTarget.from_payload(target_payload)
+
+    result = target.model_copy(update={"subscription": subscription}).to_dict()
+
+    assert result["subscription"] == {
+        "id": "SUB-1111-1111",
+        "name": "Sub A",
+        "status": "Active",
+        "quantity": 20,
+    }
