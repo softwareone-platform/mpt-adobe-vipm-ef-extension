@@ -1,13 +1,12 @@
 import logging
 from typing import Any
 
+from adobe.constants import RECOMMENDATION_TRACKER_HEADER
 from adobe.enums import AdobeOrderType
 from adobe.errors import wrap_http_error
 from adobe.transport import AdobeTransport
 
 logger = logging.getLogger(__name__)
-
-RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"
 
 
 class OrderClient:

@@ -10,9 +10,9 @@ from mpt_extension_sdk.api import (
 from mpt_extension_sdk.routing import APIRouter
 from pydantic import ValidationError as PydanticValidationError
 
+from adobe.constants import RECOMMENDATION_TRACKER_HEADER
 from adobe.errors import AdobeError, AdobeHttpError
 from adobe.transport import get_header_value
-from mpt_adobe_vipm_ef.constants import RECOMMENDATION_TRACKER_HEADER
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.recommendation import (
     RecommendationRequest,

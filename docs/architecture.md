@@ -45,7 +45,26 @@ frontend/                    TypeScript plug UI (esbuild)
 - `client.py` — the Adobe client
 - `transport.py` — HTTP transport and authentication
 - `resources/` — resource-specific operations (e.g. `customer.py`)
-- `dataclasses.py`, `enums.py`, `errors.py` — request/response types and errors
+- `constants.py`, `dataclasses.py`, `enums.py`, `errors.py` — shared request
+  headers, request/response types, and errors
+
+### Scheduled net-new subscriptions
+
+`resources/subscription.py` creates a subscription for a product the customer
+does not yet hold. Adobe creates it with `currentQuantity` 0 and status `1009`:
+it activates and is invoiced only at the anniversary (coterm) date, which is
+left unchanged. `autoRenewal.enabled` is always sent as `true` because Adobe
+rejects any other value on creation, `currencyCode` and `deploymentId` are sent
+only for global customers ordering outside their home country, and the captured
+`x-recommendation-tracker-id` is replayed as a request header so Adobe can
+attribute the outcome.
+
+Adobe accepts the creation only between 30 and 3 days before the anniversary
+date and only while the customer holds at least one active subscription. The
+client does not check either constraint; callers must invoke
+`mpt_adobe_vipm_ef/services/renewal.py::require_scheduled_creation_eligibility`
+themselves before creating the subscription, so they can show an explanation
+rather than an Adobe rejection code.
 
 ## Frontend
 
