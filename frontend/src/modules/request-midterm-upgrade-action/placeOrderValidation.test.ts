@@ -98,4 +98,38 @@ describe('getPlaceOrderValidationError', () => {
 
     expect(getPlaceOrderValidationError(target, makeOfferPaths('FULL_ONLY'), 10)).toBeNull();
   });
+
+  describe('when the target subscription already exists on the agreement', () => {
+    const existing = { id: 'SUB-1111-2222', name: 'Existing sub', currentQuantity: 20 };
+
+    it('rejects a quantity that does not add seats to the existing subscription', () => {
+      const target = makeTarget({ ...existing, newQuantity: 20 });
+
+      expect(getPlaceOrderValidationError(target, makeOfferPaths('PARTIAL_ALLOWED'), 10)).toBe(
+        'Quantity must be at least 21',
+      );
+    });
+
+    it('rejects a quantity above the existing seats plus the source quantity', () => {
+      const target = makeTarget({ ...existing, newQuantity: 31 });
+
+      expect(getPlaceOrderValidationError(target, makeOfferPaths('PARTIAL_ALLOWED'), 10)).toBe(
+        'Quantity cannot exceed 30',
+      );
+    });
+
+    it('requires the whole source quantity on top of the existing seats for FULL_ONLY', () => {
+      const target = makeTarget({ ...existing, newQuantity: 25 });
+
+      expect(getPlaceOrderValidationError(target, makeOfferPaths('FULL_ONLY'), 10)).toBe(
+        'Quantity must be 30',
+      );
+    });
+
+    it('accepts a valid top-up of the existing subscription', () => {
+      const target = makeTarget({ ...existing, newQuantity: 26 });
+
+      expect(getPlaceOrderValidationError(target, makeOfferPaths('PARTIAL_ALLOWED'), 10)).toBeNull();
+    });
+  });
 });

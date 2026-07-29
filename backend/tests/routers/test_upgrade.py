@@ -15,6 +15,7 @@ from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
 from mpt_adobe_vipm_ef.models.switch import UpgradeOrderRequest
 from mpt_adobe_vipm_ef.routers.api.upgrade import create_upgrade_order
+from mpt_adobe_vipm_ef.services.switch_order import ExistingTargetLine
 
 _AGREEMENT_ID = "AGR-1234-5678"
 _SUBSCRIPTION_ID = "SUB-1234-5678"
@@ -100,6 +101,15 @@ def resolve_target_item(mocker):
 
 
 @pytest.fixture
+def existing_target_line(mocker):
+    """Patch the existing-target-line lookup, none by default (target SKU not on the agreement)."""
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.upgrade.find_existing_target_line",
+        mocker.AsyncMock(return_value=None),
+    )
+
+
+@pytest.fixture
 def caller_client(mocker):
     client = mocker.Mock()
     mocker.patch(
@@ -118,8 +128,13 @@ def create_order_mock(mocker):
 
 
 @pytest.fixture
-def submit_deps(
-    upgrade_agreement, source_subscription, resolve_target_item, caller_client, create_order_mock
+def submit_deps(  # noqa: WPS211
+    upgrade_agreement,
+    source_subscription,
+    resolve_target_item,
+    existing_target_line,
+    caller_client,
+    create_order_mock,
 ):
     """Bundle the happy-path collaborators for the submit endpoint."""
 
@@ -149,28 +164,33 @@ async def test_create_upgrade_order_full_creates_single_line_order(
 
 async def test_create_upgrade_order_tops_up_existing_target_line(
     fake_ctx,
-    patch_agreement,
     submit_deps,
+    existing_target_line,
     create_order_mock,
 ):
-    patch_agreement(
-        Agreement.from_payload(
-            _agreement_payload(
-                lines=[
-                    _line_payload(_SOURCE_LINE_ID, _SOURCE_SKU, 10),
-                    _line_payload(_TARGET_LINE_ID, _TARGET_SKU, 4),
-                ],
-            ),
-        ),
-    )
+    existing_target_line.return_value = ExistingTargetLine(id=_TARGET_LINE_ID, quantity=4)
 
     await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))  # act
 
+    existing_target_line.assert_awaited_once_with(
+        fake_ctx, _AGREEMENT_ID, _ADOBE_SUBSCRIPTION_ID, _TARGET_OFFER_ID
+    )
     call_args, _ = create_order_mock.await_args
     assert call_args[2] == [
         {"id": _SOURCE_LINE_ID, "quantity": 4},
         {"id": _TARGET_LINE_ID, "quantity": 10},
     ]
+
+
+async def test_create_upgrade_order_fails_when_the_target_line_lookup_fails(
+    fake_ctx, submit_deps, existing_target_line, create_order_mock
+):
+    existing_target_line.side_effect = UpstreamServiceError(detail="MPT service request failed")
+
+    with pytest.raises(UpstreamServiceError):
+        await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+    create_order_mock.assert_not_awaited()
 
 
 async def test_create_upgrade_order_previews_the_switch_snapshot(fake_ctx, submit_deps, adobe_call):

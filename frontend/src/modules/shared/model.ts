@@ -212,11 +212,20 @@ export interface AdobeCustomer {
   data: AdobeCustomerData | null;
 }
 
+export interface AdobeTargetSubscription {
+  id?: string | null;
+  name?: string | null;
+  status?: string | null;
+  quantity?: number | null;
+  lineId?: string | null;
+}
+
 export interface AdobeTarget {
   targetBaseOfferId: string;
   sequence: number;
   switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY';
   item?: { id: string; name: string; externalId: string; unitSP?: number | null } | null;
+  subscription?: AdobeTargetSubscription | null;
 }
 
 export interface AdobeProductUpgrade {
