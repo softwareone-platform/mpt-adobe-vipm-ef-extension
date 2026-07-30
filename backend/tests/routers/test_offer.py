@@ -56,7 +56,19 @@ class FakeUnitPrices:
         return self._prices
 
 
-def _patch_enrichment(monkeypatch, product_items, prices):
+class FakeAgreementSubscriptions:
+    """Async stub for resolve_agreement_subscriptions_by_sku, recording its calls."""
+
+    def __init__(self, subscriptions_by_sku):
+        self._subscriptions_by_sku = subscriptions_by_sku
+        self.calls = []
+
+    async def __call__(self, ctx, agreement_id, source_subscription_id):
+        self.calls.append((agreement_id, source_subscription_id))
+        return self._subscriptions_by_sku
+
+
+def _patch_enrichment(monkeypatch, product_items, prices, subscriptions_by_sku=None):
     monkeypatch.setattr(
         "mpt_adobe_vipm_ef.routers.api.offer.resolve_items_by_sku",
         FakeResolveItems(product_items),
@@ -65,6 +77,12 @@ def _patch_enrichment(monkeypatch, product_items, prices):
         "mpt_adobe_vipm_ef.routers.api.offer.get_unit_selling_prices",
         FakeUnitPrices(prices),
     )
+    fake_subscriptions = FakeAgreementSubscriptions(subscriptions_by_sku or {})
+    monkeypatch.setattr(
+        "mpt_adobe_vipm_ef.routers.api.offer.resolve_agreement_subscriptions_by_sku",
+        fake_subscriptions,
+    )
+    return fake_subscriptions
 
 
 async def test_get_offer_switch_paths_resolves_ids_and_returns_enriched_payload(
@@ -95,6 +113,23 @@ async def test_get_offer_switch_paths_enrichment_attaches_item_name_and_price(
     target_list = result.payload["productUpgrades"][0]["targetList"]
     assert target_list[0]["item"]["name"] == "Item A"
     assert target_list[0]["item"]["unitSP"] == pytest.approx(_UNIT_SP)
+
+
+async def test_get_offer_switch_paths_attaches_existing_agreement_subscription(
+    fake_ctx, resolve_ids, adobe_call, monkeypatch
+):
+    adobe_call.returns = _switch_paths()
+    existing = {"id": "SUB-1111-1111", "name": "Sub A", "status": "Active", "quantity": 20}
+    fake_subscriptions = _patch_enrichment(
+        monkeypatch, _items_map(), {}, subscriptions_by_sku={"OFFERAAAAA": existing}
+    )
+
+    result = await get_offer_switch_paths(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx)  # act
+
+    targets = result.payload["productUpgrades"][0]["targetList"]
+    assert targets[0]["subscription"] == existing
+    assert targets[1]["subscription"] is None
+    assert fake_subscriptions.calls == [(_AGREEMENT_ID, _SUBSCRIPTION_ID)]
 
 
 async def test_get_offer_switch_paths_skips_targets_without_offer_id(
