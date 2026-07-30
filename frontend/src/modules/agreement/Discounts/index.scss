@@ -1,0 +1,29 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.discounts {
+  display: flex;
+  flex-direction: column;
+  gap: $var-spacing-4;
+  width: 100%;
+  min-width: 0;
+
+  &__grid {
+    min-width: 0;
+  }
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    p {
+      margin: 0;
+    }
+  }
+
+  &__code-line {
+    display: flex;
+    align-items: center;
+    gap: $var-spacing-2;
+  }
+}

@@ -449,3 +449,50 @@ export interface AgreementSplit {
   revision: number;
   allocations: AgreementSplitAllocation[];
 }
+
+export type DiscountType = 'PERCENTAGE' | 'FIXED_DISCOUNT' | 'FIXED_PRICE';
+
+export type DiscountOrderType = 'NEW' | 'RENEWAL' | 'SWITCH';
+
+export interface DiscountValueEntry {
+  country?: string;
+  currency?: string;
+  value?: number;
+}
+
+export interface Discount {
+  id: string;
+  code: string;
+  adobeDiscountId?: string | null;
+  name?: string | null;
+  description?: string | null;
+  source?: string | null;
+  category?: string | null;
+  status?: string | null;
+  discountType?: DiscountType | null;
+  marketSegment?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  reusable?: boolean;
+  discountLockEndDate?: string | null;
+  targetOfferIds?: string[];
+  qualifyingOfferIds?: string[];
+  applicableOrderTypes?: DiscountOrderType[];
+  supportsAnnual?: boolean;
+  supports3yc?: boolean;
+  targetCustomerId?: string | null;
+  values?: DiscountValueEntry[];
+  redeemedAt?: string | null;
+  retiredAt?: string | null;
+  enrichmentStatus?: string | null;
+  synchronizedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface DiscountsPage {
+  status: Status;
+  error: string | null;
+  data: Discount[];
+  total: number;
+}

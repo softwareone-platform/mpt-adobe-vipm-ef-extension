@@ -5,6 +5,7 @@ import { i18n } from '../../i18n/translations';
 import { ThreeYearCommitment } from './ThreeYearCommitment';
 import { LinkedMembership } from './LinkedMembership';
 import { GlobalCustomer } from './GlobalCustomer';
+import { Discounts } from './Discounts';
 
 const DEFAULT_PATH = '/3-year-commitment';
 
@@ -12,6 +13,7 @@ const NAV_ITEMS: Array<{ label: string; path: string }> = [
   { label: i18n.t('Agreement:Nav:3-year commitment'), path: DEFAULT_PATH },
   { label: i18n.t('Agreement:Nav:Linked membership'), path: '/linked-membership' },
   { label: i18n.t('Agreement:Nav:Global customer'), path: '/global-customer' },
+  { label: i18n.t('Agreement:Nav:Discounts'), path: '/discounts' },
 ];
 
 export default function App() {
@@ -65,6 +67,7 @@ export default function App() {
             <Route path="/3-year-commitment" element={<ThreeYearCommitment />} />
             <Route path="/linked-membership" element={<LinkedMembership />} />
             <Route path="/global-customer" element={<GlobalCustomer />} />
+            <Route path="/discounts" element={<Discounts />} />
             <Route path="*" element={<Navigate to={DEFAULT_PATH} replace />} />
           </Routes>
         </section>
