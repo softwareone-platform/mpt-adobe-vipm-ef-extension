@@ -1,3 +1,5 @@
+import '../utils/safe-storage';
+
 import '../../i18n/translations';
 
 import { setup } from '@mpt-extension/sdk';

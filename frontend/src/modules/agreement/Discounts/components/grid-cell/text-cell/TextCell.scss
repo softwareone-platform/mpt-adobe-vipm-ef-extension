@@ -1,0 +1,11 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.discounts-text-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  p {
+    margin: 0;
+  }
+}
