@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <4"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1304,6 +1304,7 @@ source = { editable = "." }
 dependencies = [
     { name = "mpt-extension-sdk", extra = ["azure-monitor"] },
     { name = "mpt-tool" },
+    { name = "pyairtable" },
 ]
 
 [package.dev-dependencies]
@@ -1328,6 +1329,7 @@ dev = [
 requires-dist = [
     { name = "mpt-extension-sdk", extras = ["azure-monitor"], specifier = "==6.5.*" },
     { name = "mpt-tool", specifier = "==6.0.*" },
+    { name = "pyairtable", specifier = "==3.4.*" },
 ]
 
 [package.metadata.requires-dev]

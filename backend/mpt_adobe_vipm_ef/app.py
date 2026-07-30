@@ -2,6 +2,7 @@ from mpt_extension_sdk import ExtensionApp
 
 from mpt_adobe_vipm_ef.routers.api import customer  # noqa: F401  (registers agreement routes)
 from mpt_adobe_vipm_ef.routers.api.agreements import agreements_router
+from mpt_adobe_vipm_ef.routers.api.discounts import discounts_router
 from mpt_adobe_vipm_ef.routers.api.offer import offer_router
 from mpt_adobe_vipm_ef.routers.api.recommendations import recommendation_router
 from mpt_adobe_vipm_ef.routers.api.settings import settings_router
@@ -19,3 +20,4 @@ ext_app.include_router(plugs_router)
 ext_app.include_router(settings_router)
 ext_app.include_router(subscriptions_router)
 ext_app.include_router(upgrade_router)
+ext_app.include_router(discounts_router)
