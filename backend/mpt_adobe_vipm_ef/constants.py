@@ -32,6 +32,7 @@ CUSTOMER_ID_PARAM = "customerId"
 SWITCH_PAYLOAD_PARAM = "switchPayload"
 MIN_LENGTH = 1
 MAX_LENGTH = 255
+NOTES_MAX_LENGTH = 4000
 AGREEMENT_CACHE_KEY = "agreements_by_id"
 
 FULFILLMENT_PHASE = "fulfillment"

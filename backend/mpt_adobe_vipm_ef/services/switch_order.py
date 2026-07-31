@@ -14,7 +14,7 @@ from mpt_adobe_vipm_ef.constants import (
     PROCESSING_ORDER_STATUS,
     SWITCH_PAYLOAD_PARAM,
 )
-from mpt_adobe_vipm_ef.models.switch import SwitchPayload
+from mpt_adobe_vipm_ef.models.switch import SwitchPayload, UpgradeOrderRequest
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ async def create_switch_change_order(
     agreement_id: str,
     lines: list[Line],
     switch_payload: SwitchPayload,
+    request: UpgradeOrderRequest,
 ) -> dict[str, Any]:
     """Create the switch-driven change order on the marketplace, already in execution.
 
@@ -76,9 +77,9 @@ async def create_switch_change_order(
     requires ``status`` on creation), so no separate process call is needed.
     It carries the hidden ``switchPayload`` DataObject parameter — the
     discriminator the fulfillment extension uses to place the Adobe SWITCH
-    order.
+    order — plus the customer's optional notes and additional (client) id.
     """
-    order_payload = {
+    order_payload: dict[str, Any] = {
         "status": PROCESSING_ORDER_STATUS,
         "type": CHANGE_ORDER_TYPE,
         "agreement": {"id": agreement_id},
@@ -89,6 +90,10 @@ async def create_switch_change_order(
             ],
         },
     }
+    if request.notes:
+        order_payload["notes"] = request.notes
+    if request.external_ids.client:
+        order_payload["externalIds"] = {"client": request.external_ids.client}
     order = await client.commerce.orders.create(order_payload)
     order_data = order.to_dict()
     logger.info(
