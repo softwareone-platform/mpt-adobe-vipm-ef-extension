@@ -1,7 +1,7 @@
 from mpt_api_client.exceptions import MPTError
 from mpt_extension_sdk.api.context import APIContext
 
-from mpt_adobe_vipm_ef.constants import AGREEMENT_SELECT
+from mpt_adobe_vipm_ef.constants import AGREEMENT_SELECT, LINES_SELECT
 from mpt_adobe_vipm_ef.routers.api import subscriptions
 
 sync_subscription = subscriptions.sync_subscription
@@ -17,8 +17,7 @@ def _resource(mocker, entity_data):
     return mocker.Mock(get=mocker.AsyncMock(return_value=_entity(mocker, entity_data)))
 
 
-def _build_ctx(mocker, payload, *, related=None, with_caller=True):  # noqa: WPS210
-    mocker.patch.object(subscriptions, "add_selling_prices", mocker.AsyncMock())
+def _build_ctx(mocker, payload, *, related=None, with_caller=True, priced_lines=None):  # noqa: WPS210
     related = related or {}
     subscription = mocker.Mock()
     subscription.to_dict.return_value = payload
@@ -26,8 +25,12 @@ def _build_ctx(mocker, payload, *, related=None, with_caller=True):  # noqa: WPS
         key: _resource(mocker, related.get(key))
         for key in ("agreement", "licensee", "buyer", "seller")
     }
+    resource["subscription"] = _resource(mocker, {"lines": priced_lines or []})
     client = mocker.Mock(
-        commerce=mocker.Mock(agreements=resource["agreement"]),
+        commerce=mocker.Mock(
+            agreements=resource["agreement"],
+            subscriptions=resource["subscription"],
+        ),
         accounts=mocker.Mock(
             licensees=resource["licensee"],
             buyers=resource["buyer"],
@@ -98,6 +101,37 @@ async def test_sync_keeps_stub_on_api_error(mocker):
     result = await sync_subscription("SUB-1", ctx)  # act
 
     assert result.payload["agreement"] == {"id": "AGR-1", "name": "stub"}
+
+
+async def test_sync_takes_the_line_prices_from_the_caller_view(mocker):
+    payload = {"id": "SUB-1", "lines": [{"id": "ALI-1", "price": {"unitSP": 400.0}}]}
+    priced = {"id": "ALI-1", "price": {"unitSP": 307.28, "SPxY": 3072.8, "SPxM": 256.07}}
+    ctx, client = _build_ctx(mocker, payload, priced_lines=[priced])
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    client.commerce.subscriptions.get.assert_awaited_once_with("SUB-1", select=LINES_SELECT)
+    assert result.payload["lines"][0]["price"] == priced["price"]
+
+
+async def test_sync_keeps_the_line_price_when_the_caller_view_lacks_it(mocker):
+    payload = {"id": "SUB-1", "lines": [{"id": "ALI-1", "price": {"PPxY": 2734.8}}]}
+    other_line = {"id": "ALI-2", "price": {"unitSP": 1.0}}
+    ctx, _ = _build_ctx(mocker, payload, priced_lines=[other_line])
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    assert result.payload["lines"][0]["price"] == {"PPxY": 2734.8}
+
+
+async def test_sync_keeps_the_line_prices_when_the_caller_read_fails(mocker):
+    payload = {"id": "SUB-1", "lines": [{"id": "ALI-1", "price": {"PPxY": 2734.8}}]}
+    ctx, client = _build_ctx(mocker, payload)
+    client.commerce.subscriptions.get.side_effect = MPTError("boom")
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    assert result.payload["lines"][0]["price"] == {"PPxY": 2734.8}
 
 
 async def test_sync_without_caller_skips_enrichment(mocker):
