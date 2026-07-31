@@ -86,6 +86,9 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         "description": "Request a mid-term upgrade for the subscription.",
         "icon": None,
         "socket": "portal.commerce.subscriptions.subscription.actions",
-        "condition": "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "condition": "and("
+        "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222)),"
+        "eq(subscription.status,Active)"
+        ")",
         "href": "/static/request-midterm-upgrade-action/index.js",
     }
