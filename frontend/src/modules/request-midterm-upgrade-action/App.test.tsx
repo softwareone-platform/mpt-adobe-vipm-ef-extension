@@ -24,6 +24,17 @@ jest.mock('@mpt-extension/sdk', () => ({
         data: {
           id: 'SUB-1',
           splitStatus: 'Active',
+          split: {
+            id: 'SBS-1111-1111',
+            revision: 1,
+            allocations: [
+              {
+                buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+                percentage: 100,
+                price: { currency: 'USD', SPxY: 100, SPxM: 10 },
+              },
+            ],
+          },
           agreement: { id: 'AGR-1' },
           product: { id: 'PRD-1' },
           lines: [{ quantity: 10 }],
@@ -63,28 +74,6 @@ let mockRecommendation: { status: string; error: string | null; data: unknown; r
 };
 jest.mock('../shared/hooks/useAdobeRecommendation', () => ({
   useAdobeRecommendation: () => mockRecommendation,
-}));
-
-const splitWithAllocations = {
-  status: 'success',
-  error: null,
-  data: {
-    id: 'SBA-1111-1111',
-    revision: 1,
-    allocations: [
-      {
-        buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
-        percentage: 100,
-        price: { currency: 'USD', SPxY: 100, SPxM: 10 },
-      },
-    ],
-  },
-  refresh: () => {},
-};
-let mockSplit: { status: string; error: string | null; data: unknown; refresh: () => void } =
-  splitWithAllocations;
-jest.mock('../shared/hooks/useAgreementSplit', () => ({
-  useAgreementSplit: () => mockSplit,
 }));
 
 interface MockChildren {
@@ -136,6 +125,7 @@ interface SplitBillingProps {
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: unknown;
   onChange: (buyer: unknown) => void;
+  split: { id?: string; allocations?: unknown[] } | null;
 }
 let splitBillingProps: SplitBillingProps;
 
@@ -217,7 +207,6 @@ describe('request-midterm-upgrade-action App', () => {
     mockActiveStepIndex = 0;
     mockOfferResult.data = defaultOfferData;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
-    mockSplit = splitWithAllocations;
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {
@@ -244,6 +233,7 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof splitBillingProps.addBuyerToOrder).toBe('function');
     expect(typeof splitBillingProps.onChange).toBe('function');
     expect(splitBillingProps.selectedBuyer).toBeDefined();
+    expect(splitBillingProps.split?.id).toBe('SBS-1111-1111');
   });
 
   it('skips the split-billing step when split billing is disabled', async () => {

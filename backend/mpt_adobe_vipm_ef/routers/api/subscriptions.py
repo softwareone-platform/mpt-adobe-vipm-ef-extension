@@ -13,6 +13,7 @@ from mpt_adobe_vipm_ef.constants import (
     LICENSEE_SELECT,
     LINES_SELECT,
     SELLER_SELECT,
+    SPLIT_SELECT,
 )
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 
@@ -34,25 +35,22 @@ async def _enrich_related(payload: dict[str, Any], key: str, resource: Any, sele
     payload[key] = entity.to_dict()
 
 
-async def _enrich_line_prices(payload: dict[str, Any], subscription_id: str, resource: Any) -> None:
-    """Replace the line prices with the ones the caller sees.
+async def _enrich_split(payload: dict[str, Any], subscription_id: str, resource: Any) -> None:
+    """Attach the subscription's own split allocations.
 
-    Selling prices are only returned to the caller's own token, and the
-    subscription's own lines already carry the negotiated ones: the price list
-    holds the undiscounted unit price, which does not match what the commerce
-    apps show for a discounted item.
+    ``split`` is not part of the default subscription payload, it has to be
+    selected explicitly. Allocations are per subscription, so the agreement
+    split cannot stand in for them: agreements with several subscriptions have
+    different percentages per subscription.
     """
-    try:
-        subscription = await resource.get(subscription_id, select=LINES_SELECT)
-    except MPTError:
-        logger.exception("Failed to load subscription line prices")
+    if not payload.get("splitStatus"):
         return
-    priced_lines = subscription.to_dict().get("lines") or []
-    prices = {line.get("id"): line.get("price") for line in priced_lines}
-    for line in payload.get("lines") or []:
-        price = prices.get(line.get("id"))
-        if price:
-            line["price"] = price
+    try:
+        subscription = await resource.get(subscription_id, select=SPLIT_SELECT)
+    except MPTError:
+        logger.exception("Failed to load subscription split")
+        return
+    payload["split"] = subscription.to_dict().get("split")
 
 
 @subscriptions_router.post(path="/{subscription_id}/sync", name="subscriptions-sync")
@@ -74,7 +72,7 @@ async def sync_subscription(subscription_id: str, ctx: APIContext) -> APIRespons
     )
     await asyncio.gather(
         *(_enrich_related(payload, key, resource, select) for key, resource, select in related),
-        _enrich_line_prices(payload, subscription_id, client.commerce.subscriptions),
+        _enrich_split(payload, subscription_id, client.commerce.subscriptions),
     )
 
     return APIResponse.ok(payload=payload)

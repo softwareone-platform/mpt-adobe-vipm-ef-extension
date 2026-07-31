@@ -75,7 +75,6 @@
     "LoadAdobeCustomer": "Failed to load Adobe customer data.",
     "LoadAdobeOffer": "Failed to load Adobe offer switch paths.",
     "LoadAdobeRecommendations": "Failed to load Adobe recommendations.",
-    "LoadAgreementSplit": "Failed to load agreement split.",
     "SubscriptionSync": "Subscription sync failed.",
     "AgreementSync": "Agreement sync failed.",
     "OrderSubmission": "Order submission failed.",

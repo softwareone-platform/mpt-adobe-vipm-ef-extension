@@ -12,7 +12,6 @@ import { canRequestMidtermUpgradeAction } from '../utils/security';
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
 import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
-import { useAgreementSplit } from '../shared/hooks/useAgreementSplit';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { useUpgradeOrderRequest } from '../shared/hooks/useUpgradeOrderRequest';
@@ -66,7 +65,7 @@ export default function App() {
     sourceQuantity,
   );
   const hasSplit = subscription?.splitStatus === 'Active';
-  const { data: splitAgreement } = useAgreementSplit(hasSplit ? (subscription?.agreement?.id ?? '') : '');
+  const split = subscription?.split ?? null;
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
@@ -169,10 +168,10 @@ export default function App() {
 
   const addBuyerToOrder = useCallback(
     async (buyer: { id?: string }) => {
-      const selected = splitAgreement?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
+      const selected = split?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
       setOrder(prev => ({ ...prev, billTo: selected ?? null }));
     },
-    [splitAgreement]
+    [split]
   );
 
   useEffect(() => {
@@ -289,7 +288,7 @@ export default function App() {
             render: () => (
               <SplitBillingStep
                 subscription={subscription}
-                splitAgreement={splitAgreement}
+                split={split}
                 order={order}
                 addBuyerToOrder={addBuyerToOrder}
                 selectedBuyer={selectedBuyer}
