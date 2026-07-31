@@ -9,6 +9,8 @@ export interface UpgradeOrderInput {
   targetOfferId: string;
   quantity: number;
   recommendationTrackerId?: string;
+  notes?: string;
+  externalIds?: { client?: string };
 }
 
 export interface UpgradeOrderResult {
