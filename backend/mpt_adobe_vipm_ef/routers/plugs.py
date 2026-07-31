@@ -11,7 +11,9 @@ def agreement_plugs() -> list[Plug]:
     """Declare agreement UI plugs served from the static asset bridge."""
     product_ids = ",".join(segment.id for segment in load_product_segments())
     agreement_condition = f"in(agreement.product.id,({product_ids}))"
-    subscription_condition = f"in(subscription.product.id,({product_ids}))"
+    subscription_condition = (
+        f"and(in(subscription.product.id,({product_ids})),eq(subscription.status,Active))"
+    )
     return [
         Plug(
             id="agreement-adobe",
