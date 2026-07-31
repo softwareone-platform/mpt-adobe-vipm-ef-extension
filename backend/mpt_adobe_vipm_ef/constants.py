@@ -27,6 +27,7 @@ AGREEMENT_SELECT = (
 LICENSEE_SELECT = ("account", "audit", "buyer", "seller")
 BUYER_SELECT = ("account", "audit")
 SELLER_SELECT = ("audit",)
+SPLIT_SELECT = ("split",)
 
 CUSTOMER_ID_PARAM = "customerId"
 SWITCH_PAYLOAD_PARAM = "switchPayload"

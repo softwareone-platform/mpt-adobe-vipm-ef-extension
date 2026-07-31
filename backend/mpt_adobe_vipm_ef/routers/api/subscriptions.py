@@ -12,6 +12,7 @@ from mpt_adobe_vipm_ef.constants import (
     BUYER_SELECT,
     LICENSEE_SELECT,
     SELLER_SELECT,
+    SPLIT_SELECT,
 )
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 from mpt_adobe_vipm_ef.services.pricing import add_selling_prices
@@ -34,6 +35,24 @@ async def _enrich_related(payload: dict[str, Any], key: str, resource: Any, sele
     payload[key] = entity.to_dict()
 
 
+async def _enrich_split(payload: dict[str, Any], subscription_id: str, resource: Any) -> None:
+    """Attach the subscription's own split allocations.
+
+    ``split`` is not part of the default subscription payload, it has to be
+    selected explicitly. Allocations are per subscription, so the agreement
+    split cannot stand in for them: agreements with several subscriptions have
+    different percentages per subscription.
+    """
+    if not payload.get("splitStatus"):
+        return
+    try:
+        subscription = await resource.get(subscription_id, select=SPLIT_SELECT)
+    except MPTError:
+        logger.exception("Failed to load subscription split")
+        return
+    payload["split"] = subscription.to_dict().get("split")
+
+
 @subscriptions_router.post(path="/{subscription_id}/sync", name="subscriptions-sync")
 async def sync_subscription(subscription_id: str, ctx: APIContext) -> APIResponse:  # noqa: WPS210
     """Synchronize a subscription view with the current Marketplace data."""
@@ -54,7 +73,8 @@ async def sync_subscription(subscription_id: str, ctx: APIContext) -> APIRespons
         ("seller", client.accounts.sellers, SELLER_SELECT),
     )
     await asyncio.gather(
-        *(_enrich_related(payload, key, resource, select) for key, resource, select in related)
+        *(_enrich_related(payload, key, resource, select) for key, resource, select in related),
+        _enrich_split(payload, subscription_id, client.commerce.subscriptions),
     )
 
     return APIResponse.ok(payload=payload)
