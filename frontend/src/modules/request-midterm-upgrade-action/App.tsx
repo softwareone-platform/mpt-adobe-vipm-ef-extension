@@ -141,6 +141,8 @@ export default function App() {
       targetOfferId: currentSelectedTarget.targetBaseOfferId ?? '',
       quantity: currentSelectedTarget.delta,
       recommendationTrackerId,
+      notes: order?.notes ?? '',
+      externalIds: { client: order?.externalIds?.client ?? '' },
     });
     if (!result) {
       return false;
@@ -153,6 +155,8 @@ export default function App() {
     offerPaths,
     sourceQuantity,
     recommendationTrackerId,
+    order?.notes,
+    order?.externalIds?.client,
     submitOrder,
   ]);
 

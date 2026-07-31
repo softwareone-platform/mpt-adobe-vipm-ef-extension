@@ -71,11 +71,13 @@ def _subscription_payload(vendor=_ADOBE_SUBSCRIPTION_ID, lines=None):
     }
 
 
-def _body(quantity=6, tracker_id="TRACKER-1"):
+def _body(quantity=6, tracker_id="TRACKER-1", notes="", client_external_id=""):
     return UpgradeOrderRequest.model_validate({
         "targetOfferId": _TARGET_OFFER_ID,
         "quantity": quantity,
         "recommendationTrackerId": tracker_id,
+        "notes": notes,
+        "externalIds": {"client": client_external_id},
     })
 
 
@@ -224,6 +226,19 @@ async def test_create_upgrade_order_passes_switch_payload_with_tracker(
     assert payload["recommendationTrackerId"] == "TRACKER-1"
     assert payload["orderType"] == "SWITCH"
     assert payload["currencyCode"] == "USD"
+
+
+async def test_create_upgrade_order_forwards_the_customer_details(
+    fake_ctx, submit_deps, create_order_mock
+):
+    body = _body(6, notes="Upgrade for the design team", client_external_id="234234234")
+
+    await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[4] is body
+    assert call_args[4].notes == "Upgrade for the design team"
+    assert call_args[4].external_ids.client == "234234234"
 
 
 async def test_create_upgrade_order_rejects_quantity_above_source(fake_ctx, submit_deps):

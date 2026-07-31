@@ -79,7 +79,7 @@ async def create_upgrade_order(  # noqa: WPS210, WPS217
         ctx, agreement_id, adobe_subscription_id, body.target_offer_id
     )
     lines = build_change_order_lines(source_line, body.quantity, target_line, target_item_id)
-    order = await _create_change_order(ctx, agreement_id, lines, switch_payload)
+    order = await _create_change_order(ctx, agreement_id, lines, switch_payload, body)
     return APIResponse.created(payload=order)
 
 
@@ -199,6 +199,7 @@ async def _create_change_order(
     agreement_id: str,
     lines: list[dict[str, Any]],
     switch_payload: SwitchPayload,
+    body: UpgradeOrderRequest,
 ) -> dict[str, Any]:
     """Create and process the change order acting as the caller (client actor)."""
     client = build_caller_client(ctx)
@@ -206,7 +207,7 @@ async def _create_change_order(
         logger.warning("Upgrade order for agreement %s has no caller auth context", agreement_id)
         raise ForbiddenError(detail="Caller authentication is required to place the order.")
     try:
-        return await create_switch_change_order(client, agreement_id, lines, switch_payload)
+        return await create_switch_change_order(client, agreement_id, lines, switch_payload, body)
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the switch change order on agreement %s: status=%s %s",
