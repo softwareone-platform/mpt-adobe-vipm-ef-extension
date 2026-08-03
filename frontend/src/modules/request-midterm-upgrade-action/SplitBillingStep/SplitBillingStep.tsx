@@ -17,14 +17,14 @@ import { AgreementSplit, AgreementSplitAllocation, Subscription } from '../../sh
 
 export function SplitBillingStep({
   subscription,
-  splitAgreement,
+  split,
   order,
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
   onChange,
 }: {
   subscription: Subscription;
-  splitAgreement: AgreementSplit | null;
+  split: AgreementSplit | null;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: AgreementSplitAllocation | null;
@@ -40,7 +40,7 @@ export function SplitBillingStep({
   const [error, setError] = useState('');
 
   const agreementBuyerId = subscription?.buyer?.id ?? '';
-  const allocations = splitAgreement?.allocations ?? [];
+  const allocations = split?.allocations ?? [];
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {

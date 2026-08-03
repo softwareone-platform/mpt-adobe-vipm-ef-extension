@@ -23,12 +23,8 @@ duplicate those tables.
   `get_authorization()`), not during `load()`/app startup.
 - Airtable is only used when `MPT_TOOL_STORAGE_TYPE=airtable`; with the default
   `local` storage the Airtable variables can remain unset.
-- The split billing view (`GET /agreements/{id}/split`) reads the MPT split
-  subresource (`/public/v1/commerce/agreements/{id}/split`) with the caller's
-  token so allocation selling prices resolve. The frontend requests it only when
-  the subscription's `splitStatus` is `Active`.
-- The subscription sync (`POST /subscriptions/{id}/sync`) re-reads the
-  subscription with the caller's token to take its line prices, because selling
-  prices are only returned to that token and the line already carries the
-  discounted values. The price list is still used for upgrade targets, which
-  have no line to read from.
+- The split billing view is served by the subscription sync
+  (`POST /subscriptions/{id}/sync`): when the subscription has a `splitStatus`,
+  the sync reads it back with `select=split` using the caller's token, so
+  allocation selling prices resolve. Allocations are per subscription, so the
+  agreement split cannot stand in for them.
