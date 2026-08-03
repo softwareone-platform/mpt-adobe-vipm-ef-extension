@@ -27,3 +27,8 @@ duplicate those tables.
   subresource (`/public/v1/commerce/agreements/{id}/split`) with the caller's
   token so allocation selling prices resolve. The frontend requests it only when
   the subscription's `splitStatus` is `Active`.
+- The subscription sync (`POST /subscriptions/{id}/sync`) re-reads the
+  subscription with the caller's token to take its line prices, because selling
+  prices are only returned to that token and the line already carries the
+  discounted values. The price list is still used for upgrade targets, which
+  have no line to read from.
