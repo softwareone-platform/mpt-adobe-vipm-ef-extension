@@ -19,7 +19,7 @@ def _resource(mocker, entity_data):
 
 def _build_ctx(mocker, payload, *, related=None, with_caller=True, priced_lines=None, split=None):  # noqa: WPS210
     related = related or {}
-    subscription = mocker.Mock() 
+    subscription = mocker.Mock()
     subscription.to_dict.return_value = payload
     resource = {
         key: _resource(mocker, related.get(key))
