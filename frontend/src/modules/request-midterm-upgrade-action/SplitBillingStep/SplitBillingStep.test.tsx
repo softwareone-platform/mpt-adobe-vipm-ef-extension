@@ -10,7 +10,7 @@ const buyerTwo: AgreementSplitAllocation = {
   price: { currency: 'USD', SPxY: 800, SPxM: 66.67 },
 };
 
-const agreement: AgreementSplit = {
+const subscriptionSplit: AgreementSplit = {
   id: 'SBA-1111-1111',
   revision: 1,
   allocations: [
@@ -72,7 +72,7 @@ jest.mock('../components/allocate-to-buyer/AllocateToBuyer', () => ({
 function renderStep(overrides: Partial<Parameters<typeof SplitBillingStep>[0]> = {}) {
   const props = {
     subscription: { id: 'SUB-1', buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' } } as Subscription,
-    splitAgreement: agreement,
+    split: subscriptionSplit,
     order,
     addBuyerToOrder: jest.fn().mockResolvedValue(undefined),
     selectedBuyer: null,

@@ -1,7 +1,5 @@
 import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/utils';
 
-import type { AgreementSplitState } from './model';
-
 export const SCREEN_HEIGHT_FACTOR = 0.85;
 export const SCREEN_WIDTH_FACTOR = 0.90;
 
@@ -27,12 +25,6 @@ export enum EntityType {
   Buyers = 'buyers',
   Licensees = 'licensees',
 }
-
-export const INITIAL_SPLIT_STATE: AgreementSplitState = {
-  status: 'idle',
-  error: null,
-  data: null,
-};
 
 export const TERM_PERIOD_LABELS: Record<string, string> = {
   '1m': 'Monthly billing',
