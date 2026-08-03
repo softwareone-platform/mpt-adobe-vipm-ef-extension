@@ -37,7 +37,9 @@ Repository-specific test settings come from [`backend/pyproject.toml`](../backen
 
 - tests are discovered under `tests`
 - `pythonpath` includes the repository root
-- coverage is collected for `mpt_adobe_vipm_ef`
+- coverage is collected from the backend root, so every reported file keeps its
+  package prefix (`adobe/...`, `mpt_adobe_vipm_ef/...`) and same-named modules in
+  different packages stay distinct in the report
 - tests run with `--import-mode=importlib`
 
 ## Writing Tests
