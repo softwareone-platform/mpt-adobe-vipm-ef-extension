@@ -1,7 +1,7 @@
 import http
 
 import pytest
-from mpt_api_client.exceptions import MPTAPIError
+from mpt_api_client.exceptions import MPTAPIError, MPTMaxRetryError
 from mpt_extension_sdk.api.errors import (
     ForbiddenError,
     NotFoundError,
@@ -207,6 +207,13 @@ async def test_guard_maps_mpt_not_found_to_not_found_error(fake_ctx, fake_agreem
 
 async def test_guard_maps_other_mpt_errors_to_upstream_error(fake_ctx, fake_agreements):
     fake_agreements.error = MPTAPIError(http.HTTPStatus.INTERNAL_SERVER_ERROR, "boom", {})
+
+    with pytest.raises(UpstreamServiceError):
+        await get_customer(_AGREEMENT_ID, fake_ctx)
+
+
+async def test_guard_maps_mpt_transport_errors_to_upstream_error(fake_ctx, fake_agreements):
+    fake_agreements.error = MPTMaxRetryError("connection failed", 3)
 
     with pytest.raises(UpstreamServiceError):
         await get_customer(_AGREEMENT_ID, fake_ctx)
