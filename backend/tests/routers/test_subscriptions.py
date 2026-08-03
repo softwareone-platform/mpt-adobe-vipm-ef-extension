@@ -17,7 +17,7 @@ def _resource(mocker, entity_data):
     return mocker.Mock(get=mocker.AsyncMock(return_value=_entity(mocker, entity_data)))
 
 
-def _build_ctx(mocker, payload, *, related=None, with_caller=True, priced_lines=None, split=None):  # noqa: WPS210
+def _build_ctx(mocker, payload, *, related=None, with_caller=True, priced_lines=None, split=None):  # noqa: WPS210 WPS211
     related = related or {}
     subscription = mocker.Mock()
     subscription.to_dict.return_value = payload

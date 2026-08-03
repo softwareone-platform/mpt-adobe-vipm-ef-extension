@@ -11,7 +11,6 @@ from mpt_adobe_vipm_ef.constants import (
     AGREEMENT_SELECT,
     BUYER_SELECT,
     LICENSEE_SELECT,
-    LINES_SELECT,
     SELLER_SELECT,
     SPLIT_SELECT,
 )
