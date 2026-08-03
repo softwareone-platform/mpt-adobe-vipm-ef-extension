@@ -5,56 +5,9 @@ from mpt_api_client import RQLQuery
 from mpt_api_client.exceptions import MPTError
 from mpt_extension_sdk.api.context import APIContext
 
-from mpt_adobe_vipm_ef.constants import (
-    MONTHLY_FACTOR,
-    PRICE_PRECISION,
-    YEARLY_FACTOR,
-)
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 
 logger = logging.getLogger(__name__)
-
-Line = dict[str, Any]
-
-
-def _item_id(line: Line) -> Any:
-    return line.get("item", {}).get("id")
-
-
-async def add_selling_prices(subscription: dict[str, Any], ctx: APIContext) -> None:  # noqa: WPS210
-    """Merge selling prices onto each subscription line.
-
-    The subscription payload only carries purchase prices; the per-unit selling
-    price lives on the agreement's listing price list. We look it up per item and
-    derive ``unitSP``/``SPxM``/``SPxY`` the same way the commerce apps do: from
-    the per-unit price, the billing period and the line quantity. An API failure
-    leaves the subscription untouched so the sync still succeeds.
-    """
-    lines = subscription.get("lines") or []
-    item_ids = [_item_id(line) for line in lines if _item_id(line)]
-    if not item_ids:
-        return
-
-    agreement_id = subscription["agreement"]["id"]
-    unit_prices = await get_unit_selling_prices(ctx, agreement_id, item_ids)
-    period = subscription.get("terms", {}).get("period")
-    for line in lines:
-        apply_selling_price(line, unit_prices.get(_item_id(line)), period)
-
-
-def apply_selling_price(line: Line, unit_sp: float | None, period: str | None) -> None:
-    """Derive a line's selling prices from its per-unit price and quantity."""
-    if unit_sp is None:
-        return
-    quantity = line.get("quantity") or 0
-    price = line.setdefault("price", {})
-    price["unitSP"] = unit_sp
-    yearly = YEARLY_FACTOR.get(period)
-    if yearly is not None:
-        price["SPxY"] = round(unit_sp * yearly * quantity, PRICE_PRECISION)
-    monthly = MONTHLY_FACTOR.get(period)
-    if monthly is not None:
-        price["SPxM"] = round(unit_sp * monthly * quantity, PRICE_PRECISION)
 
 
 async def get_unit_selling_prices(
