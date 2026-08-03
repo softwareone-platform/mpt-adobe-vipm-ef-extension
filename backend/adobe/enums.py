@@ -13,10 +13,3 @@ class AdobeOrderType(StrEnum):
 
     SWITCH = "SWITCH"
     PREVIEW_SWITCH = "PREVIEW_SWITCH"
-
-
-class AdobeSubscriptionStatus(StrEnum):
-    """Subscription statuses reported by the Adobe VIPM API."""
-
-    ACTIVE = "1000"
-    SCHEDULED = "1009"
