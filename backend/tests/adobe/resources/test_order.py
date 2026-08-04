@@ -133,3 +133,95 @@ def test_preview_switch_order_raises_adobe_http_error_when_response_has_no_json(
         )
 
     assert exc_info.value.status_code == http.HTTPStatus.SERVICE_UNAVAILABLE
+
+
+@pytest.fixture
+def renewal_line_items():
+    return [
+        {
+            "extLineItemNumber": 1,
+            "offerId": "65304470CA01A12",
+            "subscriptionId": "adobe-sub-1",
+            "quantity": 7,
+            "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
+        },
+    ]
+
+
+@pytest.fixture
+def preview_renewal_data(renewal_line_items):
+    return {
+        "orderType": "PREVIEW_RENEWAL",
+        "currencyCode": "USD",
+        "pricingSummary": [{"totalLineItemPrice": 350.5, "currencyCode": "USD"}],
+        "lineItems": renewal_line_items,
+    }
+
+
+@responses.activate
+def test_preview_renewal_order_calls_correct_url_and_returns_data(
+    adobe_client, preview_renewal_data, renewal_line_items
+):
+    responses.post(_ORDERS_URL, json=preview_renewal_data, status=http.HTTPStatus.OK)
+
+    result = adobe_client.order.preview_renewal_order(
+        "AUT-1234-5678", "CUST-000", "USD", renewal_line_items
+    )
+
+    request = responses.calls[0].request
+    assert result == preview_renewal_data
+    assert request.url.startswith(_ORDERS_URL)
+
+
+@responses.activate
+def test_preview_renewal_order_sends_preview_renewal_body(
+    adobe_client, preview_renewal_data, renewal_line_items
+):
+    responses.post(_ORDERS_URL, json=preview_renewal_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_renewal_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", renewal_line_items
+    )
+
+    body = json.loads(responses.calls[0].request.body)
+    assert body == {
+        "orderType": "PREVIEW_RENEWAL",
+        "currencyCode": "USD",
+        "lineItems": renewal_line_items,
+    }
+
+
+@responses.activate
+def test_preview_renewal_order_raises_adobe_api_error_on_http_error_with_json(
+    adobe_client, renewal_line_items
+):
+    responses.post(
+        _ORDERS_URL,
+        json={"code": "3132", "message": "Ineligible product or orderType"},
+        status=http.HTTPStatus.BAD_REQUEST,
+    )
+
+    with pytest.raises(AdobeAPIError) as exc_info:
+        adobe_client.order.preview_renewal_order(
+            "AUT-1234-5678", "CUST-000", "USD", renewal_line_items
+        )
+
+    assert exc_info.value.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+@responses.activate
+def test_preview_renewal_order_raises_adobe_http_error_when_response_has_no_json(
+    adobe_client, renewal_line_items
+):
+    responses.post(
+        _ORDERS_URL,
+        body="Service Unavailable",
+        status=http.HTTPStatus.SERVICE_UNAVAILABLE,
+    )
+
+    with pytest.raises(AdobeHttpError) as exc_info:
+        adobe_client.order.preview_renewal_order(
+            "AUT-1234-5678", "CUST-000", "USD", renewal_line_items
+        )
+
+    assert exc_info.value.status_code == http.HTTPStatus.SERVICE_UNAVAILABLE

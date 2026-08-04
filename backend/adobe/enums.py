@@ -9,7 +9,8 @@ class LinkedMembershipType(StrEnum):
 
 
 class AdobeOrderType(StrEnum):
-    """Order types accepted by the Adobe VIPM orders API for mid-term upgrades."""
+    """Order types accepted by the Adobe VIPM orders API."""
 
     SWITCH = "SWITCH"
     PREVIEW_SWITCH = "PREVIEW_SWITCH"
+    PREVIEW_RENEWAL = "PREVIEW_RENEWAL"

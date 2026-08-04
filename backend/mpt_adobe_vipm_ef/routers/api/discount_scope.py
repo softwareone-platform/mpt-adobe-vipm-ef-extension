@@ -47,7 +47,7 @@ async def load_discount_scope(ctx: APIContext) -> DiscountScope:
     customer_id = await require_customer_id(ctx, agreement_id)
     return DiscountScope(
         agreement=agreement,
-        market_segment=_resolve_market_segment(ctx, agreement),
+        market_segment=resolve_market_segment(ctx, agreement),
         customer_id=customer_id,
     )
 
@@ -68,7 +68,7 @@ def _assert_product_allowed(ctx: APIContext, agreement: Agreement) -> None:
         )
 
 
-def _resolve_market_segment(ctx: APIContext, agreement: Agreement) -> str:
+def resolve_market_segment(ctx: APIContext, agreement: Agreement) -> str:
     """Map the agreement's product to its configured market segment."""
     settings = cast(ExtensionSettings, ctx.ext_settings)
     product_id = agreement.product.id

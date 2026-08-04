@@ -1,0 +1,84 @@
+"""Airtable-backed lookup of the Adobe SKU master data (``SKU Mapping`` table).
+
+The SoftwareOne Adobe extensions keep the Adobe product master data in an
+Airtable base with a ``SKU Mapping`` table: one row per partial SKU and
+segment, whose ``type_3yc`` column classifies the product as a three-year
+commitment license or consumable. The 3YC floor pre-check needs that
+classification to split the renewal quantities between the LICENSE and
+CONSUMABLES commitment floors. All methods are synchronous and callers run
+them in a thread.
+"""
+
+from types import MappingProxyType
+
+from mpt_extension_sdk.errors.runtime import ConfigError
+from pyairtable import Api, Table
+from pyairtable.formulas import AND, EQ, OR, Field
+
+from mpt_adobe_vipm_ef.settings import ExtensionSettings
+
+SKU_MAPPING_TABLE = "SKU Mapping"
+
+THREE_YC_TYPE_LICENSE = "License"
+THREE_YC_TYPE_CONSUMABLE = "Consumable"
+
+# EXT_PRODUCT_SEGMENTS configures Adobe segment codes per product; the Airtable
+# ``segment`` column stores the segment display names.
+SEGMENT_TO_AIRTABLE_SEGMENT = MappingProxyType({
+    "COM": "Commercial",
+    "GOV": "Government",
+    "EDU": "Education",
+    "GOV_LGA": "LargeGovernment",
+})
+
+# Bound every Airtable HTTP call by (connect, read) seconds so a stalled
+# request cannot hang the worker thread indefinitely; mirrors the 60s Adobe
+# transport timeout.
+_REQUEST_TIMEOUT = (60, 60)
+
+
+class SkuMappingStore:
+    """Synchronous gateway to the Airtable SKU mapping table."""
+
+    def __init__(self, api_token: str, base_id: str) -> None:
+        self._api = Api(api_token, timeout=_REQUEST_TIMEOUT)
+        self._base_id = base_id
+
+    @classmethod
+    def from_settings(cls, settings: ExtensionSettings) -> "SkuMappingStore":
+        """Build the store from the extension settings, failing fast when unset."""
+        if not settings.airtable_api_token or not settings.airtable_sku_mapping_base_id:
+            raise ConfigError(
+                "The Airtable SKU mapping store is not configured "
+                "(EXT_AIRTABLE_API_TOKEN / EXT_AIRTABLE_SKU_MAPPING_ID)."
+            )
+        return cls(settings.airtable_api_token, settings.airtable_sku_mapping_base_id)
+
+    def list_three_yc_types(self, partial_skus: list[str], market_segment: str) -> dict[str, str]:
+        """Return the ``type_3yc`` classification of each SKU within the segment.
+
+        Keyed by partial SKU (the ``vendor_external_id`` column); SKUs without
+        a mapping row are absent from the result.
+        """
+        if not partial_skus:
+            return {}
+        formula = AND(
+            EQ(Field("segment"), _to_airtable_segment(market_segment)),
+            OR(*(EQ(Field("vendor_external_id"), sku) for sku in partial_skus)),
+        )
+        records = self._table(SKU_MAPPING_TABLE).all(formula=formula)
+        return {
+            record["fields"]["vendor_external_id"]: record["fields"].get("type_3yc", "")
+            for record in records
+            if record.get("fields", {}).get("vendor_external_id")
+        }
+
+    def _table(self, table_name: str) -> Table:
+        return self._api.table(self._base_id, table_name)
+
+
+def _to_airtable_segment(market_segment: str) -> str:
+    airtable_segment = SEGMENT_TO_AIRTABLE_SEGMENT.get(market_segment)
+    if airtable_segment is None:
+        raise ConfigError(f"Market segment {market_segment!r} has no Airtable SKU mapping segment.")
+    return airtable_segment
