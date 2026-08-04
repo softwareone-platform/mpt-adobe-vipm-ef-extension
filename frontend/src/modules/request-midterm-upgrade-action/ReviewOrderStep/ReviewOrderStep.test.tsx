@@ -183,6 +183,24 @@ describe('ReviewOrderStep', () => {
     });
   });
 
+  it('gives each row the new total price of its item alongside the price change', () => {
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
+
+    expect(capturedRows[0]).toMatchObject({ newTotalM: '104.93', newTotalY: '1,259.16' });
+    expect(capturedRows[1]).toMatchObject({ newTotalM: '136.50', newTotalY: '1,638.00' });
+    expect(capturedRows[capturedRows.length - 1]).toMatchObject({
+      newTotalM: '241.43',
+      newTotalY: '2,897.16',
+    });
+  });
+
+  it('leaves the new total empty for an item without a unit price', () => {
+    const unpriced = [{ ...subscriptions[0], unitSP: '', spxM: '', spxY: '' }];
+    render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={unpriced} />);
+
+    expect(capturedRows[0]).toMatchObject({ newTotalM: '', newTotalY: '' });
+  });
+
   it('configures the expected columns and pages all rows on one page', () => {
     render(<ReviewOrderStep subscription={{ id: 'SUB-1' }} order={order} subscriptions={subscriptions} />);
 

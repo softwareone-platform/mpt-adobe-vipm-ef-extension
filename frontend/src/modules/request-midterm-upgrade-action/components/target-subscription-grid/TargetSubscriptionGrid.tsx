@@ -20,6 +20,7 @@ import { TextCell } from '../grid-cell/text-cell/TextCell';
 import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
 import { TargetSubscription } from '../../model';
 import { AdobeOfferSwitchPath } from '../../../shared/model';
+import { getMonthlyPrice, getYearlyPrice, parseUnitPrice } from '../../../utils/price';
 
 const columns: GridColumnDefinition<TargetSubscription>[] = [
   {
@@ -175,11 +176,18 @@ export function TargetSubscriptionGrid({
       if (!/^\d*$/.test(value)) return;
       const newQuantity = value === '' ? null : Number(value);
       onSubscriptionsChange(
-        subscriptions.map((s) =>
-          isEqual(s, target)
-            ? { ...s, newQuantity, delta: (newQuantity ?? s.currentQuantity) - s.currentQuantity }
-            : s,
-        ),
+        subscriptions.map((s) => {
+          if (!isEqual(s, target)) return s;
+          const delta = (newQuantity ?? s.currentQuantity) - s.currentQuantity;
+          const unitPrice = parseUnitPrice(s.unitSP);
+          return {
+            ...s,
+            newQuantity,
+            delta,
+            spxM: getMonthlyPrice(unitPrice, delta),
+            spxY: getYearlyPrice(unitPrice, delta),
+          };
+        }),
       );
     },
     [subscriptions, onSubscriptionsChange],

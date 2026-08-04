@@ -239,6 +239,42 @@ describe('TargetSubscriptionGrid', () => {
     expect(onSubscriptionsChange.mock.calls[0][0][0]).toMatchObject({ newQuantity: 10, delta: 3 });
   });
 
+  it('reprices the row on the switched quantity so a partial switch drops the full price', () => {
+    const rows = [makeSubscription({ targetBaseOfferId: 'OFFER-A', currentQuantity: 0, newQuantity: 10, delta: 10, unitSP: '120.00' })];
+    render(<TargetSubscriptionGrid subscriptions={rows} offerPaths={offerPaths} sourceQuantity={10} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    const column = capturedConfig.columns.find((c) => c.name === 'newQuantity') as unknown as {
+      cell: (item: Subscription) => ReactNode;
+    };
+    const { getByRole } = render(<>{column.cell(rows[0])}</>);
+    fireEvent.change(getByRole('spinbutton'), { target: { value: '5' } });
+
+    expect(onSubscriptionsChange.mock.calls[0][0][0]).toMatchObject({
+      newQuantity: 5,
+      delta: 5,
+      spxM: '50.00',
+      spxY: '600.00',
+    });
+  });
+
+  it('clears the row price when the quantity is emptied', () => {
+    const rows = [makeSubscription({ targetBaseOfferId: 'OFFER-A', currentQuantity: 0, newQuantity: 10, delta: 10, unitSP: '120.00' })];
+    render(<TargetSubscriptionGrid subscriptions={rows} offerPaths={offerPaths} sourceQuantity={10} onSubscriptionsChange={onSubscriptionsChange} />);
+
+    const column = capturedConfig.columns.find((c) => c.name === 'newQuantity') as unknown as {
+      cell: (item: Subscription) => ReactNode;
+    };
+    const { getByRole } = render(<>{column.cell(rows[0])}</>);
+    fireEvent.change(getByRole('spinbutton'), { target: { value: '' } });
+
+    expect(onSubscriptionsChange.mock.calls[0][0][0]).toMatchObject({
+      newQuantity: null,
+      delta: 0,
+      spxM: '0.00',
+      spxY: '0.00',
+    });
+  });
+
   it('keeps rows sharing an item id distinct via targetBaseOfferId when updating quantity', () => {
     const sharedId = 'ITM-DUP-0000-0000';
     const rows = [
