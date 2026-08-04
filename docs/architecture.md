@@ -33,6 +33,14 @@ frontend/                    TypeScript plug UI (esbuild)
     vendor SKU
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
+  - `api/renewal.py` — at-anniversary renewal routes; restricted to client
+    accounts. `3yc-check` pre-checks the plan against the customer's 3YC
+    commitment floors (splitting licenses and consumables through the Airtable
+    SKU mapping), `preview` quotes the plan through an Adobe `PREVIEW_RENEWAL`
+    order (validating the selected flexible discount codes and returning the
+    renewal pricing), and the submit route repeats both gates and creates the
+    change order carrying the selected codes and the recommendation tracker id
+    on the product's existing `flexibleDiscounts` fulfillment parameter
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend
 - `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order
