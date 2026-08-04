@@ -22,6 +22,7 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { Loader } from './components/loader/Loader';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
 import { getPortalOrigin } from '../utils/link';
+import { getMonthlyPrice, getYearlyPrice } from '../utils/price';
 import { UpgradeFromStep } from './UpgradeFromStep';
 import { UpgradeToStep } from './UpgradeToStep';
 import { SplitBillingStep } from './SplitBillingStep';
@@ -108,8 +109,8 @@ export default function App() {
     newQuantity: sourceQuantity - movedQuantity,
     delta: -movedQuantity,
     unitSP: sourceUnitSP != null ? sourceUnitSP.toFixed(2) : '',
-    spxM: sourceUnitSP != null ? (-(sourceUnitSP * movedQuantity) / 12).toFixed(2) : '',
-    spxY: sourceUnitSP != null ? (-(sourceUnitSP * movedQuantity)).toFixed(2) : '',
+    spxM: getMonthlyPrice(sourceUnitSP, -movedQuantity),
+    spxY: getYearlyPrice(sourceUnitSP, -movedQuantity),
     terms: sourceTerms,
     commitment: sourceCommitment,
   };
@@ -207,8 +208,8 @@ export default function App() {
         newQuantity: currentQuantity + sourceQuantity,
         delta: sourceQuantity,
         unitSP: unitSP != null ? unitSP.toFixed(2) : '',
-        spxM: unitSP != null ? (unitSP * sourceQuantity / 12).toFixed(2) : '',
-        spxY: unitSP != null ? (unitSP * sourceQuantity).toFixed(2) : '',
+        spxM: getMonthlyPrice(unitSP, sourceQuantity),
+        spxY: getYearlyPrice(unitSP, sourceQuantity),
         terms: sourceTerms,
         commitment: sourceCommitment,
         };
