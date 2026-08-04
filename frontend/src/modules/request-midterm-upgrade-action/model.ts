@@ -1,4 +1,4 @@
-import type { Agreement, Buyer } from '../shared/model';
+import type { Agreement, Audit, Buyer, Reference, Terms } from '../shared/model';
 
 export type SplitBillingAllocationPrice = {
   currency?: string;
@@ -41,6 +41,11 @@ export type SubscriptionItem = {
   id: string;
   name: string;
   externalId: string;
+  status?: string;
+  terms?: Terms;
+  audit?: Audit;
+  product?: Reference;
+  vendor?: Reference;
 };
 
 export type TargetSubscription = {
@@ -58,4 +63,7 @@ export type TargetSubscription = {
   spxY: string;
   terms: string;
   commitment: string;
+  commitmentDate?: string | null;
+  subscriptionTerms?: Terms;
+  audit?: Audit;
 }

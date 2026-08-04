@@ -18,8 +18,11 @@ import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
 import { PopoverCell } from '../components/grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../components/grid-cell/text-cell/TextCell';
 import { ChipCell } from '../components/grid-cell/chip-cell/ChipCell';
+import { ItemCard } from '../components/item-card/ItemCard';
+import { SubscriptionCard } from '../components/subscription-card/SubscriptionCard';
 import { Order, TargetSubscription } from '../model';
-import { Subscription } from '../../shared/model';
+import { Agreement, Subscription } from '../../shared/model';
+import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { getMonthlyPrice, getYearlyPrice, parseUnitPrice, sumPrices } from '../../utils/price';
 
 import './ReviewOrderStep.scss';
@@ -65,7 +68,10 @@ function getSummaryRow(rows: ReviewRow[]): ReviewRow {
   };
 }
 
-function getColumns(subscriptions: ReviewRow[]): GridColumnDefinition<ReviewRow>[] {
+function getColumns(
+  subscriptions: ReviewRow[],
+  agreement?: Agreement,
+): GridColumnDefinition<ReviewRow>[] {
   return [
     {
       name: 'rowNumber',
@@ -88,11 +94,8 @@ function getColumns(subscriptions: ReviewRow[]): GridColumnDefinition<ReviewRow>
             title={i18n.t('Common:Item')}
             text={item.item.name}
             secondaryContent={`${item.item.id} | ${item.item.externalId}`}
-            items={[
-              { title: i18n.t('Common:ID'), content: item.item.id },
-              { title: i18n.t('Common:Name'), content: item.item.name },
-              { title: i18n.t('Common:External ID'), content: item.item.externalId },
-            ]}
+            url={getItemLink(item.item.id)}
+            card={<ItemCard item={item.item} />}
           />
         ),
     },
@@ -107,10 +110,18 @@ function getColumns(subscriptions: ReviewRow[]): GridColumnDefinition<ReviewRow>
             title={i18n.t('Common:Subscription')}
             text={item.name ?? undefined}
             secondaryContent={item.id}
-            items={[
-              { title: i18n.t('Common:ID'), content: item.id },
-              { title: i18n.t('Common:Name'), content: item.name },
-            ]}
+            url={getSubscriptionLink(item.id ?? undefined)}
+            card={
+              <SubscriptionCard
+                id={item.id}
+                name={item.name}
+                status={item.status}
+                commitmentDate={item.commitmentDate}
+                terms={item.subscriptionTerms}
+                audit={item.audit}
+                agreement={agreement}
+              />
+            }
           />
         ) : (
           <ChipCell label={i18n.t('MidtermUpgrade:Grid:New')} color="gray" />
@@ -179,14 +190,14 @@ const fields: GridFieldDefinition[] = [
   { name: 'spxY', title: i18n.t('MidtermUpgrade:Grid:SPxY') },
 ];
 
-function ItemsGrid({ subscriptions }: { subscriptions: TargetSubscription[] }) {
+function ItemsGrid({ subscriptions, agreement }: { subscriptions: TargetSubscription[]; agreement?: Agreement }) {
   const { t } = useTranslation();
   const reviewRows = subscriptions.map(getReviewRow);
   const rows: ReviewRow[] = [...reviewRows, getSummaryRow(reviewRows)];
 
   const gridProps = useGridInMemory(rows, {
     id: 'components__request-midterm-upgrade-action__review-order-grid',
-    columns: getColumns(reviewRows),
+    columns: getColumns(reviewRows, agreement),
     fields,
     paging: { page: 1, pageSize: rows.length, total: rows.length },
     isToHideFooter: true,
@@ -273,7 +284,7 @@ export function ReviewOrderStep({
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('MidtermUpgrade:Review:Tabs:Items')}>
           <Tab.Content>
-            <ItemsGrid subscriptions={subscriptions} />
+            <ItemsGrid subscriptions={subscriptions} agreement={subscription.agreement} />
           </Tab.Content>
         </Tab>
         <Tab id="parameters" title={t('MidtermUpgrade:Review:Tabs:Parameters')}>

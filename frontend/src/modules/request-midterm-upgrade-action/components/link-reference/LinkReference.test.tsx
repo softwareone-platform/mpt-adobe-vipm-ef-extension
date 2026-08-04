@@ -6,8 +6,21 @@ import { render } from '@testing-library/react';
 import { LinkReference } from './LinkReference';
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/avatar', () => ({
-  Avatar: ({ jdenticonValue }: { jdenticonValue?: string }) => (
-    <span data-testid="avatar" data-jdenticon-value={jdenticonValue} />
+  Avatar: ({
+    jdenticonValue,
+    imageSrc,
+    isToUseJdenticon,
+  }: {
+    jdenticonValue?: string;
+    imageSrc?: string;
+    isToUseJdenticon?: boolean;
+  }) => (
+    <span
+      data-testid="avatar"
+      data-jdenticon-value={jdenticonValue}
+      data-image-src={imageSrc}
+      data-use-jdenticon={String(isToUseJdenticon)}
+    />
   ),
 }));
 
@@ -58,6 +71,25 @@ describe('LinkReference', () => {
     const { queryByTestId } = renderWithRouter(<LinkReference text="Licensee Name" />);
 
     expect(queryByTestId('avatar')).toBeNull();
+  });
+
+  it('renders the entity icon of the payload when there is one', () => {
+    const iconUrl = 'https://api.dummy.test/public/v1/accounts/accounts/ACC-1/icon';
+    const { getByTestId } = renderWithRouter(
+      <LinkReference text="Vendor Name" secondaryContent="ACC-1" iconUrl={iconUrl} />
+    );
+
+    expect(getByTestId('avatar')).toHaveAttribute('data-image-src', iconUrl);
+  });
+
+  it('falls back to the generated avatar without an entity icon', () => {
+    const { getByTestId } = renderWithRouter(
+      <LinkReference text="Vendor Name" secondaryContent="ACC-1" />
+    );
+
+    const avatar = getByTestId('avatar');
+    expect(avatar).toHaveAttribute('data-image-src', '');
+    expect(avatar).toHaveAttribute('data-use-jdenticon', 'true');
   });
 
   it('prefers an explicit icon over the generated avatar', () => {
