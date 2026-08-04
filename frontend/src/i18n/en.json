@@ -32,7 +32,8 @@
     "Nav": {
       "3-year commitment": "3-year commitment",
       "Linked membership": "Linked membership",
-      "Global customer": "Global customer"
+      "Global customer": "Global customer",
+      "Discounts": "Discounts"
     },
     "ThreeYear": {
       "Title": "3-year commitment",
@@ -59,6 +60,34 @@
       "CreatePrompt": "To create a linked membership with this account as the owner, click <1>Create linked membership</1>.",
       "Create linked membership": "Create linked membership"
     },
+    "Discounts": {
+      "Title": "Discounts",
+      "Code": "Code",
+      "Source": "Source",
+      "Type": "Type",
+      "Value": "Value",
+      "Valid": "Valid",
+      "Order types": "Order types",
+      "Redeemed": "Redeemed",
+      "Discount lock until": "Discount lock until: {{date}}",
+      "PercentageOff": "{{value}}% off",
+      "AmountOff": "{{amount}} off",
+      "Status": {
+        "ACTIVE": "Active",
+        "EXPIRED": "Expired"
+      },
+      "Types": {
+        "PERCENTAGE": "Percentage",
+        "FIXED_DISCOUNT": "Fixed Discount",
+        "FIXED_PRICE": "Fixed Price"
+      },
+      "OrderTypes": {
+        "Any": "Any",
+        "NEW": "Add seats",
+        "RENEWAL": "Renewal",
+        "SWITCH": "Switch"
+      }
+    },
     "Global": {
       "Title": "Global customer",
       "Description": "The details of this customer's current global customer status are below.",
@@ -73,6 +102,7 @@
   },
   "Errors": {
     "LoadAdobeCustomer": "Failed to load Adobe customer data.",
+    "LoadDiscounts": "Failed to load discounts.",
     "LoadAdobeOffer": "Failed to load Adobe offer switch paths.",
     "LoadAdobeRecommendations": "Failed to load Adobe recommendations.",
     "SubscriptionSync": "Subscription sync failed.",
