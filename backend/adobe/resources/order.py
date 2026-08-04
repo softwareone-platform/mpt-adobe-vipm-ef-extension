@@ -62,3 +62,37 @@ class OrderClient:
                 "cancellingItems": cancelling_items,
             },
         )
+
+    @wrap_http_error
+    def preview_renewal_order(
+        self,
+        authorization_id: str,
+        customer_id: str,
+        currency_code: str,
+        line_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Request a PREVIEW_RENEWAL quote validating an anniversary renewal before ordering.
+
+        Adobe evaluates the renewal as described by the line items (offer,
+        subscription, quantity and any flexible discount codes carried per
+        line) and returns renewal pricing without committing an order. It is
+        the authoritative validation for discount-code eligibility on the
+        customer's existing subscriptions.
+        """
+        logger.info(
+            "preview_renewal_order: customer=%s authorization=%s lines=%d",
+            customer_id,
+            authorization_id,
+            len(line_items),
+        )
+        authorization = self._transport.settings.get_authorization(authorization_id)
+        return self._transport.request(
+            "POST",
+            authorization,
+            f"/v3/customers/{customer_id}/orders",
+            json={
+                "orderType": AdobeOrderType.PREVIEW_RENEWAL.value,
+                "currencyCode": currency_code,
+                "lineItems": line_items,
+            },
+        )

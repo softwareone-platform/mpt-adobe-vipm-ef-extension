@@ -25,6 +25,9 @@ def test_app_registers_event_routes():
         "/api/v2/settings",
         "/api/v2/discount-codes",
         "/api/v2/discount-codes/{discount_id}",
+        "/api/v2/agreements/{agreement_id}/renewal-order",
+        "/api/v2/agreements/{agreement_id}/renewal-order/3yc-check",
+        "/api/v2/agreements/{agreement_id}/renewal-order/preview",
     ],
 )
 def test_app_registers_api_route(path):
