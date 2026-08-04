@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
@@ -14,6 +16,7 @@ import { canRequestGlobalCustomer } from '../utils/security';
 import './App.scss';
 
 export default function App() {
+  const { t } = useTranslation();
   const { close } = useMPTModal();
   const settings = useSettings();
   const context = useMPTContext<{
@@ -50,19 +53,18 @@ export default function App() {
     <div className="request-global-customer-modal">
       <div className="request-global-customer-modal__header">
         <BoldText as="h2" size={4}>
-          Update global customer
+          {t('GlobalCustomer:Title')}
         </BoldText>
       </div>
 
       <div className="request-global-customer-modal__content">
         <RegularText as="p" size={2} color="grey-5">
-          Enabling this customer as a global customer allows them to transact across multiple
-          markets under a single account. This action cannot be undone.
+          {t('GlobalCustomer:Description')}
         </RegularText>
 
         {globalSalesEnabled && (
           <InlineNotification status="warning" isStandalone>
-            This customer is already enabled as a global customer.
+            {t('GlobalCustomer:AlreadyEnabled')}
           </InlineNotification>
         )}
 
@@ -74,14 +76,14 @@ export default function App() {
 
         {status === 'success' && (
           <InlineNotification status="success" isStandalone>
-            The global customer status has been updated on Adobe.
+            {t('GlobalCustomer:Success')}
           </InlineNotification>
         )}
       </div>
 
       <div className="request-global-customer-modal__actions">
         <Button isDisabled={isBusy} onClick={() => close()} type="secondary">
-          Close
+          {t('Common:Close')}
         </Button>
         <Button
           isBusy={isBusy}
@@ -89,7 +91,7 @@ export default function App() {
           onClick={handleSubmit}
           type="primary"
         >
-          Update global customer
+          {t('GlobalCustomer:Update global customer')}
         </Button>
       </div>
     </div>

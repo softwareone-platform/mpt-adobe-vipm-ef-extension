@@ -24,6 +24,17 @@ jest.mock('@mpt-extension/sdk', () => ({
         data: {
           id: 'SUB-1',
           splitStatus: 'Active',
+          split: {
+            id: 'SBS-1111-1111',
+            revision: 1,
+            allocations: [
+              {
+                buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+                percentage: 100,
+                price: { currency: 'USD', SPxY: 100, SPxM: 10 },
+              },
+            ],
+          },
           agreement: { id: 'AGR-1' },
           product: { id: 'PRD-1' },
           lines: [{ quantity: 10 }],
@@ -63,28 +74,6 @@ let mockRecommendation: { status: string; error: string | null; data: unknown; r
 };
 jest.mock('../shared/hooks/useAdobeRecommendation', () => ({
   useAdobeRecommendation: () => mockRecommendation,
-}));
-
-const splitWithAllocations = {
-  status: 'success',
-  error: null,
-  data: {
-    id: 'SBA-1111-1111',
-    revision: 1,
-    allocations: [
-      {
-        buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
-        percentage: 100,
-        price: { currency: 'USD', SPxY: 100, SPxM: 10 },
-      },
-    ],
-  },
-  refresh: () => {},
-};
-let mockSplit: { status: string; error: string | null; data: unknown; refresh: () => void } =
-  splitWithAllocations;
-jest.mock('../shared/hooks/useAgreementSplit', () => ({
-  useAgreementSplit: () => mockSplit,
 }));
 
 interface MockChildren {
@@ -136,6 +125,7 @@ interface SplitBillingProps {
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: unknown;
   onChange: (buyer: unknown) => void;
+  split: { id?: string; allocations?: unknown[] } | null;
 }
 let splitBillingProps: SplitBillingProps;
 
@@ -217,7 +207,6 @@ describe('request-midterm-upgrade-action App', () => {
     mockActiveStepIndex = 0;
     mockOfferResult.data = defaultOfferData;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
-    mockSplit = splitWithAllocations;
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {
@@ -244,6 +233,7 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof splitBillingProps.addBuyerToOrder).toBe('function');
     expect(typeof splitBillingProps.onChange).toBe('function');
     expect(splitBillingProps.selectedBuyer).toBeDefined();
+    expect(splitBillingProps.split?.id).toBe('SBS-1111-1111');
   });
 
   it('skips the split-billing step when split billing is disabled', async () => {
@@ -391,7 +381,13 @@ describe('request-midterm-upgrade-action App', () => {
     expect(placed).toBe(true);
     expect(http.post).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
-      { targetOfferId: '65322651CA02A12', quantity: 6, recommendationTrackerId: '' },
+      {
+        targetOfferId: '65322651CA02A12',
+        quantity: 6,
+        recommendationTrackerId: '',
+        notes: '',
+        externalIds: { client: '' },
+      },
     );
   });
 
@@ -504,7 +500,70 @@ describe('request-midterm-upgrade-action App', () => {
     expect(placed).toBe(true);
     expect(http.post).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
-      { targetOfferId: '65322651CA02A12', quantity: 6, recommendationTrackerId: 'TRACKER-1' },
+      {
+        targetOfferId: '65322651CA02A12',
+        quantity: 6,
+        recommendationTrackerId: 'TRACKER-1',
+        notes: '',
+        externalIds: { client: '' },
+      },
+    );
+  });
+
+  it('places the upgrade order with the notes and additional id entered in the details step', async () => {
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+
+    const selectedTarget = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: false,
+      currentQuantity: 0,
+      newQuantity: 6,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 3;
+    rerender(<App />);
+    expect(await screen.findByText('Details step')).toBeTruthy();
+    act(() => {
+      detailsProps.setOrder({
+        ...(detailsProps.order as object),
+        notes: 'Upgrade for the design team',
+        externalIds: { client: '234234234' },
+      });
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewOrderProps.onPlaceOrder();
+    });
+
+    expect(placed).toBe(true);
+    expect(http.post).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
+      {
+        targetOfferId: '65322651CA02A12',
+        quantity: 6,
+        recommendationTrackerId: '',
+        notes: 'Upgrade for the design team',
+        externalIds: { client: '234234234' },
+      },
     );
   });
 

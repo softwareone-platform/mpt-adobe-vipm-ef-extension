@@ -3,7 +3,7 @@ from mpt_extension_sdk.schemas import BaseSchema
 from pydantic import Field
 
 from adobe.enums import AdobeOrderType
-from mpt_adobe_vipm_ef.constants import MAX_LENGTH, MIN_LENGTH
+from mpt_adobe_vipm_ef.constants import MAX_LENGTH, MIN_LENGTH, NOTES_MAX_LENGTH
 
 _FIRST_LINE_NUMBER = 1
 
@@ -40,6 +40,12 @@ class SwitchPayload(APIBaseModel):
     cancelling_items: list[SwitchCancellingItem] = Field(alias="cancellingItems")
 
 
+class OrderExternalIds(BaseSchema):
+    """Customer-provided identifiers attached to the marketplace order."""
+
+    client: str = Field(default="", max_length=MAX_LENGTH)
+
+
 class UpgradeOrderRequest(BaseSchema):
     """Body schema for the mid-term upgrade order submission endpoint."""
 
@@ -53,6 +59,11 @@ class UpgradeOrderRequest(BaseSchema):
         default="",
         alias="recommendationTrackerId",
         max_length=MAX_LENGTH,
+    )
+    notes: str = Field(default="", max_length=NOTES_MAX_LENGTH)
+    external_ids: OrderExternalIds = Field(
+        default_factory=OrderExternalIds,
+        alias="externalIds",
     )
 
 

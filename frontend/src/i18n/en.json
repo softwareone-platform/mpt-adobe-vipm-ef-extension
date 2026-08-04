@@ -1,0 +1,277 @@
+{
+  "Common": {
+    "Retry": "Retry",
+    "Close": "Close",
+    "Yes": "Yes",
+    "No": "No",
+    "Name": "Name",
+    "ID": "ID",
+    "Status": "Status",
+    "Created": "Created",
+    "Updated": "Updated",
+    "Vendor": "Vendor",
+    "Product": "Product",
+    "Client": "Client",
+    "Seller": "Seller",
+    "Buyer": "Buyer",
+    "Licensee": "Licensee",
+    "Account": "Account",
+    "Agreement": "Agreement",
+    "Order": "Order",
+    "Item": "Item",
+    "Subscription": "Subscription",
+    "Subscriptions": "Subscriptions",
+    "External ID": "External ID",
+    "External Reference": "External Reference",
+    "SCU Identifier": "SCU Identifier",
+    "Tax Number": "Tax Number"
+  },
+  "Agreement": {
+    "Manage account": "Manage account",
+    "Loading": "Loading Adobe customer details…",
+    "Nav": {
+      "3-year commitment": "3-year commitment",
+      "Linked membership": "Linked membership",
+      "Global customer": "Global customer"
+    },
+    "ThreeYear": {
+      "Title": "3-year commitment",
+      "Description": "The details of this customer's current commitment and requests are below.",
+      "Current commitment": "Current commitment",
+      "Commitment request": "Commitment request",
+      "Recommitment request": "Recommitment request",
+      "Minimum licenses": "Minimum licenses",
+      "Minimum consumables": "Minimum consumables",
+      "Start date": "Start date",
+      "End date": "End date",
+      "AsidePrompt": "To request a commitment or recommitment, click <1>Request commitment</1>.",
+      "Request commitment": "Request commitment"
+    },
+    "Linked": {
+      "Title": "Linked membership",
+      "Description": "The details of this customer's current linked membership are below.",
+      "Current linked membership": "Current linked membership",
+      "Type": "Type",
+      "This account": "This account",
+      "Creation date": "Creation date",
+      "HasCommitment": "This customer has a 3-year commitment and cannot create a linked membership.",
+      "AlreadyApplied": "This customer already has a linked membership applied. A linked membership cannot be modified once it has been created.",
+      "CreatePrompt": "To create a linked membership with this account as the owner, click <1>Create linked membership</1>.",
+      "Create linked membership": "Create linked membership"
+    },
+    "Global": {
+      "Title": "Global customer",
+      "Description": "The details of this customer's current global customer status are below.",
+      "Current status": "Current global customer status",
+      "Global customer status": "Global customer status",
+      "Enabled": "Enabled",
+      "Disabled": "Disabled",
+      "AlreadyEnabled": "This customer is already enabled as a global customer and cannot be changed.",
+      "UpdatePrompt": "To update the global customer status of this customer, click <1>Update global customer</1>.",
+      "Update global customer": "Update global customer"
+    }
+  },
+  "Errors": {
+    "LoadAdobeCustomer": "Failed to load Adobe customer data.",
+    "LoadAdobeOffer": "Failed to load Adobe offer switch paths.",
+    "LoadAdobeRecommendations": "Failed to load Adobe recommendations.",
+    "SubscriptionSync": "Subscription sync failed.",
+    "AgreementSync": "Agreement sync failed.",
+    "OrderSubmission": "Order submission failed.",
+    "OrderNoData": "Order response did not include the created order.",
+    "GlobalCustomerNoData": "Global customer response did not include customer data.",
+    "GlobalCustomerRequest": "Global customer request failed.",
+    "LinkedMembershipNoData": "Linked membership response did not include customer data.",
+    "LinkedMembershipRequest": "Linked membership request failed.",
+    "CommitmentNoData": "Commitment response did not include customer data.",
+    "CommitmentRequest": "Commitment request failed."
+  },
+  "Commitment": {
+    "Title": "Request 3-year commitment",
+    "Description": "Provide the minimum quantities that the customer commits to over the next three years. You can submit licenses, consumables, or both.",
+    "Request type": "Request type",
+    "RequestType": {
+      "commitment": "commitment",
+      "recommitment": "recommitment"
+    },
+    "RequestTypeHint": "If the customer already has a three year commitment, then choosing the \"commitment\" option above will update the existing commitment. In this scenario, only increases are allowed.",
+    "Licenses": "Licenses",
+    "Consumables": "Consumables",
+    "Discount level": "Discount level",
+    "Discount level placeholder": "Select the desired discount level.",
+    "Discount tier": "Discount tier",
+    "Discount tier placeholder": "Not required",
+    "Not required": "Not required",
+    "Custom": "Custom",
+    "LicenseLevels": {
+      "Level 12": "Level 12 (10 licenses)",
+      "Level 13": "Level 13 (50 licenses)",
+      "Level 14": "Level 14 (100 licenses)"
+    },
+    "ConsumableTiers": {
+      "TB": "Tier TB (1,000 transactions)",
+      "TC": "Tier TC (2,500 transactions)",
+      "TD": "Tier TD (5,000 transactions)",
+      "TE": "Tier TE (15,000 transactions)",
+      "TF": "Tier TF (50,000 transactions)",
+      "TG": "Tier TG (100,000 transactions)"
+    },
+    "Custom license count": "Custom license count",
+    "Custom license placeholder": "Enter a minimum license quantity",
+    "Custom level hint": "Select custom under the discount level to use this option.",
+    "Custom consumable count": "Custom consumable count",
+    "Custom consumable placeholder": "Enter a minimum consumable quantity",
+    "Custom tier hint": "Select custom under the discount tier to use this option.",
+    "Success": "The 3YC request has been submitted to Adobe.",
+    "Send invitation": "Send invitation",
+    "Validation": {
+      "AtLeastOne": "At least one quantity is required.",
+      "AboveMinimum": "{{label}} must be greater than the current minimum ({{minimum}}).",
+      "AlreadyCommitted": "The customer is already committed. Select recommitment instead."
+    }
+  },
+  "LinkedMembership": {
+    "Title": "Create linked membership",
+    "Type": "Linked membership type",
+    "Options": {
+      "Standard": {
+        "Title": "Standard",
+        "Description": "Suitable for departments or sub-organizations with separate budget or administrative requirements, including business affiliates, school districts, state schools, government departments, and entities."
+      },
+      "Consortium": {
+        "Title": "Consortium",
+        "Description": "An association or combination of organizations with similar interests and objectives, managed by a controlling entity."
+      }
+    },
+    "Name label": "Linked membership name",
+    "Name description": "Enter linked membership name.",
+    "Name placeholder": "Enter linked membership name",
+    "Validation": {
+      "NameRequired": "A linked membership name is required."
+    },
+    "HasCommitment": "This customer has a 3-year commitment and cannot create a linked membership.",
+    "Success": "The linked membership request has been submitted to Adobe.",
+    "Create": "Create"
+  },
+  "GlobalCustomer": {
+    "Title": "Update global customer",
+    "Description": "Enabling this customer as a global customer allows them to transact across multiple markets under a single account. This action cannot be undone.",
+    "AlreadyEnabled": "This customer is already enabled as a global customer.",
+    "Success": "The global customer status has been updated on Adobe.",
+    "Update global customer": "Update global customer"
+  },
+  "MidtermUpgrade": {
+    "Header": "Upgrade subscription",
+    "Steps": {
+      "Upgrade from": "Upgrade from",
+      "Upgrade to": "Upgrade to",
+      "Split billing": "Split billing",
+      "Details": "Details",
+      "Review order": "Review order",
+      "Summary": "Summary"
+    },
+    "Actions": {
+      "Place order": "Place order",
+      "View order": "View order"
+    },
+    "Errors": {
+      "Subscription could not be loaded": "Subscription could not be loaded.",
+      "Settings could not be loaded": "Settings could not be loaded."
+    },
+    "Restricted": {
+      "Title": "Not available",
+      "Message": "The mid-term upgrade is available to client accounts only."
+    },
+    "Highlights": {
+      "orderSuffix": "{{type}} order",
+      "Base currency": "Base currency",
+      "Billing currency": "Billing currency"
+    },
+    "SplitBilling": {
+      "Prompt": "Select split billing option to use with this order",
+      "Percentages": {
+        "Title": "Allocate billing in line with current billing split percentages",
+        "Description": "Billing for this order will be allocated to buyers in line with the split percentages configured for this subscription"
+      },
+      "Buyer": {
+        "Title": "Allocate billing to specific buyer",
+        "Description": "Billing for this order will be allocated to an individual buyer from the buyers configured for split billing within this agreement"
+      },
+      "AllocationInfo": "Billing for subscription changes will be allocated between buyers as follows",
+      "Allocation %": "Allocation %",
+      "Validation": {
+        "SelectOption": "Select a split billing option.",
+        "SelectBuyer": "Select a buyer to allocate billing to.",
+        "SaveFailed": "Failed to save the split billing option."
+      }
+    },
+    "UpgradeFrom": {
+      "Instruction": "The subscription below will be upgraded. If the entire quantity of this subscription is upgraded, then the subscription below will be terminated."
+    },
+    "Details": {
+      "Additional ID": "Additional ID",
+      "Additional ID placeholder": "Enter additional ID",
+      "Additional ID description": "Enter a value that will help you identify this order",
+      "Notes": "Notes",
+      "Notes placeholder": "Enter notes"
+    },
+    "PlaceOrder": {
+      "SelectItem": "Select an item to continue.",
+      "MissingOffer": "The selected item is missing its Adobe offer and cannot be ordered.",
+      "EnterQuantity": "Enter a new quantity of at least 1 for the selected item.",
+      "NotAvailable": "The selected item is not an available upgrade and cannot be ordered."
+    },
+    "UpgradeTo": {
+      "Instruction": "Select the item to upgrade to. If a new subscription is created, auto-renewal will be enabled by default.",
+      "PriceDisclaimer": "* These estimated prices include estimates of invoice charges, which are subject to change, and the actual amounts will be reflected on your next bill. Please note that any applicable taxes (e.g., VAT or sales tax) will be calculated and included in the final invoice.",
+      "Empty": {
+        "Title": "No upgrades available",
+        "Description": "Adobe has not published any upgrades for this item"
+      }
+    },
+    "Review": {
+      "Order price": "Order price *",
+      "Items price": "Items price *",
+      "Placing order": "Placing your order…",
+      "No parameters": "No parameters to display.",
+      "Additional ID": "Additional ID",
+      "Notes": "Notes",
+      "Tabs": {
+        "Items": "Items",
+        "Parameters": "Parameters",
+        "Details": "Details"
+      }
+    },
+    "Grid": {
+      "Qty": "Qty",
+      "Terms": "Terms",
+      "Unit SP": "Unit SP",
+      "SPxM": "SPxM",
+      "SPxY": "SPxY",
+      "user/year": "user/year",
+      "Recommended": "Recommended",
+      "Current Quantity": "Current Quantity",
+      "New Quantity": "New Quantity",
+      "Delta": "Delta",
+      "New": "New",
+      "Yes": "Yes",
+      "Validation": {
+        "Required": "Quantity is required",
+        "MustBe": "Quantity must be {{quantity}}",
+        "AtLeast": "Quantity must be at least {{quantity}}",
+        "CannotExceed": "Quantity cannot exceed {{quantity}}"
+      }
+    },
+    "Summary": {
+      "Title": "Your order is being processed",
+      "StatusBody": "Your order is currently being processed. No action is required from you at this stage.",
+      "NextHeading": "What happens next",
+      "NextBody": "If everything proceeds as expected, your order will complete automatically. If additional information is required, you'll be notified here.",
+      "NextUpdates": "Updates will be provided as your order progresses.",
+      "HelpHeading": "Need help?",
+      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
+      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
+      "HelpClosing": "We're here to help."
+    }
+  }
+}

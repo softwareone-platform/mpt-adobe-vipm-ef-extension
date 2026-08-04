@@ -1,5 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 
+import { useTranslation } from 'react-i18next';
+
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { useStepActions, StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -15,19 +17,20 @@ import { AgreementSplit, AgreementSplitAllocation, Subscription } from '../../sh
 
 export function SplitBillingStep({
   subscription,
-  splitAgreement,
+  split,
   order,
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
   onChange,
 }: {
   subscription: Subscription;
-  splitAgreement: AgreementSplit | null;
+  split: AgreementSplit | null;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: AgreementSplitAllocation | null;
   onChange: (buyer: AgreementSplitAllocation) => void;
 }) {
+  const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
 
   const [option, setOption] = useState<SplitBillingOptionValue | null>(null);
@@ -37,31 +40,33 @@ export function SplitBillingStep({
   const [error, setError] = useState('');
 
   const agreementBuyerId = subscription?.buyer?.id ?? '';
-  const allocations = splitAgreement?.allocations ?? [];
+  const allocations = split?.allocations ?? [];
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
       const buyerId = option === 'buyer' ? selectedBuyer?.buyer?.id : undefined;
       if (option === null) {
-        setError('Select a split billing option.');
+        setError(t('MidtermUpgrade:SplitBilling:Validation:SelectOption'));
         return currentStepIndex;
       }
       if (option === 'buyer' && !buyerId) {
-        setError('Select a buyer to allocate billing to.');
+        setError(t('MidtermUpgrade:SplitBilling:Validation:SelectBuyer'));
         return currentStepIndex;
       }
       try {
-        await addBuyerToOrder({ id: buyerId });
+        if (option === 'buyer') {
+          await addBuyerToOrder({ id: buyerId });
+        }
       } catch (submitError) {
         setError(
-          submitError instanceof Error ? submitError.message : 'Failed to save the split billing option.'
+          submitError instanceof Error ? submitError.message : t('MidtermUpgrade:SplitBilling:Validation:SaveFailed')
         );
         return currentStepIndex;
       }
       setError('');
       return targetStepIndex;
     },
-    [addBuyerToOrder, option, selectedBuyer?.buyer?.id]
+    [addBuyerToOrder, option, selectedBuyer?.buyer?.id, t]
   );
 
   useEffect(() => {
@@ -80,7 +85,7 @@ export function SplitBillingStep({
     <div className="split-billing-step">
       <div className="split-billing-step__header">
         <RegularText as="h2" size={4}>
-          Split billing
+          {t('MidtermUpgrade:Steps:Split billing')}
         </RegularText>
       </div>
       <div className="split-billing-step__highlights">

@@ -1,7 +1,7 @@
 from mpt_api_client.exceptions import MPTError
 from mpt_extension_sdk.api.context import APIContext
 
-from mpt_adobe_vipm_ef.constants import AGREEMENT_SELECT
+from mpt_adobe_vipm_ef.constants import AGREEMENT_SELECT, SPLIT_SELECT
 from mpt_adobe_vipm_ef.routers.api import subscriptions
 
 sync_subscription = subscriptions.sync_subscription
@@ -17,8 +17,7 @@ def _resource(mocker, entity_data):
     return mocker.Mock(get=mocker.AsyncMock(return_value=_entity(mocker, entity_data)))
 
 
-def _build_ctx(mocker, payload, *, related=None, with_caller=True):  # noqa: WPS210
-    mocker.patch.object(subscriptions, "add_selling_prices", mocker.AsyncMock())
+def _build_ctx(mocker, payload, *, related=None, with_caller=True, priced_lines=None, split=None):  # noqa: WPS210 WPS211
     related = related or {}
     subscription = mocker.Mock()
     subscription.to_dict.return_value = payload
@@ -26,8 +25,12 @@ def _build_ctx(mocker, payload, *, related=None, with_caller=True):  # noqa: WPS
         key: _resource(mocker, related.get(key))
         for key in ("agreement", "licensee", "buyer", "seller")
     }
+    resource["subscription"] = _resource(mocker, {"lines": priced_lines or [], "split": split})
     client = mocker.Mock(
-        commerce=mocker.Mock(agreements=resource["agreement"]),
+        commerce=mocker.Mock(
+            agreements=resource["agreement"],
+            subscriptions=resource["subscription"],
+        ),
         accounts=mocker.Mock(
             licensees=resource["licensee"],
             buyers=resource["buyer"],
@@ -98,6 +101,36 @@ async def test_sync_keeps_stub_on_api_error(mocker):
     result = await sync_subscription("SUB-1", ctx)  # act
 
     assert result.payload["agreement"] == {"id": "AGR-1", "name": "stub"}
+
+
+async def test_sync_adds_the_subscription_split(mocker, split_payload):
+    payload = {"id": "SUB-1", "splitStatus": "Active"}
+    ctx, client = _build_ctx(mocker, payload, split=split_payload)
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    client.commerce.subscriptions.get.assert_awaited_once_with("SUB-1", select=SPLIT_SELECT)
+    assert result.payload["split"] == split_payload
+
+
+async def test_sync_skips_the_split_without_split_status(mocker):
+    payload = {"id": "SUB-1"}
+    ctx, client = _build_ctx(mocker, payload)
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    client.commerce.subscriptions.get.assert_not_awaited()
+    assert result.payload == {"id": "SUB-1"}
+
+
+async def test_sync_keeps_the_payload_when_the_split_fails(mocker):
+    payload = {"id": "SUB-1", "splitStatus": "Active"}
+    ctx, client = _build_ctx(mocker, payload)
+    client.commerce.subscriptions.get.side_effect = MPTError("boom")
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    assert result.payload == {"id": "SUB-1", "splitStatus": "Active"}
 
 
 async def test_sync_without_caller_skips_enrichment(mocker):

@@ -13,6 +13,7 @@ import { useEffect, useMemo } from 'react';
 
 import { Subscription } from '../../../shared/model';
 
+import { i18n } from '../../../../i18n/translations';
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
@@ -58,69 +59,69 @@ const columns: GridColumnDefinition<Row>[] = [
   },
   {
     name: 'name',
-    title: 'Name',
+    title: i18n.t('Common:Name'),
     fields: ['name'],
     cell: (item) => (
       <PopoverCell
-        title="Item"
+        title={i18n.t('Common:Item')}
         text={item.item.name}
         secondaryContent={`${item.item.id} | ${item.item.externalId}`}
         items={[
-          { title: 'ID', content: item.item.id },
-          { title: 'Name', content: item.item.name },
-          { title: 'External ID', content: item.item.externalId },
+          { title: i18n.t('Common:ID'), content: item.item.id },
+          { title: i18n.t('Common:Name'), content: item.item.name },
+          { title: i18n.t('Common:External ID'), content: item.item.externalId },
         ]}
       />
     ),
   },
   {
     name: 'subscription',
-    title: 'Subscription',
+    title: i18n.t('Common:Subscription'),
     fields: ['subscription'],
     cell: (item) => (
       <PopoverCell
-        title="Subscription"
+        title={i18n.t('Common:Subscription')}
         text={item.subscriptionName}
         secondaryContent={item.subscriptionId}
         items={[
-          { title: 'ID', content: item.subscriptionId },
-          { title: 'Name', content: item.subscriptionName },
-          { title: 'Status', content: <Chip label={item.status} /> },
+          { title: i18n.t('Common:ID'), content: item.subscriptionId },
+          { title: i18n.t('Common:Name'), content: item.subscriptionName },
+          { title: i18n.t('Common:Status'), content: <Chip label={item.status} /> },
         ]}
       />
     ),
   },
   {
     name: 'quantity',
-    title: 'Qty',
+    title: i18n.t('MidtermUpgrade:Grid:Qty'),
     fields: ['quantity'],
     initialWidth: 80,
     cell: (item) => <TextCell text={item.quantity} />,
   },
   {
     name: 'unitSP',
-    title: 'Unit SP',
+    title: i18n.t('MidtermUpgrade:Grid:Unit SP'),
     fields: ['unitSP'],
     initialWidth: 120,
-    cell: (item) => <TextCell text={item.unitSP} secondaryContent="user/year" />,
+    cell: (item) => <TextCell text={item.unitSP} secondaryContent={i18n.t('MidtermUpgrade:Grid:user/year')} />,
   },
   {
     name: 'spxM',
-    title: 'SPxM',
+    title: i18n.t('MidtermUpgrade:Grid:SPxM'),
     fields: ['spxM'],
     initialWidth: 120,
     cell: (item) => <TextCell text={item.spxM} />,
   },
   {
     name: 'spxY',
-    title: 'SPxY',
+    title: i18n.t('MidtermUpgrade:Grid:SPxY'),
     fields: ['spxY'],
     initialWidth: 120,
     cell: (item) => <TextCell text={item.spxY} />,
   },
   {
     name: 'status',
-    title: 'Status',
+    title: i18n.t('Common:Status'),
     fields: ['status'],
     initialWidth: 120,
     cell: (item) => <ChipCell label={item.status} />,
@@ -128,13 +129,13 @@ const columns: GridColumnDefinition<Row>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'name', title: 'Name' },
-  { name: 'subscription', title: 'Subscription' },
-  { name: 'quantity', title: 'Qty', type: 'number' },
-  { name: 'unitSP', title: 'Unit SP', type: 'number' },
-  { name: 'spxM', title: 'SPxM', type: 'number' },
-  { name: 'spxY', title: 'SPxY', type: 'number' },
-  { name: 'status', title: 'Status' },
+  { name: 'name', title: i18n.t('Common:Name') },
+  { name: 'subscription', title: i18n.t('Common:Subscription') },
+  { name: 'quantity', title: i18n.t('MidtermUpgrade:Grid:Qty'), type: 'number' },
+  { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP'), type: 'number' },
+  { name: 'spxM', title: i18n.t('MidtermUpgrade:Grid:SPxM'), type: 'number' },
+  { name: 'spxY', title: i18n.t('MidtermUpgrade:Grid:SPxY'), type: 'number' },
+  { name: 'status', title: i18n.t('Common:Status') },
 ];
 
 const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];

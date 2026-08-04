@@ -141,6 +141,7 @@ export interface Subscription {
   name?: string;
   status?: string;
   splitStatus?: string;
+  split?: AgreementSplit | null;
   externalIds?: ExternalIds;
   terms?: Terms;
   agreement?: Agreement;
@@ -419,10 +420,4 @@ export interface AgreementSplit {
   id: string;
   revision: number;
   allocations: AgreementSplitAllocation[];
-}
-
-export interface AgreementSplitState {
-  status: Status;
-  error: string | null;
-  data: AgreementSplit | null;
 }

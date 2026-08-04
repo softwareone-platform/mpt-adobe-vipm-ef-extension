@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import {
   TargetSubscriptionGrid,
@@ -323,27 +323,27 @@ describe('getDeltaCell', () => {
 });
 
 describe('getNewQuantityCell', () => {
-  it('enables the input and forwards changes for a selected PARTIAL_ALLOWED target', () => {
+  it('enables the input and forwards changes for a selected PARTIAL_ALLOWED target', async () => {
     const onChange = jest.fn();
     const subscription = makeSubscription({ recommended: true, newQuantity: 7 });
     const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, onChange, true)}</>);
 
     const input = getByRole('spinbutton');
-    expect(input).toBeEnabled();
+    await waitFor(() => expect(input).toBeEnabled());
     expect(input).toHaveValue(7);
 
     fireEvent.change(input, { target: { value: '12' } });
     expect(onChange).toHaveBeenCalledWith(subscription, '12');
   });
 
-  it('disables the input for a PARTIAL_ALLOWED target that is not selected', () => {
+  it('disables the input for a PARTIAL_ALLOWED target that is not selected', async () => {
     const subscription = makeSubscription({ recommended: true, newQuantity: 7 });
     const { getByRole } = render(<>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), false)}</>);
 
-    expect(getByRole('spinbutton')).toBeDisabled();
+    await waitFor(() => expect(getByRole('spinbutton')).toBeDisabled());
   });
 
-  it('disables the input when the target is not in the offer paths', () => {
+  it('disables the input when the target is not in the offer paths', async () => {
     const subscription = makeSubscription({
       item: { id: 'ITM-3', name: 'Photoshop', externalId: 'AO03.99999' },
     });
@@ -351,10 +351,10 @@ describe('getNewQuantityCell', () => {
       <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), true)}</>,
     );
 
-    expect(getByRole('spinbutton')).toBeDisabled();
+    await waitFor(() => expect(getByRole('spinbutton')).toBeDisabled());
   });
 
-  it('disables the input for a FULL_ONLY target', () => {
+  it('disables the input for a FULL_ONLY target', async () => {
     const subscription = makeSubscription({
       recommended: true,
       item: { id: 'ITM-2', name: 'Creative Cloud', externalId: 'AO03.25471' },
@@ -363,6 +363,6 @@ describe('getNewQuantityCell', () => {
       <>{getNewQuantityCell(subscription, offerPaths, 7, jest.fn(), true)}</>,
     );
 
-    expect(getByRole('spinbutton')).toBeDisabled();
+    await waitFor(() => expect(getByRole('spinbutton')).toBeDisabled());
   });
 });

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Column, List, Row, SelectionType, useListInMemory, UseListInMemoryHookModel } from '@softwareone-platform/sdk-react-ui-v0/list';
 
@@ -24,6 +25,7 @@ export function AllocateToBuyer({
   onChange,
   allocations,
 }: AllocateToBuyerProps) {
+  const { t } = useTranslation();
   const [selectedRows, setSelectedRows] = useState<Row<AllocationRow>[]>(
     selectedBuyerId ? [{ data: { id: selectedBuyerId } as AllocationRow, selected: true }] : []
   );
@@ -70,7 +72,7 @@ export function AllocateToBuyer({
   return (
     <div className="buyers" data-testid="allocate-to-buyer">
       <p className="buyers__info">
-        Billing for subscription changes will be allocated between buyers as follows
+        {t('MidtermUpgrade:SplitBilling:AllocationInfo')}
       </p>
       <List<AllocationRow>
         {...listState}

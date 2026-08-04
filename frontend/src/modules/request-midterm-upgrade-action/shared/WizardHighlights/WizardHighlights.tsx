@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { EntityDomain, EntityType } from '../../../shared/constants';
 import { OrderStatus, Subscription } from '../../../shared/model';
 import { Order } from '../../model';
@@ -20,6 +22,7 @@ export function WizardHighlights({
   subscription: Subscription;
   order?: Order | null;
 }) {
+  const { t } = useTranslation();
   const orderStatus = (order?.status ?? 'New') as OrderStatus;
   const orderType = order?.type ?? 'Change';
   const orderUrl = getEntityLink(EntityDomain.Commerce, EntityType.Orders, order?.id ?? undefined);
@@ -51,19 +54,19 @@ export function WizardHighlights({
   const agreementInfoCard = (
     <InfoCard
       items={[
-        { title: 'Name', content: <LinkReference text={agreement?.name} url={agreementUrl} /> },
-        { title: 'ID', content: agreement?.id },
-        { title: 'Status', content: <Chip label={agreementStatus} color={agreementStatusColor} /> },
-        { title: 'Vendor', content: agreement?.vendor?.name },
-        { title: 'Product', content: <LinkReference text={agreement?.product?.name} url={productUrl} /> },
-        { title: 'Client', content: <LinkReference text={agreement?.client?.name} url={clientUrl} /> },
+        { title: t('Common:Name'), content: <LinkReference text={agreement?.name} url={agreementUrl} /> },
+        { title: t('Common:ID'), content: agreement?.id },
+        { title: t('Common:Status'), content: <Chip label={agreementStatus} color={agreementStatusColor} /> },
+        { title: t('Common:Vendor'), content: agreement?.vendor?.name },
+        { title: t('Common:Product'), content: <LinkReference text={agreement?.product?.name} url={productUrl} /> },
+        { title: t('Common:Client'), content: <LinkReference text={agreement?.client?.name} url={clientUrl} /> },
         { type: 'divider' },
-        { title: 'Seller', content: <LinkReference text={agreement?.seller?.name} url={agreementSellerUrl} /> },
-        { title: 'Buyer', content: <LinkReference text={agreement?.buyer?.name} url={agreementBuyerUrl} /> },
-        { title: 'Licensee', content: <LinkReference text={agreement?.licensee?.name} url={agreementLicenseeUrl} /> },
+        { title: t('Common:Seller'), content: <LinkReference text={agreement?.seller?.name} url={agreementSellerUrl} /> },
+        { title: t('Common:Buyer'), content: <LinkReference text={agreement?.buyer?.name} url={agreementBuyerUrl} /> },
+        { title: t('Common:Licensee'), content: <LinkReference text={agreement?.licensee?.name} url={agreementLicenseeUrl} /> },
         { type: 'divider' },
-        { title: 'Created', content: timestampContent(agreement?.audit?.created?.at) },
-        { title: 'Updated', content: timestampContent(agreement?.audit?.updated?.at) },
+        { title: t('Common:Created'), content: timestampContent(agreement?.audit?.created?.at) },
+        { title: t('Common:Updated'), content: timestampContent(agreement?.audit?.updated?.at) },
       ]}
     />
   );
@@ -76,16 +79,16 @@ export function WizardHighlights({
   const licenseeInfoCard = (
     <InfoCard
       items={[
-        { title: 'Name', content: <LinkReference text={licensee?.name} url={licenseeUrl} /> },
-        { title: 'ID', content: licensee?.id },
-        { title: 'Status', content: <Chip label={licensee?.status ?? ''} /> },
-        { title: 'Account', content: <LinkReference text={licensee?.account?.name} url={licenseeAccountUrl} /> },
-        { title: 'Buyer', content: <LinkReference text={licensee?.buyer?.name} url={licenseeBuyerUrl} /> },
-        { title: 'Seller', content: <LinkReference text={licensee?.seller?.name} url={licenseeSellerUrl} /> },
-        { title: 'External Reference', content: licensee?.externalId ?? '—' },
+        { title: t('Common:Name'), content: <LinkReference text={licensee?.name} url={licenseeUrl} /> },
+        { title: t('Common:ID'), content: licensee?.id },
+        { title: t('Common:Status'), content: <Chip label={licensee?.status ?? ''} /> },
+        { title: t('Common:Account'), content: <LinkReference text={licensee?.account?.name} url={licenseeAccountUrl} /> },
+        { title: t('Common:Buyer'), content: <LinkReference text={licensee?.buyer?.name} url={licenseeBuyerUrl} /> },
+        { title: t('Common:Seller'), content: <LinkReference text={licensee?.seller?.name} url={licenseeSellerUrl} /> },
+        { title: t('Common:External Reference'), content: licensee?.externalId ?? '—' },
         { type: 'divider' },
-        { title: 'Created', content: timestampContent(licensee?.audit?.created?.at) },
-        { title: 'Updated', content: timestampContent(licensee?.audit?.updated?.at) },
+        { title: t('Common:Created'), content: timestampContent(licensee?.audit?.created?.at) },
+        { title: t('Common:Updated'), content: timestampContent(licensee?.audit?.updated?.at) },
       ]}
     />
   );
@@ -96,15 +99,15 @@ export function WizardHighlights({
   const buyerInfoCard = (
     <InfoCard
       items={[
-        { title: 'Name', content: <LinkReference text={buyer?.name} url={buyerUrl} /> },
-        { title: 'ID', content: buyer?.id },
-        { title: 'SCU Identifier', content: buyer?.externalIds?.erpCustomer ?? '—' },
-        { title: 'Tax Number', content: buyer?.taxId ?? '—' },
-        { title: 'Status', content: <Chip label={buyer?.status ?? ''} /> },
-        { title: 'Account', content: <LinkReference text={buyer?.account?.name} url={buyerAccountUrl} /> },
+        { title: t('Common:Name'), content: <LinkReference text={buyer?.name} url={buyerUrl} /> },
+        { title: t('Common:ID'), content: buyer?.id },
+        { title: t('Common:SCU Identifier'), content: buyer?.externalIds?.erpCustomer ?? '—' },
+        { title: t('Common:Tax Number'), content: buyer?.taxId ?? '—' },
+        { title: t('Common:Status'), content: <Chip label={buyer?.status ?? ''} /> },
+        { title: t('Common:Account'), content: <LinkReference text={buyer?.account?.name} url={buyerAccountUrl} /> },
         { type: 'divider' },
-        { title: 'Created', content: timestampContent(buyer?.audit?.created?.at) },
-        { title: 'Updated', content: timestampContent(buyer?.audit?.updated?.at) },
+        { title: t('Common:Created'), content: timestampContent(buyer?.audit?.created?.at) },
+        { title: t('Common:Updated'), content: timestampContent(buyer?.audit?.updated?.at) },
       ]}
     />
   );
@@ -113,19 +116,19 @@ export function WizardHighlights({
   const sellerInfoCard = (
     <InfoCard
       items={[
-        { title: 'Name', content: <LinkReference text={seller?.name} url={sellerUrl} /> },
-        { title: 'ID', content: seller?.id },
-        { title: 'Status', content: <Chip label={seller?.status ?? ''} /> },
+        { title: t('Common:Name'), content: <LinkReference text={seller?.name} url={sellerUrl} /> },
+        { title: t('Common:ID'), content: seller?.id },
+        { title: t('Common:Status'), content: <Chip label={seller?.status ?? ''} /> },
         { type: 'divider' },
-        { title: 'Created', content: timestampContent(seller?.audit?.created?.at) },
-        { title: 'Updated', content: timestampContent(seller?.audit?.updated?.at) },
+        { title: t('Common:Created'), content: timestampContent(seller?.audit?.created?.at) },
+        { title: t('Common:Updated'), content: timestampContent(seller?.audit?.updated?.at) },
       ]}
     />
   );
 
   return (
     <Highlights>
-      <Highlights.Item label="Order">
+      <Highlights.Item label={t('Common:Order')}>
         {order?.id ? (
           <EntityReference
             primaryContent={
@@ -135,16 +138,16 @@ export function WizardHighlights({
                 statusLabel={orderStatus}
               />
             }
-            secondaryContent={`${orderType} order`}
+            secondaryContent={t('MidtermUpgrade:Highlights:orderSuffix', { type: orderType })}
           />
         ) : (
           <EntityReference
             primaryContent={<Chip label={orderStatus} />}
-            secondaryContent={`${orderType} order`}
+            secondaryContent={t('MidtermUpgrade:Highlights:orderSuffix', { type: orderType })}
           />
         )}
       </Highlights.Item>
-      <Highlights.Item label="Agreement">
+      <Highlights.Item label={t('Common:Agreement')}>
         <EntityReference
           primaryContent={
             <ReferenceWithChip
@@ -152,46 +155,46 @@ export function WizardHighlights({
               url={agreementUrl ?? undefined}
               statusLabel={agreementStatus}
               statusColor={agreementStatusColor}
-              cardTitle="Agreement"
+              cardTitle={t('Common:Agreement')}
               card={agreementInfoCard}
             />
           }
           secondaryContent={subscription.agreement?.id ?? undefined}
         />
       </Highlights.Item>
-      <Highlights.Item label="Licensee">
+      <Highlights.Item label={t('Common:Licensee')}>
         <LinkReference
           text={subscription.licensee?.name ?? undefined}
           secondaryContent={subscription.licensee?.id ?? undefined}
           url={licenseeUrl ?? undefined}
-          cardTitle="Licensee"
+          cardTitle={t('Common:Licensee')}
           card={licenseeInfoCard}
         />
       </Highlights.Item>
-      <Highlights.Item label="Buyer">
+      <Highlights.Item label={t('Common:Buyer')}>
         <LinkReference
           text={subscription.buyer?.name ?? undefined}
           secondaryContent={subscription.buyer?.id ?? undefined}
           url={buyerUrl ?? undefined}
-          cardTitle="Buyer"
+          cardTitle={t('Common:Buyer')}
           card={buyerInfoCard}
         />
       </Highlights.Item>
-      <Highlights.Item label="Seller">
+      <Highlights.Item label={t('Common:Seller')}>
         <LinkReference
           text={subscription.seller?.name ?? undefined}
           secondaryContent={subscription.seller?.id ?? undefined}
           url={sellerUrl ?? undefined}
-          cardTitle="Seller"
+          cardTitle={t('Common:Seller')}
           card={sellerInfoCard}
         />
       </Highlights.Item>
-      <Highlights.Item label="Base currency">
+      <Highlights.Item label={t('MidtermUpgrade:Highlights:Base currency')}>
         <EntityReference
           primaryContent={baseCurrency}
         />
       </Highlights.Item>
-      <Highlights.Item label="Billing currency">
+      <Highlights.Item label={t('MidtermUpgrade:Highlights:Billing currency')}>
         <EntityReference
           primaryContent={billingCurrency}
         />

@@ -1,3 +1,4 @@
+import { i18n } from '../../i18n/translations';
 import { AdobeOfferSwitchPath } from '../shared/model';
 import {
   getOfferRule,
@@ -11,17 +12,17 @@ export function getPlaceOrderValidationError(
   sourceQuantity: number,
 ): string | null {
   if (!target) {
-    return 'Select an item to continue.';
+    return i18n.t('MidtermUpgrade:PlaceOrder:SelectItem');
   }
   if (!target.targetBaseOfferId) {
-    return 'The selected item is missing its Adobe offer and cannot be ordered.';
+    return i18n.t('MidtermUpgrade:PlaceOrder:MissingOffer');
   }
   if (!target.newQuantity || target.newQuantity < 1) {
-    return 'Enter a new quantity of at least 1 for the selected item.';
+    return i18n.t('MidtermUpgrade:PlaceOrder:EnterQuantity');
   }
   const rule = getOfferRule(offerPaths, target, sourceQuantity);
   if (!rule) {
-    return 'The selected item is not an available upgrade and cannot be ordered.';
+    return i18n.t('MidtermUpgrade:PlaceOrder:NotAvailable');
   }
   return validateNewQuantity(target.newQuantity, rule);
 }

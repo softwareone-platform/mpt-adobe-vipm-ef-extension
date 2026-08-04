@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Column, List, Row, useListInMemory, UseListInMemoryHookModel } from '@softwareone-platform/sdk-react-ui-v0/list';
 
@@ -18,6 +19,7 @@ export function SplitBillingAllocations({
   allocations: AgreementSplitAllocation[];
   agreementBuyerId: string;
 }) {
+  const { t } = useTranslation();
   const rows = useMemo<AllocationRow[]>(
     () => allocations.map((allocation) => ({ ...allocation, id: allocation.buyer.id })),
     [allocations]
@@ -27,6 +29,7 @@ export function SplitBillingAllocations({
     () => [
       {
         name: 'Buyer',
+        label: t('Common:Buyer'),
         cell: ({ data }) => (
           <BuyerReference allocation={data} isOwner={data.buyer.id === agreementBuyerId} />
         ),
@@ -34,11 +37,12 @@ export function SplitBillingAllocations({
       },
       {
         name: 'Allocation %',
+        label: t('MidtermUpgrade:SplitBilling:Allocation %'),
         cell: ({ data }) => (data.percentage ? `${data.percentage}` : '—'),
         align: 'right',
       },
     ],
-    [agreementBuyerId]
+    [agreementBuyerId, t]
   );
 
   const listState = useListInMemory<AllocationRow>({
@@ -50,7 +54,7 @@ export function SplitBillingAllocations({
   return (
     <div className="split-billing-allocations">
       <p className="split-billing-allocations__info">
-        Billing for subscription changes will be allocated between buyers as follows
+        {t('MidtermUpgrade:SplitBilling:AllocationInfo')}
       </p>
       <List<AllocationRow>
         {...listState}

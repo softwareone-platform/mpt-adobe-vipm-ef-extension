@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
+import { i18n } from '../../i18n/translations';
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import { Input } from '@softwareone-platform/sdk-react-ui-v0/input';
@@ -22,22 +24,18 @@ const MAX_NAME_LENGTH = 255;
 const TYPE_OPTIONS: Array<{ value: LinkedMembershipType; title: string; description: string }> = [
   {
     value: 'STANDARD',
-    title: 'Standard',
-    description:
-      'Suitable for departments or sub-organizations with separate budget or administrative ' +
-      'requirements, including business affiliates, school districts, state schools, government ' +
-      'departments, and entities.',
+    title: i18n.t('LinkedMembership:Options:Standard:Title'),
+    description: i18n.t('LinkedMembership:Options:Standard:Description'),
   },
   {
     value: 'CONSORTIUM',
-    title: 'Consortium',
-    description:
-      'An association or combination of organizations with similar interests and objectives, ' +
-      'managed by a controlling entity.',
+    title: i18n.t('LinkedMembership:Options:Consortium:Title'),
+    description: i18n.t('LinkedMembership:Options:Consortium:Description'),
   },
 ];
 
 export default function App() {
+  const { t } = useTranslation();
   const { close } = useMPTModal();
   const settings = useSettings();
   const context = useMPTContext<{
@@ -70,7 +68,7 @@ export default function App() {
 
     const trimmed = name.trim();
     if (!trimmed) {
-      setLocalError('A linked membership name is required.');
+      setLocalError(t('LinkedMembership:Validation:NameRequired'));
       return;
     }
 
@@ -85,14 +83,14 @@ export default function App() {
     <div className="request-linked-membership-modal">
       <div className="request-linked-membership-modal__header">
         <BoldText as="h2" size={4}>
-          Create linked membership
+          {t('LinkedMembership:Title')}
         </BoldText>
       </div>
 
       <div className="request-linked-membership-modal__content">
         <RadioButtonGroup
           name="linked-membership-type"
-          label="Linked membership type"
+          label={t('LinkedMembership:Type')}
           value={membershipType}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             setMembershipType(event.target.value as LinkedMembershipType)
@@ -116,19 +114,19 @@ export default function App() {
         <div className="request-linked-membership-modal__name-field">
           <Input
             characterLimit={MAX_NAME_LENGTH}
-            description="Enter linked membership name."
+            description={t('LinkedMembership:Name description')}
             isDisabled={isBusy}
-            label="Linked membership name"
+            label={t('LinkedMembership:Name label')}
             name="linkedMembershipName"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => setName(event.target.value)}
-            placeholder="Enter linked membership name"
+            placeholder={t('LinkedMembership:Name placeholder')}
             value={name}
           />
         </div>
 
         {hasCommitment && (
           <InlineNotification status="warning" isStandalone>
-            This customer has a 3-year commitment and cannot create a linked membership.
+            {t('LinkedMembership:HasCommitment')}
           </InlineNotification>
         )}
 
@@ -140,14 +138,14 @@ export default function App() {
 
         {status === 'success' && (
           <InlineNotification status="success" isStandalone>
-            The linked membership request has been submitted to Adobe.
+            {t('LinkedMembership:Success')}
           </InlineNotification>
         )}
       </div>
 
       <div className="request-linked-membership-modal__actions">
         <Button isDisabled={isBusy} onClick={() => close()} type="secondary">
-          Close
+          {t('Common:Close')}
         </Button>
         <Button
           isBusy={isBusy}
@@ -155,7 +153,7 @@ export default function App() {
           onClick={handleSubmit}
           type="primary"
         >
-          Create
+          {t('LinkedMembership:Create')}
         </Button>
       </div>
     </div>

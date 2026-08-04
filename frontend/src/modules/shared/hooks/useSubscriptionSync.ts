@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
+import { i18n } from '../../../i18n/translations';
 import { INITIAL_SYNC_STATE, Subscription, SyncState } from '../model';
 
 
@@ -27,7 +28,7 @@ export function useSubscriptionSync(subscriptionId: string) {
         status: 'success',
       });
     } catch (syncError) {
-      const error = syncError instanceof Error ? syncError.message : 'Subscription sync failed.';
+      const error = syncError instanceof Error ? syncError.message : i18n.t('Errors:SubscriptionSync');
       setSubscription(null);
       setState({
         error,

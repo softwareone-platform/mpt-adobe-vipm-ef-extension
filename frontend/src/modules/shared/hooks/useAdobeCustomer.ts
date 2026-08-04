@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 
+import { i18n } from '../../../i18n/translations';
+
 import type { AdobeCustomer, AdobeCustomerData } from '../model';
 
 const INITIAL_STATE: AdobeCustomer = {
@@ -33,7 +35,7 @@ export function useAdobeCustomer(agreementId: string): {
         setState({ status: 'success', error: null, data });
       })
       .catch((err: unknown) => {
-        const error = err instanceof Error ? err.message : 'Failed to load Adobe customer data.';
+        const error = err instanceof Error ? err.message : i18n.t('Errors:LoadAdobeCustomer');
         setState({ status: 'error', error, data: null });
       });
   }, [agreementId, refreshToken]);

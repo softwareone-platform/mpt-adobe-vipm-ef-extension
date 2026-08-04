@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
@@ -11,7 +12,6 @@ import { canRequestMidtermUpgradeAction } from '../utils/security';
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
 import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
-import { useAgreementSplit } from '../shared/hooks/useAgreementSplit';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { useUpgradeOrderRequest } from '../shared/hooks/useUpgradeOrderRequest';
@@ -45,6 +45,7 @@ const initialOrder: Order = {
 };
 
 export default function App() {
+  const { t } = useTranslation();
   const context = useMPTContext<{ auth?: { account?: { type?: AccountType } } }>();
   const accountType = context.auth?.account?.type;
   const { data: settings, status: settingsStatus, refetch: refetchSettings } = useSettingsResult();
@@ -64,7 +65,7 @@ export default function App() {
     sourceQuantity,
   );
   const hasSplit = subscription?.splitStatus === 'Active';
-  const { data: splitAgreement } = useAgreementSplit(hasSplit ? (subscription?.agreement?.id ?? '') : '');
+  const split = subscription?.split ?? null;
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
@@ -139,6 +140,8 @@ export default function App() {
       targetOfferId: currentSelectedTarget.targetBaseOfferId ?? '',
       quantity: currentSelectedTarget.delta,
       recommendationTrackerId,
+      notes: order?.notes ?? '',
+      externalIds: { client: order?.externalIds?.client ?? '' },
     });
     if (!result) {
       return false;
@@ -151,6 +154,8 @@ export default function App() {
     offerPaths,
     sourceQuantity,
     recommendationTrackerId,
+    order?.notes,
+    order?.externalIds?.client,
     submitOrder,
   ]);
 
@@ -163,10 +168,10 @@ export default function App() {
 
   const addBuyerToOrder = useCallback(
     async (buyer: { id?: string }) => {
-      const selected = splitAgreement?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
+      const selected = split?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
       setOrder(prev => ({ ...prev, billTo: selected ?? null }));
     },
-    [splitAgreement]
+    [split]
   );
 
   useEffect(() => {
@@ -216,10 +221,10 @@ export default function App() {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <InlineNotification status="error" isStandalone>
-          {error || 'Subscription could not be loaded.'}
+          {error || t('MidtermUpgrade:Errors:Subscription could not be loaded')}
         </InlineNotification>
         <Button onClick={() => syncSubscription()}>
-          Retry
+          {t('Common:Retry')}
         </Button>
       </div>
     );
@@ -229,10 +234,10 @@ export default function App() {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <InlineNotification status="error" isStandalone>
-          Settings could not be loaded.
+          {t('MidtermUpgrade:Errors:Settings could not be loaded')}
         </InlineNotification>
         <Button onClick={refetchSettings}>
-          Retry
+          {t('Common:Retry')}
         </Button>
       </div>
     );
@@ -250,8 +255,8 @@ export default function App() {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <AccountRestrictedNotice
-          title="Not available"
-          message="The mid-term upgrade is available to client accounts only."
+          title={t('MidtermUpgrade:Restricted:Title')}
+          message={t('MidtermUpgrade:Restricted:Message')}
         />
       </div>
     );
@@ -259,11 +264,11 @@ export default function App() {
 
   const wizardSteps: (StepProps & { render: () => ReactNode })[] = [
     {
-      title: 'Upgrade from',
+      title: t('MidtermUpgrade:Steps:Upgrade from'),
       render: () => <UpgradeFromStep subscription={subscription} />,
     },
     {
-      title: 'Upgrade to',
+      title: t('MidtermUpgrade:Steps:Upgrade to'),
       render: () => (
         <UpgradeToStep
           subscription={subscription}
@@ -279,11 +284,11 @@ export default function App() {
     ...(hasSplit
       ? [
           {
-            title: 'Split billing',
+            title: t('MidtermUpgrade:Steps:Split billing'),
             render: () => (
               <SplitBillingStep
                 subscription={subscription}
-                splitAgreement={splitAgreement}
+                split={split}
                 order={order}
                 addBuyerToOrder={addBuyerToOrder}
                 selectedBuyer={selectedBuyer}
@@ -294,12 +299,12 @@ export default function App() {
         ]
       : []),
     {
-      title: 'Details',
+      title: t('MidtermUpgrade:Steps:Details'),
       render: () => <DetailsStep subscription={subscription} order={order} setOrder={setOrder} />,
     },
     {
-      title: 'Review order',
-      nextButton: { label: 'Place order', isDisabled: submitStatus === 'loading' },
+      title: t('MidtermUpgrade:Steps:Review order'),
+      nextButton: { label: t('MidtermUpgrade:Actions:Place order'), isDisabled: submitStatus === 'loading' },
       render: () => (
         <ReviewOrderStep
           subscription={subscription}
@@ -312,8 +317,8 @@ export default function App() {
       ),
     },
     {
-      title: 'Summary',
-      nextButton: { label: 'View order' },
+      title: t('MidtermUpgrade:Steps:Summary'),
+      nextButton: { label: t('MidtermUpgrade:Actions:View order') },
       render: () => <SummaryStep subscription={subscription} order={order} />,
     },
   ];
@@ -328,7 +333,7 @@ export default function App() {
           onClose={onClose}
           onSave={viewOrder}
         >
-          <Wizard.Header>Upgrade subscription</Wizard.Header>
+          <Wizard.Header>{t('MidtermUpgrade:Header')}</Wizard.Header>
           <Wizard.Content>
             <Wizard.Content.Steps />
             <Wizard.Content.StepContent>

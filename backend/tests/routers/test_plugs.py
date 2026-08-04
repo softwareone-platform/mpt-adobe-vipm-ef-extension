@@ -50,7 +50,12 @@ def test_subscription_plug_condition_lists_products(monkeypatch):
 
     plug = agreement_plugs()[4]  # act
 
-    assert plug.condition == "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222))"
+    assert plug.condition == (
+        "and("
+        "in(subscription.product.id,(PRD-1111-1111,PRD-2222-2222)),"
+        "eq(subscription.status,Active)"
+        ")"
+    )
 
 
 def test_plug_condition_lists_products(monkeypatch):

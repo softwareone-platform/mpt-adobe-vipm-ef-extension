@@ -49,12 +49,16 @@ def test_build_change_order_lines_tops_up_existing_target_line(source_line):
 
 
 @pytest.fixture
-def switch_payload():
-    request = UpgradeOrderRequest.model_validate({
+def upgrade_request():
+    return UpgradeOrderRequest.model_validate({
         "targetOfferId": "65322651CA02A12",
         "quantity": 6,
     })
-    return build_switch_payload(request, "adobe-sub-1", "USD")
+
+
+@pytest.fixture
+def switch_payload(upgrade_request):
+    return build_switch_payload(upgrade_request, "adobe-sub-1", "USD")
 
 
 @pytest.fixture
@@ -68,12 +72,14 @@ def orders_service(mocker):
 
 
 async def test_create_switch_change_order_creates_in_processing_status(
-    mocker, orders_service, switch_payload
+    mocker, orders_service, upgrade_request, switch_payload
 ):
     client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
     lines = [{"id": _SOURCE_LINE_ID, "quantity": 4}]
 
-    result = await create_switch_change_order(client, _AGREEMENT_ID, lines, switch_payload)
+    result = await create_switch_change_order(
+        client, _AGREEMENT_ID, lines, switch_payload, upgrade_request
+    )
 
     assert result == {"id": "ORD-0001", "status": "Processing"}
     orders_service.create.assert_awaited_once_with({
@@ -86,6 +92,25 @@ async def test_create_switch_change_order_creates_in_processing_status(
         },
     })
     orders_service.process.assert_not_awaited()
+
+
+async def test_create_switch_change_order_carries_the_customer_details(
+    mocker, orders_service, switch_payload
+):
+    client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
+    lines = [{"id": _SOURCE_LINE_ID, "quantity": 4}]
+    request = UpgradeOrderRequest.model_validate({
+        "targetOfferId": "65322651CA02A12",
+        "quantity": 6,
+        "notes": "Upgrade for the design team",
+        "externalIds": {"client": "234234234"},
+    })
+
+    await create_switch_change_order(client, _AGREEMENT_ID, lines, switch_payload, request)
+
+    call_args, _kwargs = orders_service.create.await_args
+    assert call_args[0]["notes"] == "Upgrade for the design team"
+    assert call_args[0]["externalIds"] == {"client": "234234234"}
 
 
 def test_mpt_order_error_detail_returns_the_platform_detail():
