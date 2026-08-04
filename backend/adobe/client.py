@@ -2,7 +2,6 @@ from adobe.resources.customer import CustomerClient
 from adobe.resources.offer import OfferClient
 from adobe.resources.order import OrderClient
 from adobe.resources.recommendation import RecommendationClient
-from adobe.resources.subscription import SubscriptionClient
 from adobe.transport import AdobeTransport
 
 
@@ -19,7 +18,6 @@ class AdobeClient:
         self.offer = OfferClient(self._transport)
         self.order = OrderClient(self._transport)
         self.recommendation = RecommendationClient(self._transport)
-        self.subscription = SubscriptionClient(self._transport)
 
 
 _ADOBE_CLIENT: "AdobeClient | None" = None
