@@ -1,4 +1,11 @@
-import { parsePrice, formatPrice } from './price';
+import {
+  parsePrice,
+  formatPrice,
+  parseUnitPrice,
+  getYearlyPrice,
+  getMonthlyPrice,
+  sumPrices,
+} from './price';
 
 describe('parsePrice', () => {
   it('parses a plain numeric string', () => {
@@ -22,5 +29,50 @@ describe('formatPrice', () => {
 
   it('pads to two decimals', () => {
     expect(formatPrice(31.5)).toBe('31.50');
+  });
+});
+
+describe('parseUnitPrice', () => {
+  it('parses a formatted unit price', () => {
+    expect(parseUnitPrice('1,200.00')).toBe(1200);
+  });
+
+  it('returns null for an unpriced item', () => {
+    expect(parseUnitPrice('')).toBeNull();
+  });
+});
+
+describe('getYearlyPrice', () => {
+  it('multiplies the unit price by the quantity', () => {
+    expect(getYearlyPrice(120, 10)).toBe('1,200.00');
+  });
+
+  it('keeps the sign of a negative quantity', () => {
+    expect(getYearlyPrice(120, -10)).toBe('-1,200.00');
+  });
+
+  it('returns an empty string when there is no unit price', () => {
+    expect(getYearlyPrice(null, 10)).toBe('');
+    expect(getYearlyPrice(undefined, 10)).toBe('');
+  });
+});
+
+describe('getMonthlyPrice', () => {
+  it('spreads the yearly price across the year', () => {
+    expect(getMonthlyPrice(120, 10)).toBe('100.00');
+  });
+
+  it('returns an empty string when there is no unit price', () => {
+    expect(getMonthlyPrice(null, 10)).toBe('');
+  });
+});
+
+describe('sumPrices', () => {
+  it('totals formatted prices', () => {
+    expect(sumPrices(['1,200.00', '300.00'])).toBe('1,500.00');
+  });
+
+  it('ignores missing values', () => {
+    expect(sumPrices(['300.00', undefined, ''])).toBe('300.00');
   });
 });

@@ -20,7 +20,7 @@ import { TextCell } from '../components/grid-cell/text-cell/TextCell';
 import { ChipCell } from '../components/grid-cell/chip-cell/ChipCell';
 import { Order, TargetSubscription } from '../model';
 import { Subscription } from '../../shared/model';
-import { parsePrice, formatPrice } from '../../utils/price';
+import { getMonthlyPrice, getYearlyPrice, parseUnitPrice, sumPrices } from '../../utils/price';
 
 import './ReviewOrderStep.scss';
 
@@ -28,9 +28,21 @@ type ReviewRow = TargetSubscription & {
   isSummary?: boolean;
   summaryTitle?: string;
   summarySubtitle?: string;
+  newTotalM?: string;
+  newTotalY?: string;
 };
 
-function getSummaryRow(subscriptions: TargetSubscription[]): ReviewRow {
+function getReviewRow(subscription: TargetSubscription): ReviewRow {
+  const unitPrice = parseUnitPrice(subscription.unitSP);
+  const newQuantity = subscription.newQuantity ?? 0;
+  return {
+    ...subscription,
+    newTotalM: getMonthlyPrice(unitPrice, newQuantity),
+    newTotalY: getYearlyPrice(unitPrice, newQuantity),
+  };
+}
+
+function getSummaryRow(rows: ReviewRow[]): ReviewRow {
   return {
     id: 'order-price',
     name: null,
@@ -41,8 +53,10 @@ function getSummaryRow(subscriptions: TargetSubscription[]): ReviewRow {
     newQuantity: null,
     delta: 0,
     unitSP: '',
-    spxM: formatPrice(subscriptions.reduce((total, s) => total + parsePrice(s.spxM), 0)),
-    spxY: formatPrice(subscriptions.reduce((total, s) => total + parsePrice(s.spxY), 0)),
+    spxM: sumPrices(rows.map((row) => row.spxM)),
+    spxY: sumPrices(rows.map((row) => row.spxY)),
+    newTotalM: sumPrices(rows.map((row) => row.newTotalM)),
+    newTotalY: sumPrices(rows.map((row) => row.newTotalY)),
     terms: '',
     commitment: '',
     isSummary: true,
@@ -51,7 +65,7 @@ function getSummaryRow(subscriptions: TargetSubscription[]): ReviewRow {
   };
 }
 
-function getColumns(subscriptions: TargetSubscription[]): GridColumnDefinition<ReviewRow>[] {
+function getColumns(subscriptions: ReviewRow[]): GridColumnDefinition<ReviewRow>[] {
   return [
     {
       name: 'rowNumber',
@@ -143,14 +157,14 @@ function getColumns(subscriptions: TargetSubscription[]): GridColumnDefinition<R
       title: i18n.t('MidtermUpgrade:Grid:SPxM'),
       fields: ['spxM'],
       initialWidth: 120,
-      cell: (item) => <TextCell text={item.spxM} />,
+      cell: (item) => <TextCell text={item.spxM} secondaryContent={item.newTotalM} />,
     },
     {
       name: 'spxY',
       title: i18n.t('MidtermUpgrade:Grid:SPxY'),
       fields: ['spxY'],
       initialWidth: 120,
-      cell: (item) => <TextCell text={item.spxY} />,
+      cell: (item) => <TextCell text={item.spxY} secondaryContent={item.newTotalY} />,
     },
   ];
 }
@@ -167,11 +181,12 @@ const fields: GridFieldDefinition[] = [
 
 function ItemsGrid({ subscriptions }: { subscriptions: TargetSubscription[] }) {
   const { t } = useTranslation();
-  const rows: ReviewRow[] = [...subscriptions, getSummaryRow(subscriptions)];
+  const reviewRows = subscriptions.map(getReviewRow);
+  const rows: ReviewRow[] = [...reviewRows, getSummaryRow(reviewRows)];
 
   const gridProps = useGridInMemory(rows, {
     id: 'components__request-midterm-upgrade-action__review-order-grid',
-    columns: getColumns(subscriptions),
+    columns: getColumns(reviewRows),
     fields,
     paging: { page: 1, pageSize: rows.length, total: rows.length },
     isToHideFooter: true,
