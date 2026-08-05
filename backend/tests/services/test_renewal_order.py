@@ -8,7 +8,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
 from mpt_adobe_vipm_ef.services.renewal_plan import (
     NetNewLine,
     PlanSubscription,
-    build_flexible_discounts_value,
+    build_renewal_payload,
 )
 
 _AGREEMENT_ID = "AGR-1234-5678"
@@ -88,11 +88,11 @@ async def test_create_renewal_change_order_creates_in_processing_status(mocker, 
         flexDiscountCodes=["BLACK_FRIDAY"],
         recommendationTrackerId="TRACKER-1",
     )
-    flexible_discounts = build_flexible_discounts_value(_plan(request), request)
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
     lines = [{"id": _LINE_ID, "quantity": 7}]
 
     result = await create_renewal_change_order(
-        client, _AGREEMENT_ID, lines, flexible_discounts, request
+        client, _AGREEMENT_ID, lines, renewal_payload, request
     )
 
     assert result == {"id": "ORD-0001", "status": "Processing"}
@@ -102,22 +102,10 @@ async def test_create_renewal_change_order_creates_in_processing_status(mocker, 
         "agreement": {"id": _AGREEMENT_ID},
         "lines": lines,
         "parameters": {
-            "fulfillment": [{"externalId": "flexibleDiscounts", "value": flexible_discounts}],
+            "ordering": [{"externalId": "renewalPayload", "value": renewal_payload.to_dict()}],
         },
     })
     orders_service.process.assert_not_awaited()
-
-
-async def test_create_renewal_change_order_omits_the_parameter_without_discount_data(
-    mocker, orders_service
-):
-    client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
-    request = _request(subscriptions=[_selection()])
-
-    await create_renewal_change_order(client, _AGREEMENT_ID, [], None, request)  # act
-
-    call_args, _kwargs = orders_service.create.await_args
-    assert "parameters" not in call_args[0]
 
 
 async def test_create_renewal_change_order_carries_the_customer_details(mocker, orders_service):
@@ -127,8 +115,9 @@ async def test_create_renewal_change_order_carries_the_customer_details(mocker, 
         notes="Renewal for the design team",
         externalIds={"client": "234234234"},
     )
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
 
-    await create_renewal_change_order(client, _AGREEMENT_ID, [], None, request)  # act
+    await create_renewal_change_order(client, _AGREEMENT_ID, [], renewal_payload, request)  # act
 
     call_args, _kwargs = orders_service.create.await_args
     assert call_args[0]["notes"] == "Renewal for the design team"

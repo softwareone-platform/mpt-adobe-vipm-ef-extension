@@ -39,8 +39,9 @@ frontend/                    TypeScript plug UI (esbuild)
     SKU mapping), `preview` quotes the plan through an Adobe `PREVIEW_RENEWAL`
     order (validating the selected flexible discount codes and returning the
     renewal pricing), and the submit route repeats both gates and creates the
-    change order carrying the selected codes and the recommendation tracker id
-    on the product's existing `flexibleDiscounts` fulfillment parameter
+    change order carrying the plan snapshot (renew decisions, quantities,
+    discount codes and the recommendation tracker id) on the hidden
+    `renewalPayload` order parameter
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend
 - `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order

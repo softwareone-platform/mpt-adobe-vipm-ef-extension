@@ -3,9 +3,10 @@ from mpt_extension_sdk.api import ValidationError
 
 from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
 from mpt_adobe_vipm_ef.services.renewal_plan import (
+    NetNewLine,
     PlanSubscription,
-    build_flexible_discounts_value,
     build_preview_renewal_line_items,
+    build_renewal_payload,
     require_renewal_selections,
 )
 
@@ -96,67 +97,61 @@ def test_build_preview_renewal_line_items_skips_lapsing_subscriptions():
     assert result == []
 
 
-def test_build_flexible_discounts_value_maps_codes_per_renewing_line():
+def test_build_renewal_payload_snapshots_the_whole_plan():
     request = _request(
         subscriptions=[
             _selection(),
             _selection(renew=False, quantity=0, subscription_id="SUB-9999-0001"),
         ],
+        net_new_items=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
         codes=["BLACK_FRIDAY", "CYBER_MONDAY"],
         recommendationTrackerId="TRACKER-1",
     )
+    net_new_lines = [
+        NetNewLine(selection=request.net_new_items[0], item_id="ITM-NET-NEW"),
+    ]
 
-    result = build_flexible_discounts_value(_plan(request), request)
+    result = build_renewal_payload(_plan(request), net_new_lines, request, "USD")
 
-    assert result == {
+    assert result.to_dict() == {
         "recommendationTrackerId": "TRACKER-1",
-        "lineItems": [
+        "currencyCode": "USD",
+        "subscriptions": [
             {
-                "extLineItemNumber": 1,
-                "baseOfferId": _OFFER_ID,
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
-                "flexDiscountCode": "BLACK_FRIDAY",
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": 7,
+                "flexDiscountCodes": ["BLACK_FRIDAY", "CYBER_MONDAY"],
             },
             {
-                "extLineItemNumber": 1,
-                "baseOfferId": _OFFER_ID,
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
-                "flexDiscountCode": "CYBER_MONDAY",
+                "offerId": _OFFER_ID,
+                "renew": False,
+                "renewalQuantity": 0,
+                "flexDiscountCodes": [],
             },
         ],
+        "netNewItems": [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
     }
 
 
-def test_build_flexible_discounts_value_numbers_lines_like_the_preview():
+def test_build_renewal_payload_keeps_codes_off_lapsing_subscriptions():
     request = _request(
-        subscriptions=[
-            _selection(),
-            _selection(subscription_id="SUB-9999-0001"),
-        ],
+        subscriptions=[_selection(renew=False, quantity=0)],
         codes=["BLACK_FRIDAY"],
     )
 
-    result = build_flexible_discounts_value(_plan(request), request)
+    result = build_renewal_payload(_plan(request), [], request, "USD")
 
-    line_numbers = [entry["extLineItemNumber"] for entry in result["lineItems"]]
-    preview_numbers = [
-        line_item["extLineItemNumber"]
-        for line_item in build_preview_renewal_line_items(_plan(request), ["BLACK_FRIDAY"])
-    ]
-    assert line_numbers == preview_numbers
+    assert result.subscriptions[0].flex_discount_codes == []
 
 
-def test_build_flexible_discounts_value_keeps_the_tracker_without_codes():
-    request = _request(subscriptions=[_selection()], recommendationTrackerId="TRACKER-1")
-
-    result = build_flexible_discounts_value(_plan(request), request)
-
-    assert result == {"recommendationTrackerId": "TRACKER-1", "lineItems": []}
-
-
-def test_build_flexible_discounts_value_is_none_when_nothing_to_record():
+def test_build_renewal_payload_defaults_the_optional_fields():
     request = _request(subscriptions=[_selection()], recommendationTrackerId="")
 
-    result = build_flexible_discounts_value(_plan(request), request)
+    result = build_renewal_payload(_plan(request), [], request, "USD")
 
-    assert result is None
+    payload = result.to_dict()
+    assert not payload["recommendationTrackerId"]
+    assert payload["netNewItems"] == []

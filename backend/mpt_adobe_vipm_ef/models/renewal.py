@@ -1,5 +1,6 @@
 from typing import Self
 
+from mpt_extension_sdk.api.models.base import APIBaseModel
 from mpt_extension_sdk.schemas import BaseSchema
 from pydantic import Field, field_validator, model_validator
 
@@ -83,4 +84,45 @@ class RenewalOrderRequest(RenewalPreviewRequest):
     external_ids: OrderExternalIds = Field(
         default_factory=OrderExternalIds,
         alias="externalIds",
+    )
+
+
+class RenewalPayloadSubscription(APIBaseModel):
+    """One existing subscription's at-anniversary decision, keyed by its Adobe id.
+
+    Mirrors Adobe's auto-renewal preference object (``enabled`` as ``renew``,
+    ``renewalQuantity`` and ``flexDiscountCodes``) so fulfilment can PATCH the
+    subscription without recomputing the plan.
+    """
+
+    subscription_id: str = Field(alias="subscriptionId")
+    offer_id: str = Field(alias="offerId")
+    renew: bool
+    renewal_quantity: int = Field(alias="renewalQuantity")
+    flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
+
+
+class RenewalPayloadNetNewItem(APIBaseModel):
+    """A net-new product to create as an Adobe scheduled subscription at fulfilment."""
+
+    offer_id: str = Field(alias="offerId")
+    quantity: int
+
+
+class RenewalPayload(APIBaseModel):
+    """The renewal plan snapshot stored in the hidden order DataObject.
+
+    Locks in what the customer agreed to in the wizard: the per-subscription
+    renew decisions with their quantities and discount codes, the net-new
+    products to schedule (with their full offer ids), and the recommendation
+    tracker id — everything the fulfillment extension needs to apply the plan
+    to Adobe at the anniversary.
+    """
+
+    recommendation_tracker_id: str = Field(default="", alias="recommendationTrackerId")
+    currency_code: str = Field(alias="currencyCode")
+    subscriptions: list[RenewalPayloadSubscription]
+    net_new_items: list[RenewalPayloadNetNewItem] = Field(
+        default_factory=list,
+        alias="netNewItems",
     )
