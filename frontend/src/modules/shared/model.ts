@@ -334,6 +334,22 @@ export enum ProductSegments {
 
 export type OrderStatus = 'New' | 'Draft' | 'Deleted' | 'Processing' | 'Querying' | 'Failed' | 'Completed' | 'Quoted';
 
+export interface OrderExternalIds {
+  client?: string | null;
+  operations?: string | null;
+  vendor?: string | null;
+}
+
+export interface Order {
+  id?: string | null;
+  status?: string | null;
+  type?: string | null;
+  agreement?: Agreement | null;
+  billTo?: Buyer | null;
+  externalIds?: OrderExternalIds | null;
+  notes?: string | null;
+}
+
 export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }

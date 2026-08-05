@@ -177,7 +177,7 @@ jest.mock('./SummaryStep', () => ({
   },
 }));
 
-jest.mock('./components/loader/Loader', () => ({
+jest.mock('../shared/components/Loader/Loader', () => ({
   Loader: () => <div data-testid="loader" />,
 }));
 

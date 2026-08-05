@@ -1,7 +1,7 @@
-import { EntityDomain, EntityType } from '../../../shared/constants';
-import { Reference } from '../../../shared/model';
+import { EntityDomain, EntityType } from '../../constants';
+import { Reference } from '../../model';
 import { getEntityLink } from '../../../utils/link';
-import { LinkReference } from '../link-reference/LinkReference';
+import { LinkReference } from '../LinkReference/LinkReference';
 
 export interface EntityLinkProps {
   entityDomain: EntityDomain;

@@ -1,6 +1,6 @@
 import { EntityReference } from '@softwareone-platform/sdk-react-ui-v0/entity-reference';
 
-import { AgreementSplitAllocation } from '../../../shared/model';
+import { AgreementSplitAllocation } from '../../model';
 
 export function BuyerReference({
   allocation,

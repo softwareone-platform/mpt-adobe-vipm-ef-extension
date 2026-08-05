@@ -6,10 +6,10 @@ import { Agreement, Audit, Terms } from '../../../shared/model';
 import { formatDate } from '../../../utils/date';
 import { getSubscriptionLink } from '../../../utils/link';
 import { termLabel } from '../../../utils/terms';
-import { EntityLink } from '../entity-link/EntityLink';
-import { InfoCard } from '../info-card/InfoCard';
-import { LinkReference } from '../link-reference/LinkReference';
-import { Timestamp } from '../timestamp/Timestamp';
+import { EntityLink } from '../../../shared/components/EntityLink/EntityLink';
+import { InfoCard } from '../../../shared/components/InfoCard/InfoCard';
+import { LinkReference } from '../../../shared/components/LinkReference/LinkReference';
+import { Timestamp } from '../../../shared/components/Timestamp/Timestamp';
 
 export interface SubscriptionCardProps {
   id?: string | null;

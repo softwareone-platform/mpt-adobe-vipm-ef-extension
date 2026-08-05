@@ -35,7 +35,7 @@ jest.mock('../components/target-subscription-grid/TargetSubscriptionGrid', () =>
   },
 }));
 
-jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
+jest.mock('../../shared/components/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
 }));
 

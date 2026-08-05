@@ -16,11 +16,13 @@ export function TextCell({ text, secondaryContent }: TextCellProps) {
         <RegularText as="p" size={2}>
           {text}
         </RegularText>
-        {secondaryContent && (
-          <RegularText as="p" size={1} color="grey-4">
-            {secondaryContent}
-          </RegularText>
-        )}
+        {secondaryContent != null &&
+          secondaryContent !== '' &&
+          typeof secondaryContent !== 'boolean' && (
+            <RegularText as="p" size={1} color="grey-4">
+              {secondaryContent}
+            </RegularText>
+          )}
       </div>
     </GridCellSimple>
   );

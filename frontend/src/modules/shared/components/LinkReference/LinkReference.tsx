@@ -48,7 +48,7 @@ export function LinkReference({
   cardTitle,
   card,
 }: LinkReferenceProps) {
-  const href = url ? `${getPortalOrigin()}${url}` : undefined;
+  const href = text && url ? `${getPortalOrigin()}${url}` : undefined;
 
   const primaryContent = href ? (
     <a href={href} target="_top" rel="noopener noreferrer">

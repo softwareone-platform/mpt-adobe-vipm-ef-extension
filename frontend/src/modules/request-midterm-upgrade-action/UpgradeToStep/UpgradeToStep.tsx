@@ -7,7 +7,7 @@ import { StepNavigationProperties, useStepActions } from '@softwareone-platform/
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
 import { getPlaceOrderValidationError } from '../placeOrderValidation';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
-import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TargetSubscription } from '../model';
 import { AdobeOfferSwitchPath, Status, Subscription } from '../../shared/model';
 
@@ -58,7 +58,7 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
         </RegularText>
       </div>
       <div className="upgrade-to-step__highlights">
-        <WizardHighlights subscription={subscription} />
+        <WizardHighlights agreement={subscription.agreement} parties={subscription} />
       </div>
       <div className="upgrade-to-step__inline-text">
         <span className="upgrade-to-step__inline-text__pill" />

@@ -8,7 +8,7 @@ import { Input } from '@softwareone-platform/sdk-react-ui-v0';
 import { isValueChanged } from '../../utils/value';
 
 import './DetailsStep.scss';
-import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 
 interface DetailsStepProps {
   subscription: Subscription;
@@ -84,7 +84,7 @@ export function DetailsStep({
         </RegularText>
       </div>
       <div className="details__section__highlights">
-        <WizardHighlights subscription={subscription} />
+        <WizardHighlights agreement={subscription.agreement} parties={subscription} />
       </div>
       <div className="details__section">
         <div className="details__section__inputs">

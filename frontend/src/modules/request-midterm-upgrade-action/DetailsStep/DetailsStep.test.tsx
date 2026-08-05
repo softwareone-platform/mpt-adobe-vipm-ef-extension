@@ -45,7 +45,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0', () => ({
   ),
 }));
 
-jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
+jest.mock('../../shared/components/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
 }));
 
