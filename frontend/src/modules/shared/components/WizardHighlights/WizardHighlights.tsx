@@ -1,40 +1,50 @@
 import { useTranslation } from 'react-i18next';
 
-import { EntityDomain, EntityType } from '../../../shared/constants';
-import { OrderStatus, Subscription } from '../../../shared/model';
-import { Order } from '../../model';
+import { EntityDomain, EntityType } from '../../constants';
+import { Agreement, Buyer, Licensee, Order, OrderStatus, Seller } from '../../model';
 import { getEntityLink } from '../../../utils/link';
 
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { EntityReference } from '@softwareone-platform/sdk-react-ui-v0/entity-reference';
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
-import { Highlights } from '../../components/highlights/Highlights';
-import { InfoCard } from '../../components/info-card/InfoCard';
-import { LinkReference } from '../../components/link-reference/LinkReference';
-import { ReferenceWithChip } from '../../components/reference-with-chip/ReferenceWithChip';
+import { Highlights } from '../Highlights/Highlights';
+import { InfoCard } from '../InfoCard/InfoCard';
+import { LinkReference } from '../LinkReference/LinkReference';
+import { ReferenceWithChip } from '../ReferenceWithChip/ReferenceWithChip';
 import { formatDate, formatTime } from '../../../utils/date';
 
-export function WizardHighlights({
-  subscription,
-  order,
-}: {
-  subscription: Subscription;
+export interface WizardHighlightsParties {
+  licensee?: Licensee | null;
+  buyer?: Buyer | null;
+  seller?: Seller | null;
+}
+
+export interface WizardHighlightsProps {
+  agreement?: Agreement | null;
+  parties?: WizardHighlightsParties | null;
   order?: Order | null;
-}) {
+}
+
+export function WizardHighlights({ agreement, parties, order }: WizardHighlightsProps) {
   const { t } = useTranslation();
   const orderStatus = (order?.status ?? 'New') as OrderStatus;
   const orderType = order?.type ?? 'Change';
   const orderUrl = getEntityLink(EntityDomain.Commerce, EntityType.Orders, order?.id ?? undefined);
-  const agreementStatus = subscription.agreement?.status ?? '';
+  const agreementStatus = agreement?.status ?? '';
   const agreementStatusColor: ChipColor | undefined =
     agreementStatus === 'Active' ? 'success' : undefined;
-  const agreementUrl = getEntityLink(EntityDomain.Commerce, EntityType.Agreements, subscription.agreement?.id);
-  const licenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, subscription.licensee?.id);
-  const buyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, subscription.buyer?.id);
-  const sellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, subscription.seller?.id);
-  const baseCurrency = subscription.agreement?.price?.currency ?? '';
-  const billingCurrency = subscription.agreement?.price?.billingCurrency ?? '';
+  const agreementUrl = getEntityLink(EntityDomain.Commerce, EntityType.Agreements, agreement?.id);
+  // Split billing can bill a subscription to another buyer than the agreement's,
+  // so subscription wizards pass their own accounts.
+  const licensee = parties?.licensee ?? agreement?.licensee;
+  const buyer = parties?.buyer ?? agreement?.buyer;
+  const seller = parties?.seller ?? agreement?.seller;
+  const licenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, licensee?.id);
+  const buyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, buyer?.id);
+  const sellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, seller?.id);
+  const baseCurrency = agreement?.price?.currency ?? '';
+  const billingCurrency = agreement?.price?.billingCurrency ?? '';
 
   const timestampContent = (at: string | undefined) =>
     at ? (
@@ -44,7 +54,6 @@ export function WizardHighlights({
       </>
     ) : undefined;
 
-  const agreement = subscription.agreement;
   const productUrl = getEntityLink(EntityDomain.Catalog, EntityType.Products, agreement?.product?.id);
   const clientUrl = getEntityLink(EntityDomain.Accounts, EntityType.Accounts, agreement?.client?.id);
   const agreementSellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, agreement?.seller?.id);
@@ -71,7 +80,6 @@ export function WizardHighlights({
     />
   );
 
-  const licensee = subscription.licensee;
   const licenseeAccountUrl = getEntityLink(EntityDomain.Accounts, EntityType.Accounts, licensee?.account?.id);
   const licenseeBuyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, licensee?.buyer?.id);
   const licenseeSellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, licensee?.seller?.id);
@@ -93,7 +101,6 @@ export function WizardHighlights({
     />
   );
 
-  const buyer = subscription.buyer;
   const buyerAccountUrl = getEntityLink(EntityDomain.Accounts, EntityType.Accounts, buyer?.account?.id);
 
   const buyerInfoCard = (
@@ -112,7 +119,6 @@ export function WizardHighlights({
     />
   );
 
-  const seller = subscription.seller;
   const sellerInfoCard = (
     <InfoCard
       items={[
@@ -138,12 +144,12 @@ export function WizardHighlights({
                 statusLabel={orderStatus}
               />
             }
-            secondaryContent={t('MidtermUpgrade:Highlights:orderSuffix', { type: orderType })}
+            secondaryContent={t('Highlights:orderSuffix', { type: orderType })}
           />
         ) : (
           <EntityReference
             primaryContent={<Chip label={orderStatus} />}
-            secondaryContent={t('MidtermUpgrade:Highlights:orderSuffix', { type: orderType })}
+            secondaryContent={t('Highlights:orderSuffix', { type: orderType })}
           />
         )}
       </Highlights.Item>
@@ -151,7 +157,7 @@ export function WizardHighlights({
         <EntityReference
           primaryContent={
             <ReferenceWithChip
-              text={subscription.agreement?.name ?? undefined}
+              text={agreement?.name ?? undefined}
               url={agreementUrl ?? undefined}
               statusLabel={agreementStatus}
               statusColor={agreementStatusColor}
@@ -159,45 +165,45 @@ export function WizardHighlights({
               card={agreementInfoCard}
             />
           }
-          secondaryContent={subscription.agreement?.id ?? undefined}
+          secondaryContent={agreement?.id ?? undefined}
         />
       </Highlights.Item>
       <Highlights.Item label={t('Common:Licensee')}>
         <LinkReference
-          text={subscription.licensee?.name ?? undefined}
-          secondaryContent={subscription.licensee?.id ?? undefined}
+          text={licensee?.name ?? undefined}
+          secondaryContent={licensee?.id ?? undefined}
           url={licenseeUrl ?? undefined}
-          iconUrl={subscription.licensee?.icon}
+          iconUrl={licensee?.icon}
           cardTitle={t('Common:Licensee')}
           card={licenseeInfoCard}
         />
       </Highlights.Item>
       <Highlights.Item label={t('Common:Buyer')}>
         <LinkReference
-          text={subscription.buyer?.name ?? undefined}
-          secondaryContent={subscription.buyer?.id ?? undefined}
+          text={buyer?.name ?? undefined}
+          secondaryContent={buyer?.id ?? undefined}
           url={buyerUrl ?? undefined}
-          iconUrl={subscription.buyer?.icon}
+          iconUrl={buyer?.icon}
           cardTitle={t('Common:Buyer')}
           card={buyerInfoCard}
         />
       </Highlights.Item>
       <Highlights.Item label={t('Common:Seller')}>
         <LinkReference
-          text={subscription.seller?.name ?? undefined}
-          secondaryContent={subscription.seller?.id ?? undefined}
+          text={seller?.name ?? undefined}
+          secondaryContent={seller?.id ?? undefined}
           url={sellerUrl ?? undefined}
-          iconUrl={subscription.seller?.icon}
+          iconUrl={seller?.icon}
           cardTitle={t('Common:Seller')}
           card={sellerInfoCard}
         />
       </Highlights.Item>
-      <Highlights.Item label={t('MidtermUpgrade:Highlights:Base currency')}>
+      <Highlights.Item label={t('Highlights:Base currency')}>
         <EntityReference
           primaryContent={baseCurrency}
         />
       </Highlights.Item>
-      <Highlights.Item label={t('MidtermUpgrade:Highlights:Billing currency')}>
+      <Highlights.Item label={t('Highlights:Billing currency')}>
         <EntityReference
           primaryContent={billingCurrency}
         />

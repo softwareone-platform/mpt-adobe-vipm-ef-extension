@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 
 import { BuyerReference } from './BuyerReference';
-import type { AgreementSplitAllocation } from '../../../shared/model';
+import type { AgreementSplitAllocation } from '../../model';
 
 interface EntityReferenceProps {
   primaryContent?: string;

@@ -4,8 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { render } from '@testing-library/react';
 
 import { WizardHighlights } from './WizardHighlights';
-import type { Subscription } from '../../../shared/model';
-import type { Order } from '../../model';
+import type { Agreement, Order, Subscription } from '../../model';
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/avatar', () => ({
   Avatar: ({ jdenticonValue }: { jdenticonValue?: string }) => (
@@ -17,14 +16,19 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
   LinkPopover: ({ target }: { target: ReactNode }) => <div data-testid="link-popover">{target}</div>,
 }));
 
+const agreement: Agreement = {
+  id: 'AGR-1111-1111',
+  name: 'Agreement Name',
+  status: 'Active',
+  price: { currency: 'USD', billingCurrency: 'EUR' },
+  licensee: { id: 'LIC-9999-9999', name: 'Agreement Licensee' },
+  buyer: { id: 'BUY-9999-9999', name: 'Agreement Buyer' },
+  seller: { id: 'SEL-9999-9999', name: 'Agreement Seller' },
+};
+
 const subscription: Subscription = {
   id: 'SUB-1',
-  agreement: {
-    id: 'AGR-1111-1111',
-    name: 'Agreement Name',
-    status: 'Active',
-    price: { currency: 'USD', billingCurrency: 'EUR' },
-  },
+  agreement,
   licensee: { id: 'LIC-1111-1111', name: 'Licensee Name' },
   buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
   seller: { id: 'SEL-1111-1111', name: 'Seller Name' },
@@ -34,7 +38,7 @@ const subscription: Subscription = {
 const renderHighlights = (order?: Order | null) =>
   render(
     <MemoryRouter>
-      <WizardHighlights subscription={subscription} order={order} />
+      <WizardHighlights agreement={agreement} parties={subscription} order={order} />
     </MemoryRouter>
   );
 
@@ -55,6 +59,18 @@ describe('WizardHighlights', () => {
     expect(getByText('Licensee Name')).toBeTruthy();
     expect(getByText('Buyer Name')).toBeTruthy();
     expect(getByText('Seller Name')).toBeTruthy();
+  });
+
+  it('falls back to the accounts of the agreement when no parties are given', () => {
+    const { getByText } = render(
+      <MemoryRouter>
+        <WizardHighlights agreement={agreement} />
+      </MemoryRouter>
+    );
+
+    expect(getByText('Agreement Licensee')).toBeTruthy();
+    expect(getByText('Agreement Buyer')).toBeTruthy();
+    expect(getByText('Agreement Seller')).toBeTruthy();
   });
 
   it('renders a person avatar keyed on the id for the licensee, buyer, and seller', () => {

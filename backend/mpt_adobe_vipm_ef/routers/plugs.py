@@ -55,4 +55,12 @@ def agreement_plugs() -> list[Plug]:
             href="/static/request-midterm-upgrade-action/index.js",
             condition=subscription_condition,
         ),
+        Plug(
+            id="request-renewal-action",
+            name="Renew",
+            description="Request a renewal for the agreement.",
+            socket="portal.commerce.agreements.agreement.actions",
+            href="/static/request-renewal-action/index.js",
+            condition=agreement_condition,
+        ),
     ]

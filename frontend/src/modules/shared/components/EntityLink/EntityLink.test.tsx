@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { render } from '@testing-library/react';
 
-import { EntityDomain, EntityType } from '../../../shared/constants';
+import { EntityDomain, EntityType } from '../../constants';
 import { EntityLink } from './EntityLink';
 
 const renderWithRouter = (ui: ReactNode) => render(<MemoryRouter>{ui}</MemoryRouter>);
