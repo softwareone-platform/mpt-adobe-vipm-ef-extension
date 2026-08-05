@@ -23,6 +23,17 @@
     "Subscriptions": "Subscriptions",
     "External ID": "External ID",
     "External Reference": "External Reference",
+    "Vendor ID": "Vendor ID",
+    "Renewal Date": "Renewal Date",
+    "Billing": "Billing",
+    "Commitment": "Commitment",
+    "Terms": {
+      "1m": "1 month",
+      "1y": "1 year",
+      "2y": "2 years",
+      "3y": "3 years",
+      "one-time": "One-time"
+    },
     "SCU Identifier": "SCU Identifier",
     "Tax Number": "Tax Number"
   },

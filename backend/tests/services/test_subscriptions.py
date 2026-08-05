@@ -14,6 +14,8 @@ _AGREEMENT_ID = "AGR-1234-5678"
 _SOURCE_VENDOR_ID = "adobe-sub-source"
 _LINE_QUANTITY = 20
 _SOURCE_QUANTITY = 50
+_COMMITMENT_DATE = "2000-01-01T00:00:00.000Z"
+_CREATED_AT = "2000-02-02T00:00:00.000Z"
 
 
 def _build_ctx(mocker, subscriptions, *, error=None):
@@ -40,6 +42,9 @@ def _subscription(mocker, sub_id, name, vendor_id, lines):
         status="Active",
         external_ids=mocker.Mock(vendor=vendor_id),
         lines=lines,
+        commitment_date=_COMMITMENT_DATE,
+        terms={"period": "dummy-period", "commitment": "dummy-commitment"},
+        audit={"created": {"at": _CREATED_AT}},
     )
     result.name = name
     return result
@@ -73,6 +78,9 @@ async def test_resolve_agreement_subscriptions_by_sku_maps_lines_to_subscription
             "status": "Active",
             "quantity": _LINE_QUANTITY,
             "lineId": "ALI-0002",
+            "commitmentDate": _COMMITMENT_DATE,
+            "terms": {"period": "dummy-period", "commitment": "dummy-commitment"},
+            "audit": {"created": {"at": _CREATED_AT}},
         },
     }
 

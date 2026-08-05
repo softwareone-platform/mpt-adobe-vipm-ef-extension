@@ -22,7 +22,7 @@ def _subscriptions_query(ctx: APIContext, agreement_id: str) -> Any:
     agreement_filter = RQLQuery().n("agreement.id").eq(agreement_id)
     status_filter = RQLQuery().n("status").in_(targetable_statuses)
     subscriptions = ctx.mpt_api_service.client.commerce.subscriptions
-    return subscriptions.filter(agreement_filter & status_filter).select("lines")
+    return subscriptions.filter(agreement_filter & status_filter).select("lines", "audit")
 
 
 async def fetch_agreement_subscriptions_by_sku(
@@ -30,9 +30,11 @@ async def fetch_agreement_subscriptions_by_sku(
 ) -> dict[str, dict[str, Any]]:
     """Map each vendor SKU held on the agreement to the subscription holding it.
 
-    Returns ``{vendor_sku: {"id", "name", "status", "quantity", "lineId"}}``
-    built from the lines of the agreement's live subscriptions, excluding the
-    switch source subscription itself (identified by its Adobe/vendor id).
+    Returns ``{vendor_sku: {"id", "name", "status", "quantity", "lineId",
+    "commitmentDate", "terms", "audit"}}`` built from the lines of the
+    agreement's live subscriptions, excluding the switch source subscription
+    itself (identified by its Adobe/vendor id). The renewal date, terms and
+    audit trail are what the wizard subscription info card shows.
 
     This query is the authoritative SKU lookup for the switch flows: the
     agreement payload's own lines do not carry the item vendor SKU, so both the
@@ -119,4 +121,7 @@ def _collect_lines(subscriptions_by_sku: dict[str, dict[str, Any]], subscription
                 "status": getattr(subscription, "status", None),
                 "quantity": getattr(line, "quantity", None),
                 "lineId": getattr(line, "id", None),
+                "commitmentDate": getattr(subscription, "commitment_date", None),
+                "terms": getattr(subscription, "terms", None),
+                "audit": getattr(subscription, "audit", None),
             }

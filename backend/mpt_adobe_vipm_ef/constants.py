@@ -13,6 +13,9 @@ LICENSEE_SELECT = ("account", "audit", "buyer", "seller")
 BUYER_SELECT = ("account", "audit")
 SELLER_SELECT = ("audit",)
 SPLIT_SELECT = ("split",)
+PUBLIC_API_PREFIX = "/public"
+ITEM_SELECT = ("audit", "product", "terms")
+SUBSCRIPTION_AUDIT_SELECT = ("audit",)
 
 CUSTOMER_ID_PARAM = "customerId"
 SWITCH_PAYLOAD_PARAM = "switchPayload"
