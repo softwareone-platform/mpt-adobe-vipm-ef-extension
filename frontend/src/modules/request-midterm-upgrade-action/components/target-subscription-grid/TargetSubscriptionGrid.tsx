@@ -1,4 +1,3 @@
-import { Chip } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import {
   Grid,
   GridCellHeader,
@@ -18,11 +17,15 @@ import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
 import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
+import { ItemCard } from '../item-card/ItemCard';
+import { SubscriptionCard } from '../subscription-card/SubscriptionCard';
 import { TargetSubscription } from '../../model';
-import { AdobeOfferSwitchPath } from '../../../shared/model';
+import { AdobeOfferSwitchPath, Agreement } from '../../../shared/model';
+import { getItemLink, getSubscriptionLink } from '../../../utils/link';
 import { getMonthlyPrice, getYearlyPrice, parseUnitPrice } from '../../../utils/price';
 
-const columns: GridColumnDefinition<TargetSubscription>[] = [
+function getColumns(agreement?: Agreement): GridColumnDefinition<TargetSubscription>[] {
+  return [
   {
     name: 'select',
     header: <GridCellHeader></GridCellHeader>,
@@ -40,11 +43,8 @@ const columns: GridColumnDefinition<TargetSubscription>[] = [
         title={i18n.t('Common:Item')}
         text={item.item.name}
         secondaryContent={`${item.item.id} | ${item.item.externalId}`}
-        items={[
-          { title: i18n.t('Common:ID'), content: item.item.id },
-          { title: i18n.t('Common:Name'), content: item.item.name },
-          { title: i18n.t('Common:External ID'), content: item.item.externalId },
-        ]}
+        url={getItemLink(item.item.id)}
+        card={<ItemCard item={item.item} />}
       />
     ),
   },
@@ -52,7 +52,7 @@ const columns: GridColumnDefinition<TargetSubscription>[] = [
     name: 'subscription',
     title: i18n.t('Common:Subscription'),
     fields: ['subscription'],
-    cell: (item) => getSubscriptionCell(item),
+    cell: (item) => getSubscriptionCell(item, agreement),
   },
   {
     name: 'recommended',
@@ -66,7 +66,8 @@ const columns: GridColumnDefinition<TargetSubscription>[] = [
     fields: ['currentQuantity'],
     cell: (item) => getCurrentQuantityCell(item),
   },
-];
+  ];
+}
 
 const priceColumns: GridColumnDefinition<TargetSubscription>[] = [
   {
@@ -157,6 +158,7 @@ export function validateNewQuantity(newQuantity: number | null, rule: OfferRule)
 }
 
 interface TargetSubscriptionGridProps {
+  agreement?: Agreement;
   subscriptions: TargetSubscription[];
   offerPaths: AdobeOfferSwitchPath[];
   sourceQuantity: number;
@@ -165,6 +167,7 @@ interface TargetSubscriptionGridProps {
 }
 
 export function TargetSubscriptionGrid({
+  agreement,
   subscriptions,
   offerPaths,
   sourceQuantity,
@@ -198,7 +201,7 @@ export function TargetSubscriptionGrid({
 
   const cols = useMemo<GridColumnDefinition<TargetSubscription>[]>(
     () => [
-      ...columns,
+      ...getColumns(agreement),
       {
         name: 'newQuantity',
         title: i18n.t('MidtermUpgrade:Grid:New Quantity'),
@@ -220,7 +223,7 @@ export function TargetSubscriptionGrid({
       },
       ...priceColumns,
     ],
-    [offerPaths, sourceQuantity, updateQuantity, selectedItem],
+    [agreement, offerPaths, sourceQuantity, updateQuantity, selectedItem],
   );
 
   useEffect(() => {
@@ -251,18 +254,28 @@ export function TargetSubscriptionGrid({
   return <Grid {...gridProps} />;
 }
 
-export function getSubscriptionCell(subscription: TargetSubscription): React.ReactNode {
+export function getSubscriptionCell(
+  subscription: TargetSubscription,
+  agreement?: Agreement,
+): React.ReactNode {
   if (subscription.id) {
     return (
       <PopoverCell
         title={i18n.t('Common:Subscription')}
         text={subscription.name ?? '—'}
         secondaryContent={subscription.id ?? undefined}
-        items={[
-          { title: i18n.t('Common:ID'), content: subscription.id ?? '—' },
-          { title: i18n.t('Common:Name'), content: subscription.name ?? '—' },
-          { title: i18n.t('Common:Status'), content: <Chip label={subscription.status || '—'} /> },
-        ]}
+        url={getSubscriptionLink(subscription.id ?? undefined)}
+        card={
+          <SubscriptionCard
+            id={subscription.id}
+            name={subscription.name}
+            status={subscription.status}
+            commitmentDate={subscription.commitmentDate}
+            terms={subscription.subscriptionTerms}
+            audit={subscription.audit}
+            agreement={agreement}
+          />
+        }
       />
     );
   } else {

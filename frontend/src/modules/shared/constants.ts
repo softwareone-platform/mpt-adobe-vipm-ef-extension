@@ -20,6 +20,8 @@ export enum EntityType {
   Agreements = 'agreements',
   Orders = 'orders',
   Products = 'products',
+  Items = 'items',
+  Subscriptions = 'subscriptions',
   Accounts = 'accounts',
   Sellers = 'sellers',
   Buyers = 'buyers',

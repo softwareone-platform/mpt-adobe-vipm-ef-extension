@@ -1,6 +1,10 @@
 from mpt_extension_sdk.api.models.base import APIBaseModel
 from pydantic import Field
 
+from mpt_adobe_vipm_ef.models.audit import Audit
+from mpt_adobe_vipm_ef.models.reference import Reference
+from mpt_adobe_vipm_ef.models.terms import Terms
+
 
 class ProductItem(APIBaseModel):
     """The MPT catalog item resolved for an offer-switch target."""
@@ -9,6 +13,11 @@ class ProductItem(APIBaseModel):
     name: str | None = None
     external_id: str | None = Field(default=None, alias="externalId")
     unit_sp: float | None = Field(default=None, alias="unitSP")
+    status: str | None = None
+    terms: Terms | None = None
+    audit: Audit | None = None
+    product: Reference | None = None
+    vendor: Reference | None = None
 
 
 class AgreementSubscription(APIBaseModel):
@@ -19,6 +28,9 @@ class AgreementSubscription(APIBaseModel):
     status: str | None = None
     quantity: int | None = None
     line_id: str | None = Field(default=None, alias="lineId")
+    commitment_date: str | None = Field(default=None, alias="commitmentDate")
+    terms: Terms | None = None
+    audit: Audit | None = None
 
 
 class OfferTarget(APIBaseModel):

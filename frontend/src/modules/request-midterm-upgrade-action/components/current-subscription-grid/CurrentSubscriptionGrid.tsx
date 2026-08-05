@@ -1,4 +1,3 @@
-import { Chip } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import {
   Grid,
   GridCellHeader,
@@ -12,17 +11,22 @@ import {
 import { useEffect, useMemo } from 'react';
 
 import { Subscription } from '../../../shared/model';
+import { getItemLink, getSubscriptionLink } from '../../../utils/link';
 
 import { i18n } from '../../../../i18n/translations';
+import { SubscriptionItem } from '../../model';
 import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
 import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
 import { TextCell } from '../grid-cell/text-cell/TextCell';
+import { ItemCard } from '../item-card/ItemCard';
+import { SubscriptionCard } from '../subscription-card/SubscriptionCard';
 
 interface Row {
   id: string;
   subscriptionId: string;
   subscriptionName: string;
-  item: { id: string; name: string; externalId: string };
+  subscription: Subscription;
+  item: SubscriptionItem;
   quantity: number;
   unitSP?: number;
   spxM?: number;
@@ -35,10 +39,16 @@ function toRows(subscription: Subscription): Row[] {
     id: line.id,
     subscriptionId: line.subscription?.id ?? subscription.id,
     subscriptionName: line.subscription?.name ?? subscription.name ?? '',
+    subscription,
     item: {
       id: line.item.id,
       name: line.item.name,
       externalId: line.item.externalIds?.vendor ?? '',
+      status: line.item.status,
+      terms: line.item.terms,
+      audit: line.item.audit,
+      product: line.item.product,
+      vendor: line.item.vendor,
     },
     quantity: line.quantity,
     unitSP: line.price?.unitSP,
@@ -66,11 +76,8 @@ const columns: GridColumnDefinition<Row>[] = [
         title={i18n.t('Common:Item')}
         text={item.item.name}
         secondaryContent={`${item.item.id} | ${item.item.externalId}`}
-        items={[
-          { title: i18n.t('Common:ID'), content: item.item.id },
-          { title: i18n.t('Common:Name'), content: item.item.name },
-          { title: i18n.t('Common:External ID'), content: item.item.externalId },
-        ]}
+        url={getItemLink(item.item.id)}
+        card={<ItemCard item={item.item} />}
       />
     ),
   },
@@ -83,11 +90,18 @@ const columns: GridColumnDefinition<Row>[] = [
         title={i18n.t('Common:Subscription')}
         text={item.subscriptionName}
         secondaryContent={item.subscriptionId}
-        items={[
-          { title: i18n.t('Common:ID'), content: item.subscriptionId },
-          { title: i18n.t('Common:Name'), content: item.subscriptionName },
-          { title: i18n.t('Common:Status'), content: <Chip label={item.status} /> },
-        ]}
+        url={getSubscriptionLink(item.subscriptionId)}
+        card={
+          <SubscriptionCard
+            id={item.subscriptionId}
+            name={item.subscriptionName}
+            status={item.status}
+            commitmentDate={item.subscription.commitmentDate}
+            terms={item.subscription.terms}
+            audit={item.subscription.audit}
+            agreement={item.subscription.agreement}
+          />
+        }
       />
     ),
   },
