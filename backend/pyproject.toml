@@ -84,6 +84,7 @@ per-file-ignores = [
   "*migrations/**:WPS102",
   "*tests/**: WPS118 WPS202 WPS204",
   "adobe/config.py: WPS121 WPS122 WPS214 WPS420",
+  "mpt_adobe_vipm_ef/models/renewal.py: WPS202",
   "mpt_adobe_vipm_ef/routers/api/customer.py: WPS202 WPS238",
   "mpt_adobe_vipm_ef/settings.py: WPS202",
   "mpt_adobe_vipm_ef/routers/api/renewal.py: WPS201 WPS202",

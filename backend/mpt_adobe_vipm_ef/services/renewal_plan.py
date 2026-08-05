@@ -8,6 +8,7 @@ from mpt_extension_sdk.models import Agreement
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
     RenewalOrderRequest,
+    RenewalPayload,
     RenewalPlanRequest,
     RenewalSubscriptionSelection,
 )
@@ -85,35 +86,43 @@ def build_preview_renewal_line_items(
     return line_items
 
 
-def build_flexible_discounts_value(
-    plan_subscriptions: list[PlanSubscription], request: RenewalOrderRequest
-) -> Line | None:
-    """Build the value of the order's ``flexibleDiscounts`` fulfillment parameter.
+def build_renewal_payload(
+    plan_subscriptions: list[PlanSubscription],
+    net_new_lines: list[NetNewLine],
+    request: RenewalOrderRequest,
+    currency_code: str,
+) -> RenewalPayload:
+    """Build the ``renewalPayload`` DataObject snapshot from the customer's plan.
 
-    Records which flexible discount code applies to which renewing subscription
-    (one entry per subscription and code, numbered like the PREVIEW_RENEWAL
-    line items) plus the recommendation tracker id, replayed to Adobe when the
-    net-new subscriptions are created at fulfilment. Returns ``None`` when
-    there is nothing to record so the parameter is left untouched.
+    Every selected subscription is recorded with its Adobe id, offer id, renew
+    decision and renewal quantity; the selected flexible discount codes ride on
+    each renewing entry, matching Adobe's auto-renewal preference object. The
+    net-new products keep their full offer ids so fulfilment can create the
+    scheduled subscriptions without re-resolving them.
     """
-    entries: list[Line] = []
-    renewing = (plan for plan in plan_subscriptions if plan.selection.renew)
-    for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER):
-        entries.extend(
-            {
-                "extLineItemNumber": line_number,
-                "baseOfferId": plan.selection.offer_id,
-                "subscriptionId": plan.adobe_subscription_id,
-                "flexDiscountCode": code,
-            }
-            for code in request.flex_discount_codes
-        )
-    if not entries and not request.recommendation_tracker_id:
-        return None
-    return {
+    return RenewalPayload.from_payload({
         "recommendationTrackerId": request.recommendation_tracker_id,
-        "lineItems": entries,
-    }
+        "currencyCode": currency_code,
+        "subscriptions": [
+            {
+                "subscriptionId": plan.adobe_subscription_id,
+                "offerId": plan.selection.offer_id,
+                "renew": plan.selection.renew,
+                "renewalQuantity": plan.selection.renewal_quantity,
+                "flexDiscountCodes": (
+                    list(request.flex_discount_codes) if plan.selection.renew else []
+                ),
+            }
+            for plan in plan_subscriptions
+        ],
+        "netNewItems": [
+            {
+                "offerId": net_new.selection.offer_id,
+                "quantity": net_new.selection.quantity,
+            }
+            for net_new in net_new_lines
+        ],
+    })
 
 
 def _build_net_new_line(

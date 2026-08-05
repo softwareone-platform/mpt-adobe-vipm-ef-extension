@@ -5,10 +5,10 @@ from mpt_extension_sdk.services.api_client_v2.mpt_api_client import AsyncMPTClie
 
 from mpt_adobe_vipm_ef.constants import (
     CHANGE_ORDER_TYPE,
-    FLEXIBLE_DISCOUNTS_PARAM,
     PROCESSING_ORDER_STATUS,
+    RENEWAL_PAYLOAD_PARAM,
 )
-from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
+from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest, RenewalPayload
 from mpt_adobe_vipm_ef.services.renewal_plan import Line, NetNewLine, PlanSubscription
 
 logger = logging.getLogger(__name__)
@@ -46,30 +46,29 @@ async def create_renewal_change_order(
     client: AsyncMPTClient,
     agreement_id: str,
     lines: list[Line],
-    flexible_discounts: Line | None,
+    renewal_payload: RenewalPayload,
     request: RenewalOrderRequest,
 ) -> dict[str, Any]:
     """Create the renewal-driven change order on the marketplace, already in execution.
 
     The order is created directly with ``Processing`` status (the platform
     requires ``status`` on creation), so no separate process call is needed.
-    When the plan carries flexible discount codes or a recommendation tracker
-    id, they ride on the product's existing ``flexibleDiscounts`` fulfillment
-    parameter for the fulfillment extension to apply at processing. The
-    customer's optional notes and additional (client) id are also forwarded.
+    It carries the hidden ``renewalPayload`` DataObject parameter — the
+    discriminator the fulfillment extension uses to apply the renewal plan
+    (renew decisions, quantities and discount codes) to Adobe — plus the
+    customer's optional notes and additional (client) id.
     """
     order_payload: dict[str, Any] = {
         "status": PROCESSING_ORDER_STATUS,
         "type": CHANGE_ORDER_TYPE,
         "agreement": {"id": agreement_id},
         "lines": lines,
-    }
-    if flexible_discounts is not None:
-        order_payload["parameters"] = {
-            "fulfillment": [
-                {"externalId": FLEXIBLE_DISCOUNTS_PARAM, "value": flexible_discounts},
+        "parameters": {
+            "ordering": [
+                {"externalId": RENEWAL_PAYLOAD_PARAM, "value": renewal_payload.to_dict()},
             ],
-        }
+        },
+    }
     if request.notes:
         order_payload["notes"] = request.notes
     if request.external_ids.client:
