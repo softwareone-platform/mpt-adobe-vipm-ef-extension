@@ -40,6 +40,7 @@ export interface Licensee {
 
 export interface Price {
   currency?: string;
+  billingCurrency?: string;
   PPxY?: number;
   PPxM?: number;
   unitPP?: number;
@@ -128,6 +129,7 @@ export interface Agreement {
   seller?: Seller;
   buyer?: Buyer;
   licensee?: Licensee;
+  price?: Price;
   audit?: Audit;
 }
 

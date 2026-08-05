@@ -19,7 +19,12 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/link-popover', () => ({
 
 const subscription: Subscription = {
   id: 'SUB-1',
-  agreement: { id: 'AGR-1111-1111', name: 'Agreement Name', status: 'Active' },
+  agreement: {
+    id: 'AGR-1111-1111',
+    name: 'Agreement Name',
+    status: 'Active',
+    price: { currency: 'USD', billingCurrency: 'EUR' },
+  },
   licensee: { id: 'LIC-1111-1111', name: 'Licensee Name' },
   buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
   seller: { id: 'SEL-1111-1111', name: 'Seller Name' },
@@ -71,10 +76,15 @@ describe('WizardHighlights', () => {
     ]);
   });
 
-  it('renders the base and billing currency', () => {
-    const { getAllByText } = renderHighlights();
+  it('renders the base and the billing currency of the agreement', () => {
+    const { getByText } = renderHighlights();
 
-    expect(getAllByText('USD')).toHaveLength(2);
+    const highlightContent = (label: string) =>
+      getByText(label).closest('.highlights__item')?.querySelector('.highlights__item__content')
+        ?.textContent;
+
+    expect(highlightContent('Base currency')).toBe('USD');
+    expect(highlightContent('Billing currency')).toBe('EUR');
   });
 
   it('shows the order status without a link before the order is created', () => {

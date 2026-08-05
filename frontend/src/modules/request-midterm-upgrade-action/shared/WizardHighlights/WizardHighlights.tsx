@@ -33,8 +33,8 @@ export function WizardHighlights({
   const licenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, subscription.licensee?.id);
   const buyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, subscription.buyer?.id);
   const sellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, subscription.seller?.id);
-  const baseCurrency = subscription.price?.currency ?? '';
-  const billingCurrency = subscription.price?.currency ?? '';
+  const baseCurrency = subscription.agreement?.price?.currency ?? '';
+  const billingCurrency = subscription.agreement?.price?.billingCurrency ?? '';
 
   const timestampContent = (at: string | undefined) =>
     at ? (
