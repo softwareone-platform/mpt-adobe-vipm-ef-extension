@@ -19,8 +19,9 @@ import { readParameter } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { canRequestRenewalAction } from '../utils/security';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { RenewalStep } from './RenewalStep';
 import { TimingStep } from './TimingStep';
-import type { RenewalPath } from './model';
+import { buildInitialRenewalSelections, type RenewalPath, type RenewalSelections } from './model';
 
 import './App.scss';
 
@@ -36,6 +37,7 @@ export default function App() {
   const renewalDate = readParameter(agreement?.parameters?.fulfillment, COTERM_DATE_PARAM);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [renewalPath, setRenewalPath] = useState<RenewalPath>('anniversary');
+  const [renewalSelections, setRenewalSelections] = useState<RenewalSelections | null>(null);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
 
@@ -43,9 +45,25 @@ export default function App() {
     close();
   }, [close]);
 
+  const onRenewChange = useCallback((subscriptionId: string, renew: boolean) => {
+    setRenewalSelections((current) => ({ ...current, [subscriptionId]: renew }));
+  }, []);
+
   useEffect(() => {
     syncAgreement();
   }, [syncAgreement]);
+
+  // Seed each Renew toggle once from the subscription's standing autoRenewal
+  // preference; from then on the customer's choices live in the wizard state.
+  const subscriptionsLoaded = subscriptions.status === 'success';
+  const subscriptionData = subscriptions.data;
+  useEffect(() => {
+    if (subscriptionsLoaded) {
+      setRenewalSelections(
+        (current) => current ?? buildInitialRenewalSelections(subscriptionData),
+      );
+    }
+  }, [subscriptionsLoaded, subscriptionData]);
 
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
@@ -125,7 +143,17 @@ export default function App() {
         />
       ),
     },
-    { title: t('Renewal:Steps:Renewal'), render: () => null },
+    {
+      title: t('Renewal:Steps:Renewal'),
+      render: () => (
+        <RenewalStep
+          agreement={agreement}
+          subscriptions={subscriptions.data}
+          selections={renewalSelections ?? {}}
+          onRenewChange={onRenewChange}
+        />
+      ),
+    },
     { title: t('Renewal:Steps:Items'), render: () => null },
     { title: t('Renewal:Steps:Promotions'), render: () => null },
     { title: t('Renewal:Steps:Details'), render: () => null },

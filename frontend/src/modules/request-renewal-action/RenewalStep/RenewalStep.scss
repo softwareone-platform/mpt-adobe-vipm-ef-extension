@@ -1,0 +1,25 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.renewal-step {
+  display: flex;
+  flex-direction: column;
+  gap: $var-spacing-3;
+
+  &__header {
+    h2 {
+      margin: 0;
+    }
+  }
+
+  &__highlights {
+    padding: $var-spacing-3 0 0;
+  }
+
+  &__grid {
+    width: 100%;
+  }
+
+  &__disclaimer {
+    margin: 0;
+  }
+}
