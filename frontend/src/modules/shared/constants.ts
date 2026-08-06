@@ -3,6 +3,12 @@ import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/
 export const SCREEN_HEIGHT_FACTOR = 0.85;
 export const SCREEN_WIDTH_FACTOR = 0.90;
 
+export const MS_PER_DAY = 86400000;
+
+export const RENEWAL_LEARN_MORE_URL = 'https://docs.softwareone.com';
+
+export const COTERM_DATE_PARAM = 'cotermDate';
+
 export const DESIGN_SYSTEM_OPTIONS: Partial<DesignSystemOptions> = {
   dateFormat: 'dd MMM yyyy',
   inputDateFormat: 'P',

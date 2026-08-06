@@ -13,10 +13,10 @@ import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { useCallback, useEffect, useMemo } from 'react';
 
 import { i18n } from '../../../../i18n/translations';
-import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
-import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
-import { TextCell } from '../grid-cell/text-cell/TextCell';
-import { TextInputCell } from '../grid-cell/text-input-cell/TextInputCell';
+import { ChipCell } from '../../../shared/components/GridCell/ChipCell/ChipCell';
+import { PopoverCell } from '../../../shared/components/GridCell/PopoverCell/PopoverCell';
+import { TextCell } from '../../../shared/components/GridCell/TextCell/TextCell';
+import { TextInputCell } from '../../../shared/components/GridCell/TextInputCell/TextInputCell';
 import { ItemCard } from '../item-card/ItemCard';
 import { SubscriptionCard } from '../subscription-card/SubscriptionCard';
 import { TargetSubscription } from '../../model';

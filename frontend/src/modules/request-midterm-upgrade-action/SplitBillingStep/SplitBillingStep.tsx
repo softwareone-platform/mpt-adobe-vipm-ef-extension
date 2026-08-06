@@ -6,7 +6,7 @@ import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { useStepActions, StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
-import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 
 import './SplitBillingStep.scss';
 import { AllocateToBuyer } from '../components/allocate-to-buyer/AllocateToBuyer';
@@ -89,7 +89,7 @@ export function SplitBillingStep({
         </RegularText>
       </div>
       <div className="split-billing-step__highlights">
-        <WizardHighlights subscription={subscription} />
+        <WizardHighlights agreement={subscription.agreement} parties={subscription} />
       </div>
       {error && (
         <div className="split-billing-step__error">

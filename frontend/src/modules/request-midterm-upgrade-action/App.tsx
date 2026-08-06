@@ -19,7 +19,7 @@ import { getPlaceOrderValidationError } from './placeOrderValidation';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
-import { Loader } from './components/loader/Loader';
+import { Loader } from '../shared/components/Loader/Loader';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
 import { getPortalOrigin } from '../utils/link';
 import { getMonthlyPrice, getYearlyPrice } from '../utils/price';

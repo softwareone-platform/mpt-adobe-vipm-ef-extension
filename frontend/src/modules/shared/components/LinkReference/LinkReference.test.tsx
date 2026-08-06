@@ -51,6 +51,12 @@ describe('LinkReference', () => {
     expect(queryByRole('link')).toBeNull();
   });
 
+  it('does not render an empty link when the entity has no name', () => {
+    const { queryByRole } = renderWithRouter(<LinkReference url="/agreements/1" />);
+
+    expect(queryByRole('link')).toBeNull();
+  });
+
   it('renders the secondary content', () => {
     const { getByText } = renderWithRouter(
       <LinkReference text="My Agreement" secondaryContent="AGR-1234" />

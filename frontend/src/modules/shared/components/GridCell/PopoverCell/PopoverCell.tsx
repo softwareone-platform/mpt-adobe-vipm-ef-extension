@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { LinkReference } from '../../link-reference/LinkReference';
+import { LinkReference } from '../../LinkReference/LinkReference';
 
 import './PopoverCell.scss';
 

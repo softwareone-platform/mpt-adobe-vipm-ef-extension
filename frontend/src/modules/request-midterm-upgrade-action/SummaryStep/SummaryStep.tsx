@@ -1,5 +1,5 @@
 import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text'
-import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights'
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights'
 import { Order } from '../model';
 import { Subscription } from '../../shared/model';
 import { ReactElement, useEffect, useState } from 'react';
@@ -56,7 +56,7 @@ export function SummaryStep({ subscription, order }: SummaryStepProps): ReactEle
         </RegularText>
       </div>
       <div className="summary-step__highlights">
-        <WizardHighlights subscription={subscription} order={order} />
+        <WizardHighlights agreement={subscription.agreement} parties={subscription} order={order} />
       </div>
       <div
         className="summary-step__template"
