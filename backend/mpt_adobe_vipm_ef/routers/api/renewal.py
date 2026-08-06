@@ -18,6 +18,7 @@ from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.renewal import (
     RenewalOrderRequest,
+    RenewalPayload,
     RenewalPlanRequest,
     RenewalPreviewRequest,
     RenewalSubscriptionSelection,
@@ -40,8 +41,8 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (
     Line,
     NetNewLine,
     PlanSubscription,
-    build_flexible_discounts_value,
     build_preview_renewal_line_items,
+    build_renewal_payload,
     require_renewal_selections,
     resolve_net_new_lines,
 )
@@ -138,9 +139,10 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     Validates the customer's plan, re-checks the 3YC commitment floors, gates
     the plan through an Adobe ``PREVIEW_RENEWAL`` quote carrying the
     selections (quantities and flexible discount codes), and only then creates
-    the change order (directly in Processing status) carrying the selected
-    codes and the recommendation tracker id on the ``flexibleDiscounts``
-    fulfillment parameter.
+    the change order (directly in Processing status) carrying the plan
+    snapshot — renew decisions, quantities, discount codes and the
+    recommendation tracker id — on the hidden ``renewalPayload`` order
+    parameter.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -161,8 +163,8 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     await _preview_renewal(ctx, agreement_id, currency_code, preview_line_items)
 
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
-    flexible_discounts = build_flexible_discounts_value(plan_subscriptions, body)
-    order = await _create_change_order(ctx, agreement_id, lines, flexible_discounts, body)
+    renewal_payload = build_renewal_payload(plan_subscriptions, net_new_lines, body, currency_code)
+    order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
     return APIResponse.created(payload=order)
 
 
@@ -324,7 +326,7 @@ async def _create_change_order(
     ctx: APIContext,
     agreement_id: str,
     lines: list[Line],
-    flexible_discounts: Line | None,
+    renewal_payload: RenewalPayload,
     body: RenewalOrderRequest,
 ) -> dict[str, object]:
     """Create and process the change order acting as the caller (client actor)."""
@@ -333,9 +335,7 @@ async def _create_change_order(
         logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
         raise ForbiddenError(detail="Caller authentication is required to place the order.")
     try:
-        return await create_renewal_change_order(
-            client, agreement_id, lines, flexible_discounts, body
-        )
+        return await create_renewal_change_order(client, agreement_id, lines, renewal_payload, body)
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the renewal change order on agreement %s: status=%s %s",

@@ -288,32 +288,40 @@ async def test_create_renewal_order_previews_the_renewing_lines_with_codes(
     )
 
 
-async def test_create_renewal_order_passes_the_flexible_discounts_value(
+async def test_create_renewal_order_passes_the_renewal_payload(
     fake_ctx, submit_deps, create_order_mock
 ):
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(codes=["CODE-1"]))  # act
 
     call_args, _ = create_order_mock.await_args
-    assert call_args[3] == {
+    assert call_args[3].to_dict() == {
         "recommendationTrackerId": "TRACKER-1",
-        "lineItems": [
+        "currencyCode": "USD",
+        "subscriptions": [
             {
-                "extLineItemNumber": 1,
-                "baseOfferId": _OFFER_ID,
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
-                "flexDiscountCode": "CODE-1",
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": 7,
+                "flexDiscountCodes": ["CODE-1"],
             },
         ],
+        "netNewItems": [],
     }
 
 
-async def test_create_renewal_order_omits_the_flexible_discounts_value_when_empty(
-    fake_ctx, submit_deps, create_order_mock
+@freeze_time(_TODAY)
+async def test_create_renewal_order_snapshots_the_net_new_offers_in_the_payload(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
 ):
-    await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(tracker_id=""))  # act
+    adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
+    body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
     call_args, _ = create_order_mock.await_args
-    assert call_args[3] is None
+    payload = call_args[3].to_dict()
+    assert payload["netNewItems"] == [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}]
 
 
 async def test_create_renewal_order_forwards_the_customer_details(
