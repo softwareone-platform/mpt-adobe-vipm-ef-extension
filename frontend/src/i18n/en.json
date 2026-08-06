@@ -119,6 +119,7 @@
     "SubscriptionSync": "Subscription sync failed.",
     "AgreementSync": "Agreement sync failed.",
     "LoadAgreementSubscriptions": "Failed to load the agreement subscriptions.",
+    "LoadPriceListItems": "Failed to load the price list items.",
     "OrderSubmission": "Order submission failed.",
     "OrderNoData": "Order response did not include the created order.",
     "GlobalCustomerNoData": "Global customer response did not include customer data.",
@@ -251,6 +252,27 @@
       "Actions": "Actions",
       "Undo": "Undo",
       "Price disclaimer": "* These estimated prices include estimates of invoice charges, which are subject to change, and the actual amounts will be reflected on your next bill. Please note that any applicable taxes (e.g., VAT or sales tax) will be calculated and included in the final invoice."
+    },
+    "Items": {
+      "Prompt": "Modify the renewal quantities of your existing subscriptions and add any new items as required. Updated pricing, including applicable discount levels and promotions, will be shown on the Review order page.",
+      "Add items": "Add items",
+      "Renewal qty": "Renewal qty",
+      "Select items": "Select items",
+      "Picker note": "Note: Your specific conditions will be applied after selecting and adding at least one required item from this price list to your order.",
+      "Recommended": "Recommended",
+      "Billing model": "Billing model",
+      "Unit LP": "Unit LP",
+      "Yes": "Yes",
+      "New": "New",
+      "Remove": "Remove",
+      "Empty": {
+        "Title": "No subscriptions to renew",
+        "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
+      },
+      "Validation": {
+        "Required": "Quantity is required",
+        "AtLeast": "Quantity must be at least {{quantity}}"
+      }
     }
   },
   "Highlights": {

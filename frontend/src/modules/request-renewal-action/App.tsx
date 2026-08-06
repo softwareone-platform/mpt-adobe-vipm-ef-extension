@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -14,14 +14,23 @@ import { COTERM_DATE_PARAM } from '../shared/constants';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscriptions';
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
+import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations';
 import { useSettingsResult } from '../shared/hooks/useSettings';
-import { readParameter } from '../shared/model';
+import { getRecommendedOfferIds, readParameter } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { canRequestRenewalAction } from '../utils/security';
+import { getPartialSku } from '../utils/sku';
 import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { ItemsStep } from './ItemsStep';
 import { RenewalStep } from './RenewalStep';
 import { TimingStep } from './TimingStep';
-import { buildInitialRenewalSelections, type RenewalPath, type RenewalSelections } from './model';
+import {
+  buildInitialRenewalSelections,
+  type NetNewItem,
+  type RenewalPath,
+  type RenewalQuantities,
+  type RenewalSelections,
+} from './model';
 
 import './App.scss';
 
@@ -38,8 +47,27 @@ export default function App() {
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [renewalPath, setRenewalPath] = useState<RenewalPath>('anniversary');
   const [renewalSelections, setRenewalSelections] = useState<RenewalSelections | null>(null);
+  const [renewalQuantities, setRenewalQuantities] = useState<RenewalQuantities>({});
+  const [netNewItems, setNetNewItems] = useState<NetNewItem[]>([]);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
+
+  // Adobe recommends against the customer's whole estate; the tracker id on
+  // the response is replayed when the renewal order is submitted.
+  const recommendationOffers = useMemo(
+    () =>
+      subscriptions.data.flatMap((subscription) => {
+        const line = subscription.lines?.[0];
+        const sku = line?.item.externalIds?.vendor;
+        return line && sku ? [{ offerId: sku, quantity: line.quantity }] : [];
+      }),
+    [subscriptions.data],
+  );
+  const recommendations = useAdobeRecommendations(agreementId, recommendationOffers);
+  const recommendedSkus = useMemo(
+    () => new Set(Array.from(getRecommendedOfferIds(recommendations.data), getPartialSku)),
+    [recommendations.data],
+  );
 
   const onClose = useCallback(() => {
     close();
@@ -47,6 +75,10 @@ export default function App() {
 
   const onRenewChange = useCallback((subscriptionId: string, renew: boolean) => {
     setRenewalSelections((current) => ({ ...current, [subscriptionId]: renew }));
+  }, []);
+
+  const onRenewalQuantityChange = useCallback((subscriptionId: string, quantity: number | null) => {
+    setRenewalQuantities((current) => ({ ...current, [subscriptionId]: quantity }));
   }, []);
 
   useEffect(() => {
@@ -154,7 +186,21 @@ export default function App() {
         />
       ),
     },
-    { title: t('Renewal:Steps:Items'), render: () => null },
+    {
+      title: t('Renewal:Steps:Items'),
+      render: () => (
+        <ItemsStep
+          agreement={agreement}
+          subscriptions={subscriptions.data}
+          selections={renewalSelections ?? {}}
+          quantities={renewalQuantities}
+          netNewItems={netNewItems}
+          recommendedSkus={recommendedSkus}
+          onQuantityChange={onRenewalQuantityChange}
+          onNetNewItemsChange={setNetNewItems}
+        />
+      ),
+    },
     { title: t('Renewal:Steps:Promotions'), render: () => null },
     { title: t('Renewal:Steps:Details'), render: () => null },
     { title: t('Renewal:Steps:Review order'), render: () => null },

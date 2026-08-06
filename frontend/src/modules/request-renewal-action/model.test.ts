@@ -1,4 +1,12 @@
-import { buildInitialRenewalSelections, isRenewedByDefault } from './model';
+import {
+  buildInitialRenewalSelections,
+  getDefaultRenewalQuantity,
+  getHeldSkus,
+  getRenewalQuantity,
+  isRenewedByDefault,
+  isRenewing,
+} from './model';
+import type { Subscription } from '../shared/model';
 
 describe('isRenewedByDefault', () => {
   it('renews a subscription whose autoRenewal preference is on', () => {
@@ -24,5 +32,59 @@ describe('buildInitialRenewalSelections', () => {
 
   it('builds an empty plan for an agreement without subscriptions', () => {
     expect(buildInitialRenewalSelections([])).toEqual({});
+  });
+});
+
+describe('isRenewing', () => {
+  it('prefers the customer selection over the standing preference', () => {
+    expect(isRenewing({ id: 'SUB-1', autoRenew: true }, { 'SUB-1': false })).toBe(false);
+    expect(isRenewing({ id: 'SUB-1', autoRenew: false }, { 'SUB-1': true })).toBe(true);
+  });
+
+  it('falls back to the standing preference without a selection', () => {
+    expect(isRenewing({ id: 'SUB-1', autoRenew: true }, {})).toBe(true);
+    expect(isRenewing({ id: 'SUB-1', autoRenew: false }, {})).toBe(false);
+  });
+});
+
+describe('getRenewalQuantity', () => {
+  const subscription: Subscription = {
+    id: 'SUB-1',
+    lines: [{ id: 'ALI-1', quantity: 37, item: { id: 'ITM-1', name: 'Item' } }],
+  };
+
+  it('defaults to the standing line quantity', () => {
+    expect(getDefaultRenewalQuantity(subscription)).toBe(37);
+    expect(getRenewalQuantity(subscription, {})).toBe(37);
+  });
+
+  it('prefers the quantity the customer typed, including a cleared input', () => {
+    expect(getRenewalQuantity(subscription, { 'SUB-1': 53 })).toBe(53);
+    expect(getRenewalQuantity(subscription, { 'SUB-1': null })).toBeNull();
+  });
+
+  it('has no quantity for a subscription without lines', () => {
+    expect(getDefaultRenewalQuantity({ id: 'SUB-2' })).toBeNull();
+    expect(getRenewalQuantity({ id: 'SUB-2' }, {})).toBeNull();
+  });
+});
+
+describe('getHeldSkus', () => {
+  it('collects the partial SKU of every subscription line', () => {
+    const skus = getHeldSkus([
+      {
+        id: 'SUB-1',
+        lines: [
+          {
+            id: 'ALI-1',
+            quantity: 1,
+            item: { id: 'ITM-1', name: 'Item', externalIds: { vendor: '65322587CA01A12' } },
+          },
+        ],
+      },
+      { id: 'SUB-2' },
+    ]);
+
+    expect(skus).toEqual(new Set(['65322587CA']));
   });
 });
