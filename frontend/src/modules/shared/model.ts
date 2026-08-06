@@ -151,6 +151,7 @@ export interface Subscription {
   id: string;
   name?: string;
   status?: string;
+  autoRenew?: boolean;
   splitStatus?: string;
   split?: AgreementSplit | null;
   externalIds?: ExternalIds;

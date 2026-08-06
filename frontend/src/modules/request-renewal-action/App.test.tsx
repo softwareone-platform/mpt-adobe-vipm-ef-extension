@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -30,7 +30,10 @@ const AGREEMENT = {
   },
 };
 
-const SUBSCRIPTIONS = [{ id: 'SUB-1', name: 'Subscription One' }];
+const SUBSCRIPTIONS = [
+  { id: 'SUB-1', name: 'Subscription One', autoRenew: true },
+  { id: 'SUB-2', name: 'Subscription Two', autoRenew: false },
+];
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -92,6 +95,20 @@ jest.mock('./TimingStep', () => ({
   TimingStep: (props: TimingProps) => {
     timingProps = props;
     return <div>Timing step</div>;
+  },
+}));
+
+interface RenewalStepProps {
+  subscriptions: { id: string }[];
+  selections: Record<string, boolean>;
+  onRenewChange: (subscriptionId: string, renew: boolean) => void;
+}
+let renewalProps: RenewalStepProps;
+
+jest.mock('./RenewalStep', () => ({
+  RenewalStep: (props: RenewalStepProps) => {
+    renewalProps = props;
+    return <div>Renewal step</div>;
   },
 }));
 
@@ -169,6 +186,30 @@ describe('request-renewal-action App', () => {
     expect(timingProps.renewalDate).toBe('2027-06-02');
     expect(timingProps.path).toBe('anniversary');
     expect(typeof timingProps.onPathChange).toBe('function');
+  });
+
+  it('hands the subscriptions and the seeded renew preferences to the renewal step', async () => {
+    mockActiveStepIndex = 1;
+    render(<App />);
+
+    expect(await screen.findByText('Renewal step')).toBeTruthy();
+    expect(renewalProps.subscriptions).toEqual(SUBSCRIPTIONS);
+    await waitFor(() =>
+      expect(renewalProps.selections).toEqual({ 'SUB-1': true, 'SUB-2': false }),
+    );
+    expect(typeof renewalProps.onRenewChange).toBe('function');
+  });
+
+  it('stores the renew choice in the wizard state when a toggle changes', async () => {
+    mockActiveStepIndex = 1;
+    render(<App />);
+
+    await screen.findByText('Renewal step');
+    act(() => renewalProps.onRenewChange('SUB-1', false));
+
+    await waitFor(() =>
+      expect(renewalProps.selections).toEqual({ 'SUB-1': false, 'SUB-2': false }),
+    );
   });
 
   it('shows the loader until the agreement is loaded', async () => {

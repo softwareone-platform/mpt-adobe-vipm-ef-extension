@@ -239,6 +239,18 @@
         "Summary": "Renewing now locks in today's pricing. If prices rise before your anniversary date, you avoid the increase.",
         "Detail": "Your renewal takes effect today and is invoiced immediately, and your anniversary date moves forward. Adding products or increasing quantities is handled separately afterwards, and may not receive the same combined discount."
       }
+    },
+    "Grid": {
+      "Prompt": "Select the existing subscriptions to be renewed. Updated pricing, including applicable discount levels and promotions, will be shown on the Review order page.",
+      "Current qty": "Current qty",
+      "Renew": "Renew",
+      "Unit SP": "Unit SP",
+      "Unit SP basis": "named license/year",
+      "SPxM": "SPxM",
+      "SPxY": "SPxY",
+      "Actions": "Actions",
+      "Undo": "Undo",
+      "Price disclaimer": "* These estimated prices include estimates of invoice charges, which are subject to change, and the actual amounts will be reflected on your next bill. Please note that any applicable taxes (e.g., VAT or sales tax) will be calculated and included in the final invoice."
     }
   },
   "Highlights": {
