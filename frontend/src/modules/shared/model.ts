@@ -132,6 +132,7 @@ export interface Agreement {
     ordering?: CommerceParameter[];
     fulfillment?: CommerceParameter[];
   };
+  listing?: Reference;
   product?: Product;
   vendor?: Reference;
   client?: Reference;
@@ -143,6 +144,7 @@ export interface Agreement {
 }
 
 export interface Terms {
+  model?: string | null;
   period?: string | null;
   commitment?: string | null;
 }
@@ -433,6 +435,20 @@ export function isGlobalSalesEnabled(
 }
 
 export type Status = 'idle' | 'loading' | 'success' | 'error';
+
+/**
+ * A price list entry from the platform catalog, as the extension backend
+ * returns it: the public API payload plus the Adobe-recommended badge the
+ * backend crosses in.
+ */
+export interface PriceListItem {
+  id: string;
+  status?: string;
+  unitLP?: number;
+  unitSP?: number;
+  item?: ProductItem;
+  recommended?: boolean;
+}
 
 export interface SyncState {
   error: string;

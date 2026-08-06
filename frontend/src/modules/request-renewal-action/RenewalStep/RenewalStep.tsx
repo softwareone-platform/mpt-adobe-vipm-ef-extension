@@ -216,12 +216,20 @@ export function RenewalStep({
   const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
   const columns = useMemo(() => buildColumns(onRenewChange), [onRenewChange]);
 
+  // The grid re-applies the paging config whenever its identity changes, so
+  // an inline object would reset the page on every render and dead-lock the
+  // pagination controls. Memoize it on the row count only.
+  const paging = useMemo(
+    () => ({ page: 1, pageSize: PAGE_SIZE, total: rows.length }),
+    [rows.length],
+  );
+
   const gridProps = useGridInMemory(rows, {
     id: 'components__request-renewal__subscriptions--client',
     columns,
     fields,
     sort,
-    paging: { page: 1, pageSize: PAGE_SIZE, total: rows.length },
+    paging,
   });
 
   return (
