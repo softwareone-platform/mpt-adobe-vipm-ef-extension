@@ -1,3 +1,4 @@
+import type { RenewalPlanBody } from '../shared/hooks/useRenewalPlanValidation';
 import type { Subscription, Terms } from '../shared/model';
 import { getPartialSku } from '../utils/sku';
 
@@ -85,4 +86,39 @@ export function getHeldSkus(subscriptions: Subscription[]): Set<string> {
       return sku ? [getPartialSku(sku)] : [];
     }),
   );
+}
+
+/**
+ * The wizard's renewal plan as the renewal endpoints expect it.
+ *
+ * Carries every subscription with its renew decision — the 3YC floor check
+ * needs the lapsing ones too — plus the net-new additions. Quantities are
+ * expected to have passed the Items step validation; a pending (``null``)
+ * quantity is sent as 0, which the backend rejects.
+ */
+export function buildRenewalPlanRequest(
+  subscriptions: Subscription[],
+  selections: RenewalSelections,
+  quantities: RenewalQuantities,
+  netNewItems: NetNewItem[],
+): RenewalPlanBody {
+  return {
+    subscriptions: subscriptions.flatMap((subscription) => {
+      const offerId = subscription.lines?.[0]?.item.externalIds?.vendor;
+      if (!offerId) return [];
+      const renew = isRenewing(subscription, selections);
+      return [
+        {
+          id: subscription.id,
+          offerId,
+          renew,
+          renewalQuantity: renew ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0,
+        },
+      ];
+    }),
+    netNewItems: netNewItems.map((item) => ({
+      offerId: item.sku,
+      quantity: item.quantity ?? 0,
+    })),
+  };
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
@@ -12,6 +12,8 @@ import {
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
+import { useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
+import type { StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { i18n } from '../../../i18n/translations';
 import { ChipCell } from '../../shared/components/GridCell/ChipCell/ChipCell';
@@ -21,12 +23,14 @@ import { LinkReference } from '../../shared/components/LinkReference/LinkReferen
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
+import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
 import type { Agreement, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import { getPartialSku } from '../../utils/sku';
 import { SelectItemsDialog } from '../components/select-items-dialog/SelectItemsDialog';
 import {
+  buildRenewalPlanRequest,
   getDefaultRenewalQuantity,
   getHeldSkus,
   getRenewalQuantity,
@@ -283,6 +287,11 @@ export function ItemsStep({
   const { t } = useTranslation();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const listingId = agreement.listing?.id ?? '';
+  const { registerOnNextCallback } = useStepActions();
+  const { error: planError, status: planStatus, validatePlan, reset } = useRenewalPlanValidation(
+    agreement.id,
+  );
+  const [quantityError, setQuantityError] = useState('');
 
   const rows = useMemo(
     () => [
@@ -291,6 +300,28 @@ export function ItemsStep({
     ],
     [subscriptions, selections, quantities, netNewItems],
   );
+
+  // Any plan edit invalidates the previous validation outcome.
+  useEffect(() => {
+    setQuantityError('');
+    reset();
+  }, [selections, quantities, netNewItems, reset]);
+
+  const onNext = useCallback(
+    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      if (rows.some((row) => validateRenewalQuantity(row.renewalQuantity))) {
+        setQuantityError(t('Renewal:Items:Validation:FixQuantities'));
+        return currentStepIndex;
+      }
+      setQuantityError('');
+      const plan = buildRenewalPlanRequest(subscriptions, selections, quantities, netNewItems);
+      const isValid = await validatePlan(plan);
+      return isValid ? targetStepIndex : currentStepIndex;
+    },
+    [rows, subscriptions, selections, quantities, netNewItems, validatePlan, t],
+  );
+
+  useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
   const onRowQuantityChange = useCallback(
     (row: Row, quantity: number | null) => {
@@ -367,6 +398,18 @@ export function ItemsStep({
       <InlineNotification status="info" isStandalone>
         {t('Renewal:Items:Prompt')}
       </InlineNotification>
+      {(quantityError || planError) && (
+        <div className="items-step__validation" data-testid="items-step-error">
+          <InlineNotification status="error" isStandalone>
+            {quantityError || planError}
+          </InlineNotification>
+        </div>
+      )}
+      {planStatus === 'loading' && (
+        <RegularText as="p" size={2} color="grey-4" className="items-step__validating">
+          {t('Renewal:Items:Validating')}
+        </RegularText>
+      )}
       <div className="items-step__toolbar">
         <Button
           isDisabled={!listingId}
