@@ -1,10 +1,34 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render, within } from '@testing-library/react';
+import { act, fireEvent, render, within } from '@testing-library/react';
+
+import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
 import type { Agreement, Subscription } from '../../shared/model';
 import type { NetNewItem, RenewalQuantities, RenewalSelections } from '../model';
+
+jest.mock('@mpt-extension/sdk', () => ({
+  http: {
+    post: jest.fn(),
+  },
+}), { virtual: true });
+
+const mockPost = jest.mocked(http.post);
+
+interface NavProps {
+  currentStepIndex: number;
+  targetStepIndex: number;
+}
+
+let registeredOnNext: ((props: NavProps) => Promise<number> | number) | undefined;
+const registerOnNextCallback = jest.fn((callback: (props: NavProps) => Promise<number> | number) => {
+  registeredOnNext = callback;
+});
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => ({
+  useStepActions: () => ({ registerOnNextCallback }),
+}));
 
 interface TestRow {
   id: string;
@@ -199,6 +223,11 @@ const renderStep = ({
   );
 
 describe('ItemsStep', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    registeredOnNext = undefined;
+  });
+
   it('renders the heading, the highlights, the prompt and the price disclaimer', () => {
     const { getByText, getByTestId } = renderStep();
 
@@ -409,5 +438,105 @@ describe('ItemsStep', () => {
       'spxY',
       'actions',
     ]);
+  });
+
+  describe('next-step gate', () => {
+    const NAVIGATION = { currentStepIndex: 2, targetStepIndex: 3 };
+
+    it('registers the gate on the wizard next action', () => {
+      renderStep();
+
+      expect(registerOnNextCallback).toHaveBeenCalled();
+      expect(registeredOnNext).toBeDefined();
+    });
+
+    it('blocks the step while a renewal quantity is invalid, without calling the backend', async () => {
+      const { getByTestId } = renderStep({ quantities: { 'SUB-1': null } });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(mockPost).not.toHaveBeenCalled();
+      expect(getByTestId('items-step-error').textContent).toContain(
+        'Enter a valid renewal quantity for every item before continuing.',
+      );
+    });
+
+    it('checks the 3YC floor with the whole plan and previews the existing items, then advances', async () => {
+      mockPost.mockResolvedValue({ data: { data: {} } });
+      renderStep({ netNewItems: [NET_NEW_ITEM] });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
+      const planSubscriptions = [
+        { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 37 },
+        { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
+      ];
+      expect(mockPost).toHaveBeenNthCalledWith(
+        1,
+        '/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check',
+        {
+          subscriptions: planSubscriptions,
+          netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
+        },
+      );
+      expect(mockPost).toHaveBeenNthCalledWith(
+        2,
+        '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',
+        { subscriptions: planSubscriptions },
+      );
+    });
+
+    it('stays on the step and shows the backend message when the validation fails', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: 'The renewal plan would break the commitment.' } },
+      });
+      const { getByTestId } = renderStep();
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(getByTestId('items-step-error').textContent).toContain(
+        'The renewal plan would break the commitment.',
+      );
+    });
+
+    it('clears the validation outcome when the plan changes', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: 'The renewal plan would break the commitment.' } },
+      });
+      const onQuantityChange = jest.fn();
+      const { getByTestId, queryByTestId, rerender } = renderStep({ onQuantityChange });
+
+      await act(async () => {
+        await registeredOnNext!(NAVIGATION);
+      });
+      expect(getByTestId('items-step-error')).toBeTruthy();
+
+      rerender(
+        <ItemsStep
+          agreement={agreement}
+          subscriptions={subscriptions}
+          selections={{}}
+          quantities={{ 'SUB-1': 53 }}
+          netNewItems={[]}
+          recommendedSkus={new Set<string>()}
+          onQuantityChange={onQuantityChange}
+          onNetNewItemsChange={jest.fn()}
+        />,
+      );
+
+      expect(queryByTestId('items-step-error')).toBeNull();
+    });
   });
 });

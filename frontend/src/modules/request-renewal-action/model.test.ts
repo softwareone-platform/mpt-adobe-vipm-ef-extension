@@ -1,5 +1,6 @@
 import {
   buildInitialRenewalSelections,
+  buildRenewalPlanRequest,
   getDefaultRenewalQuantity,
   getHeldSkus,
   getRenewalQuantity,
@@ -66,6 +67,71 @@ describe('getRenewalQuantity', () => {
   it('has no quantity for a subscription without lines', () => {
     expect(getDefaultRenewalQuantity({ id: 'SUB-2' })).toBeNull();
     expect(getRenewalQuantity({ id: 'SUB-2' }, {})).toBeNull();
+  });
+});
+
+describe('buildRenewalPlanRequest', () => {
+  const subscriptions: Subscription[] = [
+    {
+      id: 'SUB-1',
+      autoRenew: true,
+      lines: [
+        {
+          id: 'ALI-1',
+          quantity: 37,
+          item: { id: 'ITM-1', name: 'Item', externalIds: { vendor: '65322587CA01A12' } },
+        },
+      ],
+    },
+    {
+      id: 'SUB-2',
+      autoRenew: true,
+      lines: [
+        {
+          id: 'ALI-2',
+          quantity: 21,
+          item: { id: 'ITM-2', name: 'Item 2', externalIds: { vendor: '65322588CA01A12' } },
+        },
+      ],
+    },
+  ];
+
+  it('carries every subscription with its renew decision and quantity', () => {
+    const plan = buildRenewalPlanRequest(
+      subscriptions,
+      { 'SUB-2': false },
+      { 'SUB-1': 53 },
+      [],
+    );
+
+    expect(plan).toEqual({
+      subscriptions: [
+        { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 53 },
+        { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
+      ],
+      netNewItems: [],
+    });
+  });
+
+  it('maps the net-new additions onto their offer selections', () => {
+    const plan = buildRenewalPlanRequest(subscriptions, {}, {}, [
+      {
+        itemId: 'ITM-9',
+        itemName: 'Premiere Pro',
+        sku: '65304578CA01A12',
+        unitSP: 234,
+        quantity: 5,
+        recommended: false,
+      },
+    ]);
+
+    expect(plan.netNewItems).toEqual([{ offerId: '65304578CA01A12', quantity: 5 }]);
+  });
+
+  it('skips a subscription without a vendor SKU', () => {
+    const plan = buildRenewalPlanRequest([{ id: 'SUB-3' }], {}, {}, []);
+
+    expect(plan.subscriptions).toEqual([]);
   });
 });
 
