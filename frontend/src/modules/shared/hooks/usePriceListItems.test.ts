@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -90,7 +90,7 @@ describe('usePriceListItems', () => {
     const { result } = renderHook(() => usePriceListItems(AGREEMENT_ID, RECOMMENDED_SKUS));
 
     await waitFor(() => expect(result.current.status).toBe('success'));
-    result.current.refresh();
+    act(() => result.current.refresh());
     await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(2));
   });
 });

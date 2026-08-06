@@ -41,13 +41,14 @@ class FakeAdobeNamespace:
 
 
 class FakeAdobeClient:
-    """Fake Adobe client exposing customer, offer, order and recommendation namespaces."""
+    """Fake Adobe client exposing every resource namespace, routed to one stub."""
 
     def __init__(self, call):
         self.customer = FakeAdobeNamespace(call)
         self.offer = FakeAdobeNamespace(call)
         self.order = FakeAdobeNamespace(call)
         self.recommendation = FakeAdobeNamespace(call)
+        self.subscription = FakeAdobeNamespace(call)
 
 
 class FakeAgreements:

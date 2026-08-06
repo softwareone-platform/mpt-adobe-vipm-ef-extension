@@ -28,6 +28,10 @@ export function formatDate(value?: string): string | undefined {
   });
 }
 
+export function formatDateOnly(value?: string | null): string | undefined {
+  return value ? value.slice(0, 10) : undefined;
+}
+
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }

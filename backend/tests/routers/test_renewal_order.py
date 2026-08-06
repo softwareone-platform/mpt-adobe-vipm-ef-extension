@@ -271,7 +271,9 @@ async def test_create_renewal_order_previews_the_renewing_lines_with_codes(
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    call_args, _ = adobe_call.calls[1]
+    # calls[0] is the 3YC customer load, calls[1] resolves the full offer id
+    # from Adobe's live subscriptions, calls[2] is the PREVIEW_RENEWAL quote.
+    call_args, _ = adobe_call.calls[2]
     assert call_args == (
         "AUT-123",
         "CUST-001",
@@ -690,7 +692,9 @@ async def test_preview_renewal_plan_returns_the_adobe_quote(
 
     assert result.status_code == http.HTTPStatus.OK
     assert result.payload == {"lineItems": [{"extLineItemNumber": 1, "pricing": {}}]}
-    call_args, _ = adobe_call.calls[0]
+    # calls[0] resolves the full offer id from Adobe's live subscriptions;
+    # calls[1] is the PREVIEW_RENEWAL quote itself.
+    call_args, _ = adobe_call.calls[1]
     assert call_args == (
         "AUT-123",
         "CUST-001",
@@ -705,6 +709,51 @@ async def test_preview_renewal_plan_returns_the_adobe_quote(
             },
         ],
     )
+
+
+async def test_preview_renewal_plan_resolves_the_full_offer_id_from_adobe(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """The wizard only ever holds the partial vendor SKU.
+
+    Adobe's live subscription data carries the full offer id PREVIEW_RENEWAL needs.
+    """
+    adobe_call.returns = {
+        "items": [{"subscriptionId": _ADOBE_SUBSCRIPTION_ID, "offerId": _OFFER_ID}],
+    }
+    body = RenewalPreviewRequest.model_validate({
+        "subscriptions": [
+            {"id": _SUBSCRIPTION_ID, "offerId": _SKU, "renew": True, "renewalQuantity": 7},
+        ],
+        "flexDiscountCodes": [],
+    })
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert call_args[3] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": _OFFER_ID,
+            "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+            "quantity": 7,
+        },
+    ]
+
+
+async def test_preview_renewal_plan_falls_back_to_the_selected_offer_id(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """Adobe holding no matching subscription (or none at all) is not fatal.
+
+    The plan still previews with whatever offer id the wizard supplied.
+    """
+    adobe_call.returns = {"items": []}
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert call_args[3][0]["offerId"] == _OFFER_ID
 
 
 async def test_preview_renewal_plan_requires_a_renewing_subscription(

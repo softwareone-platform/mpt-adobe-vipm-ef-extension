@@ -30,7 +30,8 @@ frontend/                    TypeScript plug UI (esbuild)
   - `api/agreements.py`, `api/customer.py`, `api/settings.py` — API routes
   - `api/agreement_subscriptions.py` — lists an agreement's live subscriptions
     with their lines; the agreement payload's own lines do not carry the item
-    vendor SKU
+    vendor SKU. The lines expand the item's product, terms and audit trail so
+    the wizard grids can show the item info card without a second call
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
   - `api/renewal.py` — at-anniversary renewal routes; restricted to client
