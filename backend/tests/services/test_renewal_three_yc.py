@@ -35,6 +35,7 @@ def _plan_subscription(*, offer_id=_LICENSE_OFFER_ID, renew=True, quantity=7, su
         line_id="ALI-0001",
         current_quantity=10,
         adobe_subscription_id="adobe-sub-1",
+        offer_id=offer_id,
     )
 
 

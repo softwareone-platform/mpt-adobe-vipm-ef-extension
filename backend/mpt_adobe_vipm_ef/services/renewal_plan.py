@@ -22,12 +22,21 @@ _FIRST_LINE_NUMBER = 1
 
 
 class PlanSubscription(NamedTuple):
-    """A requested subscription selection resolved against its MPT subscription."""
+    """A requested subscription selection resolved against its MPT subscription.
+
+    ``offer_id`` starts out as the client-supplied ``selection.offer_id`` (only
+    the partial vendor SKU, since that is all MPT's subscription and catalog
+    data ever carries) and is overridden with Adobe's own full offer id, read
+    off the customer's live subscriptions, before a renewing line is
+    previewed or ordered. See ``_resolve_renewal_offer_ids`` in
+    ``routers/api/renewal.py``.
+    """
 
     selection: RenewalSubscriptionSelection
     line_id: str
     current_quantity: int
     adobe_subscription_id: str
+    offer_id: str
 
 
 class NetNewLine(NamedTuple):
@@ -69,14 +78,16 @@ def build_preview_renewal_line_items(
     Only renewing subscriptions can be previewed: a lapsing one has nothing to
     price and a net-new product has no Adobe subscription until fulfilment
     creates it. The selected flexible discount codes ride on every line so
-    Adobe validates their eligibility per subscription.
+    Adobe validates their eligibility per subscription. ``plan.offer_id``
+    must already carry the full Adobe offer id (resolved from the customer's
+    live subscriptions) or Adobe rejects the line.
     """
     line_items = []
     renewing = (plan for plan in plan_subscriptions if plan.selection.renew)
     for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER):
         line_item: Line = {
             "extLineItemNumber": line_number,
-            "offerId": plan.selection.offer_id,
+            "offerId": plan.offer_id,
             "subscriptionId": plan.adobe_subscription_id,
             "quantity": plan.selection.renewal_quantity,
         }
@@ -106,7 +117,7 @@ def build_renewal_payload(
         "subscriptions": [
             {
                 "subscriptionId": plan.adobe_subscription_id,
-                "offerId": plan.selection.offer_id,
+                "offerId": plan.offer_id,
                 "renew": plan.selection.renew,
                 "renewalQuantity": plan.selection.renewal_quantity,
                 "flexDiscountCodes": (

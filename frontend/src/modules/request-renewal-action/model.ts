@@ -1,5 +1,5 @@
 import type { RenewalPlanBody } from '../shared/hooks/useRenewalPlanValidation';
-import type { Subscription, Terms } from '../shared/model';
+import type { Discount, Subscription, Terms } from '../shared/model';
 import { getPartialSku } from '../utils/sku';
 
 export type RenewalPath = 'anniversary' | 'now';
@@ -86,6 +86,76 @@ export function getHeldSkus(subscriptions: Subscription[]): Set<string> {
       return sku ? [getPartialSku(sku)] : [];
     }),
   );
+}
+
+export interface OrderDetails {
+  externalId: string;
+  notes: string;
+}
+
+/** Codes are matched case-insensitively; Adobe records them in upper case. */
+export function normalizeDiscountCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+/**
+ * Whether the customer can still apply the discount.
+ *
+ * A code can be redeemed only once per customer, so a redemption recorded
+ * against this customer takes the code out of play.
+ */
+export function isDiscountAvailable(discount: Discount): boolean {
+  return !discount.redeemedAt;
+}
+
+/** Whether the discount applies to a renewal; an unrestricted code applies to any order. */
+export function appliesToRenewal(discount: Discount): boolean {
+  const orderTypes = discount.applicableOrderTypes;
+  return !orderTypes?.length || orderTypes.includes('RENEWAL');
+}
+
+/** The discount code applied to each renewal line, keyed by subscription or item id. */
+export type DiscountSelections = Record<string, string>;
+
+/** The ids of the lines the renewal carries: the renewing subscriptions and the net-new products. */
+export function getRenewalRowIds(
+  subscriptions: Subscription[],
+  selections: RenewalSelections,
+  netNewItems: NetNewItem[],
+): string[] {
+  return [
+    ...subscriptions
+      .filter((subscription) => isRenewing(subscription, selections))
+      .map((subscription) => subscription.id),
+    ...netNewItems.map((item) => item.itemId),
+  ];
+}
+
+/**
+ * The codes the renewal carries, as the order's flat ``flexDiscountCodes`` list.
+ *
+ * A code stays in the wizard state after its line leaves the plan — the
+ * customer switched Renew off or removed the net-new product — so only the
+ * codes still sitting on a carried line are sent.
+ */
+export function getSelectedDiscountCodes(
+  selections: DiscountSelections,
+  rowIds: string[],
+): string[] {
+  const carried = new Set(rowIds);
+  return Array.from(
+    new Set(
+      Object.entries(selections)
+        .filter(([rowId]) => carried.has(rowId))
+        .map(([, code]) => normalizeDiscountCode(code))
+        .filter(Boolean),
+    ),
+  );
+}
+
+export function findDiscountByCode(code: string, discounts: Discount[]): Discount | undefined {
+  const wanted = normalizeDiscountCode(code);
+  return discounts.find((discount) => normalizeDiscountCode(discount.code) === wanted);
 }
 
 /**

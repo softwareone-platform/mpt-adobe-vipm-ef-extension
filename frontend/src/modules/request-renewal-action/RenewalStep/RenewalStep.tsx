@@ -89,7 +89,7 @@ function buildColumns(
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['item'],
+      fields: ['itemName'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -104,7 +104,7 @@ function buildColumns(
     {
       name: 'subscription',
       title: i18n.t('Common:Subscription'),
-      fields: ['subscription'],
+      fields: ['subscriptionName'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -118,7 +118,7 @@ function buildColumns(
     },
     {
       name: 'terms',
-      title: i18n.t('Common:Terms'),
+      title: i18n.t('Common:Terms title'),
       fields: ['terms'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
@@ -194,9 +194,9 @@ function buildColumns(
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'item', title: i18n.t('Common:Item') },
-  { name: 'subscription', title: i18n.t('Common:Subscription') },
-  { name: 'terms', title: i18n.t('Common:Terms') },
+  { name: 'itemName', title: i18n.t('Common:Item') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'terms', title: i18n.t('Common:Terms title') },
   { name: 'quantity', title: i18n.t('Renewal:Grid:Current qty'), type: 'number' },
   { name: 'renew', title: i18n.t('Renewal:Grid:Renew') },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
@@ -204,7 +204,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'spxY', title: i18n.t('Renewal:Grid:SPxY'), type: 'number' },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'item', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [{ field: 'itemName', direction: 'asc' }];
 
 export function RenewalStep({
   agreement,
