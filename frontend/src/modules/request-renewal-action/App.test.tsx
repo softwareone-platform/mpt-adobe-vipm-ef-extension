@@ -31,8 +31,30 @@ const AGREEMENT = {
 };
 
 const SUBSCRIPTIONS = [
-  { id: 'SUB-1', name: 'Subscription One', autoRenew: true },
-  { id: 'SUB-2', name: 'Subscription Two', autoRenew: false },
+  {
+    id: 'SUB-1',
+    name: 'Subscription One',
+    autoRenew: true,
+    lines: [
+      {
+        id: 'ALI-1',
+        quantity: 37,
+        item: { id: 'ITM-1', name: 'Item One', externalIds: { vendor: '65322587CA' } },
+      },
+    ],
+  },
+  {
+    id: 'SUB-2',
+    name: 'Subscription Two',
+    autoRenew: false,
+    lines: [
+      {
+        id: 'ALI-2',
+        quantity: 21,
+        item: { id: 'ITM-2', name: 'Item Two', externalIds: { vendor: '65322588CA' } },
+      },
+    ],
+  },
 ];
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -109,6 +131,24 @@ jest.mock('./RenewalStep', () => ({
   RenewalStep: (props: RenewalStepProps) => {
     renewalProps = props;
     return <div>Renewal step</div>;
+  },
+}));
+
+interface ItemsStepProps {
+  subscriptions: { id: string }[];
+  selections: Record<string, boolean>;
+  quantities: Record<string, number | null>;
+  netNewItems: { itemId: string }[];
+  recommendedSkus: Set<string>;
+  onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
+  onNetNewItemsChange: (items: { itemId: string }[]) => void;
+}
+let itemsProps: ItemsStepProps;
+
+jest.mock('./ItemsStep', () => ({
+  ItemsStep: (props: ItemsStepProps) => {
+    itemsProps = props;
+    return <div>Items step</div>;
   },
 }));
 
@@ -212,6 +252,55 @@ describe('request-renewal-action App', () => {
     );
   });
 
+  it('hands the subscriptions, selections and quantities to the items step', async () => {
+    mockActiveStepIndex = 2;
+    render(<App />);
+
+    expect(await screen.findByText('Items step')).toBeTruthy();
+    expect(itemsProps.subscriptions).toEqual(SUBSCRIPTIONS);
+    await waitFor(() =>
+      expect(itemsProps.selections).toEqual({ 'SUB-1': true, 'SUB-2': false }),
+    );
+    expect(itemsProps.quantities).toEqual({});
+    expect(typeof itemsProps.onQuantityChange).toBe('function');
+  });
+
+  it('stores the renewal quantity in the wizard state when it changes', async () => {
+    mockActiveStepIndex = 2;
+    render(<App />);
+
+    await screen.findByText('Items step');
+    act(() => itemsProps.onQuantityChange('SUB-1', 53));
+
+    await waitFor(() => expect(itemsProps.quantities).toEqual({ 'SUB-1': 53 }));
+  });
+
+  it('stores the added net-new items in the wizard state', async () => {
+    mockActiveStepIndex = 2;
+    render(<App />);
+
+    await screen.findByText('Items step');
+    expect(itemsProps.netNewItems).toEqual([]);
+
+    act(() => itemsProps.onNetNewItemsChange([{ itemId: 'ITM-9' }]));
+
+    await waitFor(() => expect(itemsProps.netNewItems).toEqual([{ itemId: 'ITM-9' }]));
+  });
+
+  it('requests Adobe recommendations for the whole subscription estate', async () => {
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1/recommendations', {
+        offers: [
+          { offerId: '65322587CA', quantity: 37 },
+          { offerId: '65322588CA', quantity: 21 },
+        ],
+      }),
+    );
+  });
+
   it('shows the loader until the agreement is loaded', async () => {
     render(<App />);
 
@@ -230,7 +319,11 @@ describe('request-renewal-action App', () => {
 
     fireEvent.click(screen.getByText('Retry'));
 
-    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(
+        mockPost.mock.calls.filter(([url]) => url === '/api/v2/agreements/AGR-1/sync'),
+      ).toHaveLength(2),
+    );
   });
 
   it('offers a retry when the agreement subscriptions cannot be loaded', async () => {
