@@ -15,6 +15,7 @@ Local setup instructions live in [docs/local-development.md](local-development.m
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `EXT_WEBHOOKS_SECRETS` | - | `{"PRD-1111-1111": "123qweasd3432234"}` | Webhook secret keyed by Marketplace product id |
+| `EXT_FEATURES` | `{}` | `{"request-renewal-action":{"enabled":false}}` | Feature flags keyed by plug id (JSON). Opt-out: a plug is served unless its entry sets `enabled` to `false` |
 | `MPT_API_BASE_URL` | `http://localhost:8000` | `https://api.platform.softwareone.com` | SoftwareOne Marketplace API URL |
 | `MPT_API_TOKEN` | - | `eyJhbGciOiJSUzI1N...` | SoftwareOne Marketplace API token |
 | `SDK_EXTENSION_API_KEY` | - | `<extension-api-key>` | Extension API key used by the SDK to authenticate |
