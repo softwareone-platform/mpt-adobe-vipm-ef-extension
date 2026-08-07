@@ -46,6 +46,9 @@ env:
   ProductSegments:
     name: EXT_PRODUCT_SEGMENTS
     defaultValue: "{}"
+  Features:
+    name: EXT_FEATURES
+    defaultValue: "{}"
   AdobeCredentialsFile:
     name: EXT_ADOBE_CREDENTIALS_FILE
     defaultValue: /extension/config/adobe_credentials.json

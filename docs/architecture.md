@@ -44,7 +44,9 @@ frontend/                    TypeScript plug UI (esbuild)
     discount codes and the recommendation tracker id) on the hidden
     `renewalPayload` order parameter
   - `events/order.py` — order event router (fulfilment)
-  - `plugs.py` — plug routes that expose plug metadata to the frontend
+  - `plugs.py` — plug routes that expose plug metadata to the frontend, serving
+    only the plugs the `EXT_FEATURES` flags leave enabled (see
+    [deployment.md](deployment.md))
 - `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order
   processing.
 - `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including
