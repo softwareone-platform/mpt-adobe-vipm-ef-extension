@@ -1,5 +1,6 @@
 import {
   parsePrice,
+  formatCurrency,
   formatPrice,
   parseUnitPrice,
   getYearlyPrice,
@@ -64,6 +65,20 @@ describe('getMonthlyPrice', () => {
 
   it('returns an empty string when there is no unit price', () => {
     expect(getMonthlyPrice(null, 10)).toBe('');
+  });
+});
+
+describe('formatCurrency', () => {
+  it('formats an amount in its currency', () => {
+    expect(formatCurrency(20, 'USD')).toBe('$20.00');
+  });
+
+  it('returns the plain amount when no currency is given', () => {
+    expect(formatCurrency(5)).toBe('5');
+  });
+
+  it('falls back to the amount and the code for an unknown currency', () => {
+    expect(formatCurrency(5, 'XXXX')).toBe('5 XXXX');
   });
 });
 

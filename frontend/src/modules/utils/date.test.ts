@@ -1,4 +1,4 @@
-import { daysUntil, formatDate, formatTime } from './date';
+import { daysUntil, formatDate, formatDateOnly, formatTime } from './date';
 
 describe('formatDate', () => {
   it('formats an ISO timestamp as a localized date', () => {
@@ -37,6 +37,17 @@ describe('daysUntil', () => {
   it('returns undefined for missing or invalid values', () => {
     expect(daysUntil(undefined)).toBeUndefined();
     expect(daysUntil('not-a-date')).toBeUndefined();
+  });
+});
+
+describe('formatDateOnly', () => {
+  it('truncates an ISO timestamp to its date part', () => {
+    expect(formatDateOnly('2026-02-01T00:00:00+00:00')).toBe('2026-02-01');
+  });
+
+  it('returns undefined for missing values', () => {
+    expect(formatDateOnly(null)).toBeUndefined();
+    expect(formatDateOnly(undefined)).toBeUndefined();
   });
 });
 

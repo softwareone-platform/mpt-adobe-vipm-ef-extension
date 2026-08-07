@@ -114,6 +114,7 @@ async def preview_renewal_plan(
     require_active_agreement(agreement)
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
+    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     line_items = build_preview_renewal_line_items(plan_subscriptions, body.flex_discount_codes)
     if not line_items:
         raise ValidationError(
@@ -157,6 +158,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
         require_scheduled_creation_window(str(customer.get("cotermDate") or ""))
 
     currency_code = agreement.authorization.currency or ""
+    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     preview_line_items = build_preview_renewal_line_items(
         plan_subscriptions, body.flex_discount_codes
     )
@@ -249,6 +251,7 @@ def _build_plan_subscription(
         line_id=line.id,
         current_quantity=line.quantity,
         adobe_subscription_id=adobe_subscription_id,
+        offer_id=selection.offer_id,
     )
 
 
@@ -281,6 +284,66 @@ async def _load_adobe_customer(ctx: APIContext, agreement_id: str) -> dict[str, 
     except AdobeError as error:
         logger.warning("Adobe configuration error loading customer %s: %s", customer_id, error)
         raise ValidationError(detail=str(error))
+
+
+async def _resolve_renewal_offer_ids(
+    ctx: APIContext, agreement_id: str, plan_subscriptions: list[PlanSubscription]
+) -> list[PlanSubscription]:
+    """Override each renewing line's offer id with Adobe's own, before it is previewed.
+
+    MPT's subscription and catalog data only ever carries the partial
+    (10-char) vendor SKU on ``selection.offer_id``; Adobe's PREVIEW_RENEWAL
+    (and the order it gates) needs the full offer id, which only the
+    customer's live Adobe subscriptions have. Skipped when nothing renews, so
+    a lapse-only or net-new-only plan does not pay for the extra Adobe call.
+    """
+    if not any(plan.selection.renew for plan in plan_subscriptions):
+        return plan_subscriptions
+    offer_ids_by_subscription = await _load_adobe_subscription_offer_ids(ctx, agreement_id)
+    return [
+        plan._replace(
+            offer_id=offer_ids_by_subscription.get(plan.adobe_subscription_id) or plan.offer_id,
+        )
+        for plan in plan_subscriptions
+    ]
+
+
+async def _load_adobe_subscription_offer_ids(ctx: APIContext, agreement_id: str) -> dict[str, str]:
+    """Map each Adobe subscription id to its current full offer id.
+
+    ``GET /v3/customers/{customer_id}/subscriptions`` is the only source of
+    the full offer id: MPT's subscription and its catalog item both only ever
+    carry the partial vendor SKU.
+    """
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
+    try:
+        subscriptions = await asyncio.to_thread(
+            adobe_client(ctx).subscription.get_subscriptions,
+            authorization_id,
+            customer_id,
+        )
+    except AdobeAPIError as error:
+        logger.warning("Adobe API error loading subscriptions for %s: %s", customer_id, error)
+        raise UpstreamServiceError(detail=_ADOBE_REQUEST_FAILED_DETAIL)
+    except AdobeHttpError as error:
+        logger.warning(
+            "Adobe HTTP error loading subscriptions for %s: status=%s body=%r",
+            customer_id,
+            error.status_code if hasattr(error, "status_code") else "?",
+            error.response_content,
+        )
+        raise UpstreamServiceError(detail=_ADOBE_REQUEST_FAILED_DETAIL)
+    except AdobeError as error:
+        logger.warning(
+            "Adobe configuration error loading subscriptions for %s: %s", customer_id, error
+        )
+        raise ValidationError(detail=str(error))
+    return {
+        subscription_item["subscriptionId"]: subscription_item["offerId"]
+        for subscription_item in subscriptions.get("items") or []
+        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
+    }
 
 
 async def _preview_renewal(

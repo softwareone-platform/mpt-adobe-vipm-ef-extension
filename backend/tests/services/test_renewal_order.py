@@ -45,6 +45,7 @@ def _plan(request):
             line_id=_LINE_ID,
             current_quantity=_CURRENT_QUANTITY,
             adobe_subscription_id=_ADOBE_SUBSCRIPTION_ID,
+            offer_id=selection.offer_id,
         )
         for selection in request.subscriptions
     ]
