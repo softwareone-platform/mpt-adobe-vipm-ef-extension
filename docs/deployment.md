@@ -23,7 +23,7 @@ Local setup instructions live in [docs/local-development.md](local-development.m
 | `SDK_EXTENSION_URL` | `http://devmock:8000` | `http://devmock:8000` | Extension service URL (devmock locally) |
 | `MPT_PRODUCTS_IDS` | `PRD-1111-1111` | `PRD-1234-1234,PRD-4321-4321` | Comma-separated list of Marketplace product ids |
 | `MPT_TOOL_STORAGE_TYPE` | `local` | `airtable` | Storage type for MPT tools |
-| `MPT_TOOL_STORAGE_AIRTABLE_API_KEY` | - | `patXXXXXXXXXXXXXX` | Airtable API key when Airtable storage is enabled |
+| `MPT_TOOL_STORAGE_AIRTABLE_API_KEY` | - | `patXXXXXXXXXXXXXX` | Airtable API key when Airtable storage is enabled; fed by the `MptToolStorageAirtableApiKey` Helm secret carrying the shared Airtable service-account token (provisioned and rotated by DevOps) |
 | `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID` | - | `appXXXXXXXXXXXXXX` | Airtable base id when Airtable storage is enabled |
 | `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` | - | `MigrationTracking` | Airtable table name when Airtable storage is enabled |
 
