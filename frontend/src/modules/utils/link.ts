@@ -19,3 +19,11 @@ export function getEntityLink(
     ? `/${entityDomain}/${entityId}`
     : `/${entityDomain}/${entityType}/${entityId}`;
 }
+
+export function getItemLink(itemId: string | undefined): string | undefined {
+  return getEntityLink(EntityDomain.Catalog, EntityType.Items, itemId);
+}
+
+export function getSubscriptionLink(subscriptionId: string | undefined): string | undefined {
+  return getEntityLink(EntityDomain.Commerce, EntityType.Subscriptions, subscriptionId);
+}

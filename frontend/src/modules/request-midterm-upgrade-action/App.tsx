@@ -95,14 +95,20 @@ export default function App() {
   const movedQuantity = currentSelectedTarget?.delta ?? 0;
   const sourceTerms = TERM_PERIOD_LABELS[subscription?.terms?.period ?? ''] ?? '—';
   const sourceCommitment = TERM_COMMITMENT_LABELS[subscription?.terms?.commitment ?? ''] ?? '—';
+  const sourceItem = subscription?.lines?.[0]?.item;
   const sourceReviewRow: TargetSubscription = {
     id: subscription?.id ?? null,
     name: subscription?.name ?? null,
     status: subscription?.status ?? '',
     item: {
-      id: subscription?.lines?.[0]?.item?.id ?? '',
-      name: subscription?.lines?.[0]?.item?.name ?? '',
-      externalId: subscription?.lines?.[0]?.item?.externalIds?.vendor ?? '',
+      id: sourceItem?.id ?? '',
+      name: sourceItem?.name ?? '',
+      externalId: sourceItem?.externalIds?.vendor ?? '',
+      status: sourceItem?.status,
+      terms: sourceItem?.terms,
+      audit: sourceItem?.audit,
+      product: sourceItem?.product,
+      vendor: sourceItem?.vendor,
     },
     recommended: false,
     currentQuantity: sourceQuantity,
@@ -113,6 +119,9 @@ export default function App() {
     spxY: getYearlyPrice(sourceUnitSP, -movedQuantity),
     terms: sourceTerms,
     commitment: sourceCommitment,
+    commitmentDate: subscription?.commitmentDate,
+    subscriptionTerms: subscription?.terms,
+    audit: subscription?.audit,
   };
   const reviewSubscriptions = currentSelectedTarget
     ? [sourceReviewRow, currentSelectedTarget]
@@ -201,6 +210,11 @@ export default function App() {
           id: target.item?.id ?? '',
           name: target.item?.name ?? 'Item Name',
           externalId: target.item?.externalId ?? '1234567890',
+          status: target.item?.status,
+          terms: target.item?.terms,
+          audit: target.item?.audit,
+          product: target.item?.product,
+          vendor: target.item?.vendor,
         },
         targetBaseOfferId: target.targetBaseOfferId,
         recommended: recommendedOfferIds.has(target.targetBaseOfferId),
@@ -212,6 +226,9 @@ export default function App() {
         spxY: getYearlyPrice(unitSP, sourceQuantity),
         terms: sourceTerms,
         commitment: sourceCommitment,
+        commitmentDate: existing?.commitmentDate,
+        subscriptionTerms: existing?.terms,
+        audit: existing?.audit,
         };
       }),
     );

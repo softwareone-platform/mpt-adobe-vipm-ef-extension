@@ -1,6 +1,7 @@
 export interface Reference {
   id?: string;
   name?: string;
+  icon?: string;
 }
 
 export interface NamedEntity {
@@ -14,6 +15,7 @@ export interface Seller {
   id: string;
   name: string;
   status?: string;
+  icon?: string;
   audit?: Audit;
 }
 
@@ -21,6 +23,7 @@ export interface Buyer {
   id: string;
   name: string;
   status?: string;
+  icon?: string;
   taxId?: string;
   externalIds?: { erpCustomer?: string };
   account?: Reference;
@@ -31,6 +34,7 @@ export interface Licensee {
   id: string;
   name: string;
   status?: string;
+  icon?: string;
   account?: Reference;
   buyer?: Buyer;
   seller?: Seller;
@@ -40,6 +44,7 @@ export interface Licensee {
 
 export interface Price {
   currency?: string;
+  billingCurrency?: string;
   PPxY?: number;
   PPxM?: number;
   unitPP?: number;
@@ -59,6 +64,11 @@ export interface ProductItem {
   id: string;
   name: string;
   externalIds?: ExternalIds;
+  status?: string;
+  terms?: Terms;
+  audit?: Audit;
+  product?: Reference;
+  vendor?: Reference;
 }
 
 export interface SubscriptionLine {
@@ -128,6 +138,7 @@ export interface Agreement {
   seller?: Seller;
   buyer?: Buyer;
   licensee?: Licensee;
+  price?: Price;
   audit?: Audit;
 }
 
@@ -154,6 +165,8 @@ export interface Subscription {
   licensee?: Licensee;
   seller?: Seller;
   price?: Price;
+  commitmentDate?: string;
+  audit?: Audit;
 }
 
 export interface AdobeMinimumQuantity {
@@ -219,13 +232,28 @@ export interface AdobeTargetSubscription {
   status?: string | null;
   quantity?: number | null;
   lineId?: string | null;
+  commitmentDate?: string | null;
+  terms?: Terms;
+  audit?: Audit;
+}
+
+export interface AdobeTargetItem {
+  id: string;
+  name: string;
+  externalId: string;
+  unitSP?: number | null;
+  status?: string;
+  terms?: Terms;
+  audit?: Audit;
+  product?: Reference;
+  vendor?: Reference;
 }
 
 export interface AdobeTarget {
   targetBaseOfferId: string;
   sequence: number;
   switchType: 'PARTIAL_ALLOWED' | 'FULL_ONLY';
-  item?: { id: string; name: string; externalId: string; unitSP?: number | null } | null;
+  item?: AdobeTargetItem | null;
   subscription?: AdobeTargetSubscription | null;
 }
 

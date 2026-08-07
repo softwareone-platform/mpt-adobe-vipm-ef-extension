@@ -33,8 +33,8 @@ export function WizardHighlights({
   const licenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, subscription.licensee?.id);
   const buyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, subscription.buyer?.id);
   const sellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, subscription.seller?.id);
-  const baseCurrency = subscription.price?.currency ?? '';
-  const billingCurrency = subscription.price?.currency ?? '';
+  const baseCurrency = subscription.agreement?.price?.currency ?? '';
+  const billingCurrency = subscription.agreement?.price?.billingCurrency ?? '';
 
   const timestampContent = (at: string | undefined) =>
     at ? (
@@ -167,6 +167,7 @@ export function WizardHighlights({
           text={subscription.licensee?.name ?? undefined}
           secondaryContent={subscription.licensee?.id ?? undefined}
           url={licenseeUrl ?? undefined}
+          iconUrl={subscription.licensee?.icon}
           cardTitle={t('Common:Licensee')}
           card={licenseeInfoCard}
         />
@@ -176,6 +177,7 @@ export function WizardHighlights({
           text={subscription.buyer?.name ?? undefined}
           secondaryContent={subscription.buyer?.id ?? undefined}
           url={buyerUrl ?? undefined}
+          iconUrl={subscription.buyer?.icon}
           cardTitle={t('Common:Buyer')}
           card={buyerInfoCard}
         />
@@ -185,6 +187,7 @@ export function WizardHighlights({
           text={subscription.seller?.name ?? undefined}
           secondaryContent={subscription.seller?.id ?? undefined}
           url={sellerUrl ?? undefined}
+          iconUrl={subscription.seller?.icon}
           cardTitle={t('Common:Seller')}
           card={sellerInfoCard}
         />
