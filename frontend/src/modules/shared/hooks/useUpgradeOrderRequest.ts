@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 import { i18n } from '../../../i18n/translations';
 
-import type { Status } from '../model';
+import { useGuardedRequest } from './useGuardedRequest';
 
 export interface UpgradeOrderInput {
   targetOfferId: string;
@@ -19,41 +19,12 @@ export interface UpgradeOrderResult {
   type?: string | null;
 }
 
-interface RequestState {
-  error: string;
-  status: Status;
-}
-
-const INITIAL_REQUEST_STATE: RequestState = {
-  error: '',
-  status: 'idle',
-};
-
-function toErrorMessage(submitError: unknown): string {
-  const responseData = (submitError as { response?: { data?: { detail?: unknown; title?: unknown } } })
-    ?.response?.data;
-  if (typeof responseData?.detail === 'string' && responseData.detail) {
-    return responseData.detail;
-  }
-  if (typeof responseData?.title === 'string' && responseData.title) {
-    return responseData.title;
-  }
-  return submitError instanceof Error ? submitError.message : i18n.t('Errors:OrderSubmission');
-}
-
 export function useUpgradeOrderRequest(agreementId: string, subscriptionId: string) {
-  const [state, setState] = useState<RequestState>(INITIAL_REQUEST_STATE);
-  const inFlightRef = useRef(false);
+  const { run, reset, ...state } = useGuardedRequest('Errors:OrderSubmission');
 
   const submitOrder = useCallback(
-    async (input: UpgradeOrderInput): Promise<UpgradeOrderResult | false> => {
-      if (inFlightRef.current) {
-        return false;
-      }
-      inFlightRef.current = true;
-      setState({ error: '', status: 'loading' });
-
-      try {
+    (input: UpgradeOrderInput): Promise<UpgradeOrderResult | false> =>
+      run(async () => {
         const encodedAgreementId = encodeURIComponent(agreementId);
         const encodedSubscriptionId = encodeURIComponent(subscriptionId);
         const response = await http.post(
@@ -64,19 +35,10 @@ export function useUpgradeOrderRequest(agreementId: string, subscriptionId: stri
         if (!order?.id) {
           throw new Error(i18n.t('Errors:OrderNoData'));
         }
-        setState({ error: '', status: 'success' });
         return order;
-      } catch (submitError) {
-        setState({ error: toErrorMessage(submitError), status: 'error' });
-        return false;
-      } finally {
-        inFlightRef.current = false;
-      }
-    },
-    [agreementId, subscriptionId],
+      }),
+    [agreementId, subscriptionId, run],
   );
-
-  const reset = useCallback(() => setState(INITIAL_REQUEST_STATE), []);
 
   return { ...state, submitOrder, reset };
 }

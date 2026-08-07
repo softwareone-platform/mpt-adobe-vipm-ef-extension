@@ -353,6 +353,41 @@ export interface Order {
   notes?: string | null;
 }
 
+/** One existing subscription's renewal decision as the renewal endpoints expect it. */
+export interface RenewalPlanSubscriptionSelection {
+  id: string;
+  offerId: string;
+  renew: boolean;
+  renewalQuantity: number;
+}
+
+/** A net-new product selection as the renewal endpoints expect it. */
+export interface RenewalPlanNetNewItemSelection {
+  offerId: string;
+  quantity: number;
+}
+
+/** The renewal plan body shared by the 3YC check, preview and submission endpoints. */
+export interface RenewalPlanBody {
+  subscriptions: RenewalPlanSubscriptionSelection[];
+  netNewItems: RenewalPlanNetNewItemSelection[];
+}
+
+/** The renewal order body: the plan plus everything only the submission carries. */
+export interface RenewalOrderInput extends RenewalPlanBody {
+  flexDiscountCodes: string[];
+  recommendationTrackerId?: string;
+  notes?: string;
+  externalIds?: { client?: string };
+}
+
+/** The order the renewal submission endpoint returns. */
+export interface RenewalOrderResult {
+  id?: string | null;
+  status?: string | null;
+  type?: string | null;
+}
+
 export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }

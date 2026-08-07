@@ -14,7 +14,12 @@ export const COTERM_DATE_PARAM = 'cotermDate';
 export const WIZARD_GRID_PAGE_SIZE = 10;
 export const DISCOUNTS_FETCH_SIZE = 100;
 
-export const INITIAL_REQUEST_STATE: { error: string; status: Status } = {
+export interface RequestState {
+  error: string;
+  status: Status;
+}
+
+export const INITIAL_REQUEST_STATE: RequestState = {
   error: '',
   status: 'idle',
 };
