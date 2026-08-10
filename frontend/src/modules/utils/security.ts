@@ -56,3 +56,16 @@ export function canRequestGlobalCustomer(
 ): boolean {
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
+
+/**
+ * Mirrors the backend gate in `routers/api/discount_scope.py::require_editor_account`,
+ * which rejects client accounts with 403. Authoring closed discount codes is
+ * offered only to the accounts that would actually be allowed to save them.
+ */
+export function canManageDiscountCodes(
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  return canRequestAdobeAction(accountType, products, agreementProductId);
+}

@@ -1,0 +1,23 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.definition-step {
+  &__value-row {
+    display: flex;
+    align-items: flex-end;
+    gap: $var-spacing-2;
+  }
+
+  &__discount-type {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  &__value {
+    flex: 0 0 160px;
+  }
+
+  &__value-suffix {
+    padding-bottom: $var-spacing-1;
+    white-space: nowrap;
+  }
+}

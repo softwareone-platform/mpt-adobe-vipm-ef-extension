@@ -1,0 +1,35 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.validity-step {
+  &__period {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  &__period-inputs {
+    display: flex;
+    gap: $var-spacing-2;
+
+    > * {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+  }
+
+  &__reuse {
+    display: flex;
+    gap: $var-spacing-2;
+    align-items: flex-start;
+  }
+
+  &__reusable {
+    flex: 0 0 auto;
+  }
+
+  &__lock-date {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
