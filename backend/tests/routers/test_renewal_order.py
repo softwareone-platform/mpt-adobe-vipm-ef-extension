@@ -77,13 +77,14 @@ def _agreement_payload(product_id="PRD-1111-1111", status="Active"):
     }
 
 
-def _subscription_payload(vendor=_ADOBE_SUBSCRIPTION_ID, lines=None):
+def _subscription_payload(vendor=_ADOBE_SUBSCRIPTION_ID, lines=None, *, auto_renew=True):
     default_lines = [_line_payload(_LINE_ID, _SKU, _CURRENT_QUANTITY)]
     return {
         "id": _SUBSCRIPTION_ID,
         "name": "Renewing subscription",
         "externalIds": {"vendor": vendor},
         "lines": default_lines if lines is None else lines,
+        "autoRenew": auto_renew,
     }
 
 
@@ -205,6 +206,14 @@ def create_order_mock(mocker):
 
 
 @pytest.fixture
+def create_configuration_order_mock(mocker):
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.create_renewal_configuration_order",
+        mocker.AsyncMock(return_value={"id": "ORD-0002", "status": "Processing"}),
+    )
+
+
+@pytest.fixture
 def adobe_customer(adobe_call):
     """Preset the Adobe customer load with a customer holding no 3YC benefit."""
     adobe_call.returns = _customer_payload()
@@ -252,42 +261,50 @@ async def test_create_renewal_order_creates_the_order(fake_ctx, submit_deps, cre
     assert call_args[2] == [{"id": _LINE_ID, "quantity": 7}]
 
 
-async def test_create_renewal_order_keeps_the_current_quantity_on_a_lapse(
-    fake_ctx, submit_deps, create_order_mock, adobe_call
+async def test_create_renewal_order_creates_a_configuration_order_for_an_autorenew_only_change(
+    fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock, adobe_call
 ):
-    await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(renew=False, quantity=0))  # act
+    """Disabling AutoRenew with the quantity untouched carries no line-quantity delta.
 
-    call_args, _ = create_order_mock.await_args
-    assert call_args[2] == [{"id": _LINE_ID, "quantity": _CURRENT_QUANTITY}]
+    The platform rejects a Change order shaped like that, so the plan is
+    submitted as a Configuration order instead, carrying only the
+    AutoRenew-changed subscription's current snapshot.
+    """
+    body = _body(renew=False, quantity=0)  # renewing_subscription defaults autoRenew=True
+
+    result = await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload == {"id": "ORD-0002", "status": "Processing"}
+    call_args, _ = create_configuration_order_mock.await_args
+    assert call_args[2] == [
+        {
+            "id": _SUBSCRIPTION_ID,
+            "name": "Renewing subscription",
+            "revision": None,
+            "status": None,
+            "commitmentDate": None,
+            "AutoRenew": False,
+            "lines": [_line_payload(_LINE_ID, _SKU, _CURRENT_QUANTITY)],
+        },
+    ]
+    create_order_mock.assert_not_awaited()
     # Only the Adobe customer load (for the 3YC pre-check) runs: nothing renews,
-    # so there is no PREVIEW_RENEWAL quote.
+    # so there is no offer-id resolution and no PREVIEW_RENEWAL quote.
     assert len(adobe_call.calls) == 1
 
 
-async def test_create_renewal_order_previews_the_renewing_lines_with_codes(
-    fake_ctx, submit_deps, adobe_call
+async def test_create_renewal_order_rejects_a_plan_with_no_changes(
+    fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock, adobe_call
 ):
-    body = _body(codes=["ABCD-XV54-HG34-78YT"])
+    """A plan that neither moves a quantity nor flips AutoRenew is a pure no-op."""
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY)  # matches autoRenew=True and current qty
 
-    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+    with pytest.raises(ValidationError, match="no changes to submit"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
-    # calls[0] is the 3YC customer load, calls[1] resolves the full offer id
-    # from Adobe's live subscriptions, calls[2] is the PREVIEW_RENEWAL quote.
-    call_args, _ = adobe_call.calls[2]
-    assert call_args == (
-        "AUT-123",
-        "CUST-001",
-        "USD",
-        [
-            {
-                "extLineItemNumber": 1,
-                "offerId": _OFFER_ID,
-                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
-                "quantity": 7,
-                "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
-            },
-        ],
-    )
+    assert not adobe_call.calls
+    create_order_mock.assert_not_awaited()
+    create_configuration_order_mock.assert_not_awaited()
 
 
 async def test_create_renewal_order_passes_the_renewal_payload(
@@ -367,7 +384,7 @@ async def test_create_renewal_order_rejects_net_new_outside_the_window(
 
 
 @freeze_time(_TODAY)
-async def test_create_renewal_order_skips_the_preview_for_a_net_new_only_plan(
+async def test_create_renewal_order_creates_change_order_for_a_net_new_only_plan(
     fake_ctx, submit_deps, create_order_mock, adobe_call
 ):
     adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
@@ -378,6 +395,8 @@ async def test_create_renewal_order_skips_the_preview_for_a_net_new_only_plan(
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
+    # No renewing subscription: only the Adobe customer load runs, no offer-id
+    # resolution and no PREVIEW_RENEWAL quote.
     assert len(adobe_call.calls) == 1
     call_args, _ = create_order_mock.await_args
     assert call_args[2] == [{"item": {"id": _NET_NEW_ITEM_ID}, "quantity": 5}]
@@ -484,18 +503,18 @@ async def test_create_renewal_order_requires_subscription_lines(
         (AdobeError("Config error"), ValidationError),
     ],
 )
-async def test_create_renewal_order_maps_preview_errors_and_skips_order(
+async def test_create_renewal_order_maps_offer_id_resolution_errors(
     fake_ctx, submit_deps, create_order_mock, scenario
 ):
     error, expected = scenario
-    order_call = FakeAdobeCall()
-    order_call.error = error
-    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+    subscription_call = FakeAdobeCall()
+    subscription_call.error = error
+    fake_ctx.adobe_client.subscription = FakeAdobeNamespace(subscription_call)
 
     with pytest.raises(expected):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
 
-    assert order_call.calls
+    assert subscription_call.calls
     create_order_mock.assert_not_awaited()
 
 
@@ -524,6 +543,29 @@ async def test_create_renewal_order_maps_mpt_order_errors(fake_ctx, submit_deps,
 
     with pytest.raises(UpstreamServiceError):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
+
+
+async def test_create_renewal_order_requires_caller_auth_for_a_configuration_order(
+    fake_ctx, submit_deps, mocker
+):
+    mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.build_caller_client",
+        return_value=None,
+    )
+
+    with pytest.raises(ForbiddenError):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(renew=False, quantity=0))
+
+
+async def test_create_renewal_order_maps_configuration_order_mpt_errors(
+    fake_ctx, submit_deps, create_configuration_order_mock
+):
+    create_configuration_order_mock.side_effect = MPTHttpError(
+        http.HTTPStatus.BAD_REQUEST, "Bad Request", ""
+    )
+
+    with pytest.raises(UpstreamServiceError):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(renew=False, quantity=0))
 
 
 async def test_create_renewal_order_surfaces_the_platform_rejection_detail(
@@ -784,6 +826,33 @@ async def test_preview_renewal_plan_maps_adobe_errors(
 
     with pytest.raises(expected):
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        (_ADOBE_API_ERROR, UpstreamServiceError),
+        (
+            AdobeHttpError(http.HTTPStatus.SERVICE_UNAVAILABLE, "Service Unavailable"),
+            UpstreamServiceError,
+        ),
+        (AdobeError("Config error"), ValidationError),
+    ],
+)
+async def test_preview_renewal_plan_maps_preview_call_errors(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call, scenario
+):
+    """Isolates errors from the PREVIEW_RENEWAL call itself, past offer-id resolution."""
+    adobe_call.returns = {"items": []}
+    error, expected = scenario
+    order_call = FakeAdobeCall()
+    order_call.error = error
+    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+
+    with pytest.raises(expected):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+    assert order_call.calls
 
 
 @pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])

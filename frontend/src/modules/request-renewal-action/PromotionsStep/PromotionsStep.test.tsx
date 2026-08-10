@@ -346,8 +346,7 @@ describe('PromotionsStep', () => {
       expect(registeredOnNext).toBeDefined();
     });
 
-    it('previews the selected discount codes on the renewing lines, then advances', async () => {
-      mockPost.mockResolvedValue({ data: { data: {} } });
+    it('advances without validating the discount codes against Adobe', async () => {
       const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'code-one' } });
       await findByTestId('grid');
 
@@ -357,65 +356,7 @@ describe('PromotionsStep', () => {
       });
 
       expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
-      expect(mockPost).toHaveBeenCalledWith(
-        '/api/v2/agreements/AGR-1/renewal-order/preview',
-        {
-          subscriptions: [
-            { id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 10 },
-            { id: 'SUB-2', offerId: 'OFFER-2', renew: false, renewalQuantity: 0 },
-          ],
-          flexDiscountCodes: ['CODE-ONE'],
-        },
-      );
-    });
-
-    it('stays on the step and shows the Adobe message when a discount code is rejected', async () => {
-      mockPost.mockRejectedValue({
-        response: { data: { detail: '3132 - Ineligible product or orderType' } },
-      });
-      const { findByTestId, getByTestId } = renderStep({
-        discountSelections: { 'SUB-1': 'BAD-CODE' },
-      });
-      await findByTestId('grid');
-
-      let nextIndex: number | undefined;
-      await act(async () => {
-        nextIndex = await registeredOnNext!(NAVIGATION);
-      });
-
-      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
-      expect(getByTestId('promotions-step-validation-error').textContent).toContain(
-        '3132 - Ineligible product or orderType',
-      );
-    });
-
-    it('clears the validation outcome when the discount selection changes', async () => {
-      mockPost.mockRejectedValue({
-        response: { data: { detail: '3132 - Ineligible product or orderType' } },
-      });
-      const { findByTestId, getByTestId, queryByTestId, rerender } = renderStep({
-        discountSelections: { 'SUB-1': 'BAD-CODE' },
-      });
-      await findByTestId('grid');
-
-      await act(async () => {
-        await registeredOnNext!(NAVIGATION);
-      });
-      expect(getByTestId('promotions-step-validation-error')).toBeTruthy();
-
-      rerender(
-        <PromotionsStep
-          agreement={AGREEMENT}
-          subscriptions={SUBSCRIPTIONS}
-          selections={{}}
-          quantities={{}}
-          netNewItems={[]}
-          discountSelections={{}}
-          onDiscountChange={jest.fn()}
-        />,
-      );
-
-      expect(queryByTestId('promotions-step-validation-error')).toBeNull();
+      expect(mockPost).not.toHaveBeenCalled();
     });
   });
 });
