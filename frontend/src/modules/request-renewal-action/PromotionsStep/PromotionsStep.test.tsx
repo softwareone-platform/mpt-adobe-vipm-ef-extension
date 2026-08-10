@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -11,10 +11,26 @@ import type { DiscountSelections, NetNewItem } from '../model';
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
     get: jest.fn(),
+    post: jest.fn(),
   },
 }), { virtual: true });
 
 const mockGet = jest.mocked(http.get);
+const mockPost = jest.mocked(http.post);
+
+interface NavProps {
+  currentStepIndex: number;
+  targetStepIndex: number;
+}
+
+let registeredOnNext: ((props: NavProps) => Promise<number> | number) | undefined;
+const registerOnNextCallback = jest.fn((callback: (props: NavProps) => Promise<number> | number) => {
+  registeredOnNext = callback;
+});
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => ({
+  useStepActions: () => ({ registerOnNextCallback }),
+}));
 
 let capturedRows: { id: string; spxM: number | null; spxY: number | null }[] = [];
 
@@ -206,6 +222,7 @@ describe('PromotionsStep', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGet.mockResolvedValue({ data: { data: DISCOUNTS } });
+    registeredOnNext = undefined;
   });
 
   it('renders the heading, the highlights and the prompt', async () => {
@@ -316,5 +333,89 @@ describe('PromotionsStep', () => {
     expect((await findByTestId('promotions-step-error')).textContent).toContain(
       'Discounts are down',
     );
+  });
+
+  describe('next-step gate', () => {
+    const NAVIGATION = { currentStepIndex: 3, targetStepIndex: 4 };
+
+    it('registers the gate on the wizard next action', async () => {
+      const { findByTestId } = renderStep();
+
+      await findByTestId('grid');
+      expect(registerOnNextCallback).toHaveBeenCalled();
+      expect(registeredOnNext).toBeDefined();
+    });
+
+    it('previews the selected discount codes on the renewing lines, then advances', async () => {
+      mockPost.mockResolvedValue({ data: { data: {} } });
+      const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'code-one' } });
+      await findByTestId('grid');
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
+      expect(mockPost).toHaveBeenCalledWith(
+        '/api/v2/agreements/AGR-1/renewal-order/preview',
+        {
+          subscriptions: [
+            { id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 10 },
+            { id: 'SUB-2', offerId: 'OFFER-2', renew: false, renewalQuantity: 0 },
+          ],
+          flexDiscountCodes: ['CODE-ONE'],
+        },
+      );
+    });
+
+    it('stays on the step and shows the Adobe message when a discount code is rejected', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: '3132 - Ineligible product or orderType' } },
+      });
+      const { findByTestId, getByTestId } = renderStep({
+        discountSelections: { 'SUB-1': 'BAD-CODE' },
+      });
+      await findByTestId('grid');
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(getByTestId('promotions-step-validation-error').textContent).toContain(
+        '3132 - Ineligible product or orderType',
+      );
+    });
+
+    it('clears the validation outcome when the discount selection changes', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: '3132 - Ineligible product or orderType' } },
+      });
+      const { findByTestId, getByTestId, queryByTestId, rerender } = renderStep({
+        discountSelections: { 'SUB-1': 'BAD-CODE' },
+      });
+      await findByTestId('grid');
+
+      await act(async () => {
+        await registeredOnNext!(NAVIGATION);
+      });
+      expect(getByTestId('promotions-step-validation-error')).toBeTruthy();
+
+      rerender(
+        <PromotionsStep
+          agreement={AGREEMENT}
+          subscriptions={SUBSCRIPTIONS}
+          selections={{}}
+          quantities={{}}
+          netNewItems={[]}
+          discountSelections={{}}
+          onDiscountChange={jest.fn()}
+        />,
+      );
+
+      expect(queryByTestId('promotions-step-validation-error')).toBeNull();
+    });
   });
 });

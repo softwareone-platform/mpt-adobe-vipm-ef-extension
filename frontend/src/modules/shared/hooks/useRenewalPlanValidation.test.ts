@@ -2,7 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
-import { useRenewalPlanValidation, type RenewalPlanBody } from './useRenewalPlanValidation';
+import type { RenewalPlanBody } from '../model';
+import { useRenewalPlanValidation } from './useRenewalPlanValidation';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {

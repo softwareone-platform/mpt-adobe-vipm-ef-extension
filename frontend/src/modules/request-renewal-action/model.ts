@@ -1,5 +1,4 @@
-import type { RenewalPlanBody } from '../shared/hooks/useRenewalPlanValidation';
-import type { Discount, Subscription, Terms } from '../shared/model';
+import type { Discount, RenewalPlanBody, Subscription, Terms } from '../shared/model';
 import { getPartialSku } from '../utils/sku';
 
 export type RenewalPath = 'anniversary' | 'now';

@@ -16,9 +16,9 @@ import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscript
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
 import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations';
 import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
-import type { RenewalOrderResult } from '../shared/hooks/useRenewalOrderRequest';
 import { useSettingsResult } from '../shared/hooks/useSettings';
 import { getRecommendedOfferIds, readParameter } from '../shared/model';
+import type { RenewalOrderResult } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
 import { canRequestRenewalAction } from '../utils/security';

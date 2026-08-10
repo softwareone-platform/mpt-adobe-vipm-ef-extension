@@ -4,8 +4,7 @@ import { MediumText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
 import { i18n } from '../../../i18n/translations';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
-import type { RenewalOrderResult } from '../../shared/hooks/useRenewalOrderRequest';
-import type { Agreement } from '../../shared/model';
+import type { Agreement, RenewalOrderResult } from '../../shared/model';
 
 import './SummaryStep.scss';
 
