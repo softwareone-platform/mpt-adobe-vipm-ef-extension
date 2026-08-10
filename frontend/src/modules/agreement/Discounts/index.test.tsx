@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import { http } from '@mpt-extension/sdk';
@@ -6,8 +6,11 @@ import { useMPTContext } from '@mpt-extension/sdk-react';
 
 import { Discounts } from '.';
 
+const mockOpen = jest.fn();
+
 jest.mock('@mpt-extension/sdk-react', () => ({
   useMPTContext: jest.fn(),
+  useMPTModal: () => ({ open: mockOpen, close: jest.fn() }),
 }), { virtual: true });
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -39,6 +42,14 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/chip', () =>
       '../../shared/testing/sdkUiMocks',
     )
     .createChipMock(),
+);
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () =>
+  jest
+    .requireActual<typeof import('../../shared/testing/sdkUiMocks')>(
+      '../../shared/testing/sdkUiMocks',
+    )
+    .createButtonMock(),
 );
 
 // Captures every useGridAsync config so tests can drive grid events (paging)
@@ -86,9 +97,34 @@ const DISCOUNTS = [
   },
 ];
 
+const PRODUCT_ID = 'PRD-1111-1111';
+const DISCOUNTS_URL = '/api/v2/discount-codes';
+
+// The view fetches both the discount page and the settings that gate the
+// "Add closed discount" action, so the stub answers per endpoint.
 function mockBackend(data: unknown[] = DISCOUNTS, total: number = data.length) {
-  mockGet.mockResolvedValue({
-    data: { data, $meta: { pagination: { offset: 0, limit: 10, total } } },
+  mockGet.mockImplementation((url: string) => {
+    if (url === '/api/v2/settings') {
+      return Promise.resolve({
+        data: { data: { products: [{ id: PRODUCT_ID, segment: 'COM' }] } },
+      });
+    }
+    return Promise.resolve({
+      data: { data, $meta: { pagination: { offset: 0, limit: 10, total } } },
+    });
+  });
+}
+
+function discountRequests() {
+  return mockGet.mock.calls.filter(([url]) => url === DISCOUNTS_URL);
+}
+
+function mockAccount(type: string) {
+  mockUseMPTContext.mockReturnValue({
+    auth: { account: { type } },
+    data: {
+      agreement: { id: 'AGR-0000-0000-0000', product: { id: PRODUCT_ID } },
+    },
   });
 }
 
@@ -102,16 +138,14 @@ describe('Discounts view', () => {
     jest.clearAllMocks();
     mockGridConfigs.length = 0;
     mockBackend();
-    mockUseMPTContext.mockReturnValue({
-      data: { agreement: { id: 'AGR-0000-0000-0000' } },
-    });
+    mockAccount('Operations');
   });
 
   it('fetches the first page of discounts scoped to the agreement', async () => {
     await renderDiscounts();
 
     expect(mockGet).toHaveBeenCalledWith(
-      '/api/v2/discount-codes',
+      DISCOUNTS_URL,
       expect.objectContaining({
         params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 },
       }),
@@ -167,9 +201,9 @@ describe('Discounts view', () => {
       lastConfig.onConfigChange({ paging: { page: 2, pageSize: 10 } });
     });
 
-    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(discountRequests()).toHaveLength(2));
     expect(mockGet).toHaveBeenLastCalledWith(
-      '/api/v2/discount-codes',
+      DISCOUNTS_URL,
       expect.objectContaining({
         params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 },
       }),
@@ -192,5 +226,67 @@ describe('Discounts view', () => {
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1];
     expect(lastConfig.error).toBe('Airtable unavailable');
+  });
+
+  it('renders the add action inside the grid toolbar for editor accounts', async () => {
+    await renderDiscounts();
+
+    const button = screen.getByRole('button', { name: 'Add closed discount' });
+    expect(button).toBeInTheDocument();
+    expect(screen.getByTestId('grid__toolbar')).toContainElement(button);
+  });
+
+  it.each(['Vendor', 'Operations'])('offers the add action to %s accounts', async (type) => {
+    mockAccount(type);
+
+    await renderDiscounts();
+
+    expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
+  });
+
+  it('hides the add action from client accounts', async () => {
+    mockAccount('Client');
+
+    await renderDiscounts();
+
+    expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
+  });
+
+  it('opens the discount wizard plug with the create mode on the context', async () => {
+    await renderDiscounts();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add closed discount' }));
+
+    expect(mockOpen).toHaveBeenCalledWith(
+      'request-discount-action',
+      expect.objectContaining({
+        context: expect.objectContaining({ discount: { mode: 'create' } }),
+      }),
+    );
+  });
+
+  it('refreshes the grid when the wizard closes', async () => {
+    await renderDiscounts();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add closed discount' }));
+    const { onClose } = mockOpen.mock.calls[0][1] as { onClose: () => Promise<void> };
+    await act(async () => {
+      await onClose();
+    });
+
+    await waitFor(() => expect(discountRequests()).toHaveLength(2));
+  });
+
+  it('hides the add action when the agreement product is not served by the extension', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Operations' } },
+      data: {
+        agreement: { id: 'AGR-0000-0000-0000', product: { id: 'PRD-9999-9999' } },
+      },
+    });
+
+    await renderDiscounts();
+
+    expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
   });
 });
