@@ -17,11 +17,13 @@ from mpt_extension_sdk.routing import APIRouter
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.renewal import (
+    NetNewItemSelection,
     RenewalOrderRequest,
     RenewalPayload,
     RenewalPlanRequest,
     RenewalPreviewRequest,
     RenewalSubscriptionSelection,
+    SkuAutoRenewSupportRequest,
 )
 from mpt_adobe_vipm_ef.routers.api.customer import (
     get_authorization_id,
@@ -32,7 +34,12 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import resolve_market_segment
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
+from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.services.renewal import require_scheduled_creation_window
+from mpt_adobe_vipm_ef.services.renewal_auto_renew import (
+    check_renewal_plan_auto_renew_support,
+    load_auto_renew_support,
+)
 from mpt_adobe_vipm_ef.services.renewal_order import (
     build_configuration_order_subscriptions,
     build_renewal_order_lines,
@@ -63,13 +70,45 @@ _ADOBE_REQUEST_FAILED_DETAIL = "Adobe service request failed"
 
 
 @renewal_router.post(
+    path="/{agreement_id}/renewal-order/auto-renew-support",
+    name="agreements-renewal-order-auto-renew-support",
+    body_validator=SkuAutoRenewSupportRequest,
+)
+@validate_agreement_access
+@log_inputs
+async def get_renewal_auto_renew_support(
+    agreement_id: str, ctx: APIContext, body: SkuAutoRenewSupportRequest
+) -> APIResponse:
+    """Report which of the given SKUs can renew at the anniversary date.
+
+    Auto-renewal support is the at-anniversary path's routing input, so the
+    wizard reads it before it offers anything: a subscription whose SKU has no
+    support is left out of the renewal plan rather than shown with its Renew
+    toggle off. Keyed by partial SKU; an unmapped SKU comes back
+    unsupported. The market segment behind the lookup is resolved from the
+    agreement server-side.
+    """
+    _require_client_account(ctx)
+    agreement = await load_agreement(ctx, agreement_id)
+    partial_skus = sorted({get_partial_sku(sku) for sku in body.skus if sku})
+    if not partial_skus:
+        return APIResponse.ok(payload={"skus": {}})
+    support = await load_auto_renew_support(
+        ctx, partial_skus, resolve_market_segment(ctx, agreement)
+    )
+    return APIResponse.ok(
+        payload={"skus": {sku: support.get(sku, False) for sku in partial_skus}},
+    )
+
+
+@renewal_router.post(
     path="/{agreement_id}/renewal-order/3yc-check",
     name="agreements-renewal-order-3yc-check",
     body_validator=RenewalPlanRequest,
 )
 @validate_agreement_access
 @log_inputs
-async def check_renewal_order_three_yc(
+async def check_renewal_order_three_yc(  # noqa: WPS217
     agreement_id: str, ctx: APIContext, body: RenewalPlanRequest
 ) -> APIResponse:
     """Pre-check the renewal plan against the customer's 3YC minimum quantities.
@@ -77,7 +116,8 @@ async def check_renewal_order_three_yc(
     The wizard calls this while the customer selects the plan's items, before
     the discount codes step: a decrease or a disabled renewal that would place
     a committed customer below the three-year commitment floors fails here
-    with a wizard-friendly message instead of a rejected order. Returns the
+    with a wizard-friendly message instead of a rejected order, as does a
+    product whose SKU cannot renew at the anniversary at all. Returns the 3YC
     check summary (the totals compared and the floors) when the plan holds.
     """
     _require_client_account(ctx)
@@ -87,6 +127,7 @@ async def check_renewal_order_three_yc(
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
     customer = await _load_adobe_customer(ctx, agreement_id)
     summary = await _check_three_yc_floor(
         ctx, agreement, customer, plan_subscriptions, net_new_lines
@@ -110,13 +151,15 @@ async def preview_renewal_plan(
     discount codes ride on every renewing line, so Adobe validates their
     eligibility and returns the renewal pricing the wizard shows as the
     estimate. Net-new products have no Adobe subscription to preview yet and
-    are priced only at fulfilment.
+    are priced only at fulfilment. A SKU that cannot renew at the anniversary is
+    rejected here too, so no route quotes a plan the submit route would refuse.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
     plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     line_items = build_preview_renewal_line_items(plan_subscriptions, body.flex_discount_codes)
     if not line_items:
@@ -159,6 +202,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
     require_renewal_changes(plan_subscriptions, net_new_lines)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
 
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
@@ -186,6 +230,20 @@ def _require_client_account(ctx: APIContext) -> None:
         raise ForbiddenError(
             detail="The at-anniversary renewal is available to client accounts only.",
         )
+
+
+async def _check_auto_renew_support(
+    ctx: APIContext,
+    agreement: Agreement,
+    plan_subscriptions: list[PlanSubscription],
+    net_new_items: list[NetNewItemSelection],
+) -> None:
+    return await check_renewal_plan_auto_renew_support(
+        ctx,
+        lambda: resolve_market_segment(ctx, agreement),
+        plan_subscriptions,
+        net_new_items,
+    )
 
 
 async def _check_three_yc_floor(

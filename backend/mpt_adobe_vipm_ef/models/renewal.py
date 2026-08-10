@@ -66,6 +66,18 @@ class RenewalPlanRequest(BaseSchema):
         return subscriptions
 
 
+class SkuAutoRenewSupportRequest(BaseSchema):
+    """Body schema: the SKUs whose at-anniversary eligibility the wizard needs.
+
+    The wizard sends the offer ids it is about to put in front of the customer —
+    the agreement's held subscriptions and the add-items picker's price list
+    entries — and routes each one on the reply. Full or partial offer ids are
+    both accepted; the lookup keys on the partial SKU.
+    """
+
+    skus: list[str] = Field(default_factory=list)
+
+
 class RenewalPreviewRequest(RenewalPlanRequest):
     """Body schema for the renewal preview (pricing and discount codes) endpoint."""
 

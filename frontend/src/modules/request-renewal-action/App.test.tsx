@@ -67,11 +67,21 @@ jest.mock('@mpt-extension/sdk', () => ({
 const mockPost = jest.mocked(http.post);
 const mockGet = jest.mocked(http.get);
 
+const AUTO_RENEW_SUPPORT_URL = '/api/v2/agreements/AGR-1/renewal-order/auto-renew-support';
+const AUTO_RENEW_SUPPORTED = { '65322587CA': true, '65322588CA': true };
+
 function respondTo(url: string) {
   if (url === '/api/v2/settings') {
     return Promise.resolve({ data: { data: { products: [{ id: 'PRD-1', segment: 'COM' }] } } });
   }
   return Promise.resolve({ data: { data: SUBSCRIPTIONS } });
+}
+
+function respondToPost(url: string, support = AUTO_RENEW_SUPPORTED) {
+  if (url === AUTO_RENEW_SUPPORT_URL) {
+    return Promise.resolve({ data: { data: { skus: support } } });
+  }
+  return Promise.resolve({ data: { data: AGREEMENT } });
 }
 
 interface MockChildren {
@@ -110,6 +120,7 @@ interface TimingProps {
   renewalDate?: string;
   path: string;
   onPathChange: (path: string) => void;
+  lockedPath?: string | null;
 }
 let timingProps: TimingProps;
 
@@ -236,7 +247,7 @@ describe('request-renewal-action App', () => {
     mockAccountType = 'Client';
     mockPost.mockReset();
     mockGet.mockReset();
-    mockPost.mockResolvedValue({ data: { data: AGREEMENT } });
+    mockPost.mockImplementation((url: string) => respondToPost(url));
     mockGet.mockImplementation((url: string) => respondTo(url));
   });
 
@@ -271,6 +282,55 @@ describe('request-renewal-action App', () => {
       '/api/v2/agreements/AGR-1/subscriptions',
       expect.objectContaining({ signal: expect.anything() }),
     );
+  });
+
+  it('asks which held SKUs can renew at the anniversary', async () => {
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        AUTO_RENEW_SUPPORT_URL,
+        { skus: ['65322587CA', '65322588CA'] },
+        expect.objectContaining({ signal: expect.anything() }),
+      ),
+    );
+  });
+
+  it('keeps a subscription whose SKU cannot auto-renew out of the plan', async () => {
+    mockActiveStepIndex = 1;
+    mockPost.mockImplementation((url: string) =>
+      respondToPost(url, { '65322587CA': true, '65322588CA': false }),
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Renewal step')).toBeTruthy();
+    await waitFor(() =>
+      expect(renewalProps.subscriptions.map((subscription) => subscription.id)).toEqual(['SUB-1']),
+    );
+  });
+
+  it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {
+    mockPost.mockImplementation((url: string) =>
+      respondToPost(url, { '65322587CA': false, '65322588CA': false }),
+    );
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    expect(timingProps.path).toBe('anniversary');
+    expect(timingProps.lockedPath).toBeUndefined();
+  });
+
+  it('surfaces a failed auto-renewal support lookup with a retry', async () => {
+    mockPost.mockImplementation((url: string) =>
+      url === AUTO_RENEW_SUPPORT_URL
+        ? Promise.reject(new Error('Airtable unavailable'))
+        : respondToPost(url),
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Airtable unavailable')).toBeTruthy();
+    expect(screen.queryByText('Timing step')).toBeNull();
   });
 
   it('hands the renewal date and the selected path to the timing step', async () => {
@@ -395,7 +455,7 @@ describe('request-renewal-action App', () => {
       if (url === '/api/v2/agreements/AGR-1/renewal-order') {
         return Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } });
       }
-      return Promise.resolve({ data: { data: AGREEMENT } });
+      return respondToPost(url);
     });
     render(<App />);
 
@@ -432,7 +492,7 @@ describe('request-renewal-action App', () => {
     mockPost.mockImplementation((url: string) =>
       url === '/api/v2/agreements/AGR-1/renewal-order'
         ? Promise.reject({ response: { data: { detail: 'Adobe rejected the plan.' } } })
-        : Promise.resolve({ data: { data: AGREEMENT } }),
+        : respondToPost(url),
     );
     render(<App />);
 
