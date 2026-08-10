@@ -2,11 +2,13 @@
 
 The SoftwareOne Adobe extensions keep the Adobe product master data in an
 Airtable base with a ``SKU Mapping`` table: one row per partial SKU and
-segment, whose ``type_3yc`` column classifies the product as a three-year
-commitment license or consumable. The 3YC floor pre-check needs that
-classification to split the renewal quantities between the LICENSE and
-CONSUMABLES commitment floors. All methods are synchronous and callers run
-them in a thread.
+segment. Two hand-curated columns drive the at-anniversary renewal: ``type_3yc``
+classifies the product as a three-year commitment license or consumable, which
+the 3YC floor pre-check needs to split the renewal quantities between the
+LICENSE and CONSUMABLES commitment floors, and ``auto_renew_supported`` states
+whether the SKU can auto-renew at all, which routes it into or out of the
+at-anniversary path. Neither can be derived from Adobe data. All methods are
+synchronous and callers run them in a thread.
 """
 
 from types import MappingProxyType
@@ -69,6 +71,31 @@ class SkuMappingStore:
         records = self._table(SKU_MAPPING_TABLE).all(formula=formula)
         return {
             record["fields"]["vendor_external_id"]: record["fields"].get("type_3yc", "")
+            for record in records
+            if record.get("fields", {}).get("vendor_external_id")
+        }
+
+    def list_auto_renew_supported(
+        self, partial_skus: list[str], market_segment: str
+    ) -> dict[str, bool]:
+        """Return whether each SKU within the segment supports auto-renewal.
+
+        Keyed by partial SKU (the ``vendor_external_id`` column). An unticked
+        ``auto_renew_supported`` checkbox is absent from the Airtable row, and a
+        SKU without a mapping row is absent from the result, so both read as
+        unsupported at the call site.
+        """
+        if not partial_skus:
+            return {}
+        formula = AND(
+            EQ(Field("segment"), _to_airtable_segment(market_segment)),
+            OR(*(EQ(Field("vendor_external_id"), sku) for sku in partial_skus)),
+        )
+        records = self._table(SKU_MAPPING_TABLE).all(formula=formula)
+        return {
+            record["fields"]["vendor_external_id"]: bool(
+                record["fields"].get("auto_renew_supported")
+            )
             for record in records
             if record.get("fields", {}).get("vendor_external_id")
         }

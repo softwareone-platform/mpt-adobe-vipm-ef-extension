@@ -19,10 +19,12 @@ from mpt_adobe_vipm_ef.models.renewal import (
     RenewalOrderRequest,
     RenewalPlanRequest,
     RenewalPreviewRequest,
+    SkuAutoRenewSupportRequest,
 )
 from mpt_adobe_vipm_ef.routers.api.renewal import (
     check_renewal_order_three_yc,
     create_renewal_order,
+    get_renewal_auto_renew_support,
     preview_renewal_plan,
 )
 from mpt_adobe_vipm_ef.services.sku_mapping import THREE_YC_TYPE_LICENSE
@@ -122,7 +124,7 @@ def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None):
     })
 
 
-def _preview_body(*, renew=True, quantity=7, codes=None):
+def _preview_body(*, renew=True, quantity=7, codes=None, net_new=None):
     return RenewalPreviewRequest.model_validate({
         "subscriptions": [
             {
@@ -132,6 +134,7 @@ def _preview_body(*, renew=True, quantity=7, codes=None):
                 "renewalQuantity": quantity,
             },
         ],
+        "netNewItems": net_new or [],
         "flexDiscountCodes": codes or [],
     })
 
@@ -237,6 +240,22 @@ def sku_mapping_store(mocker, fake_ctx, allowed_product_id):
         _SKU: THREE_YC_TYPE_LICENSE,
         _NET_NEW_SKU: THREE_YC_TYPE_LICENSE,
     }
+    return store
+
+
+@pytest.fixture(autouse=True)
+def auto_renew_support_store(mocker, fake_ctx, allowed_product_id):
+    """Stub the per-SKU auto-renewal support gate every renewal endpoint runs.
+
+    Autouse because the gate stands in front of the whole renewal flow: without
+    it every endpoint call would reach the real Airtable store. Both SKUs
+    support auto-renewal, so tests that do not care about routing are
+    unaffected; a test that does re-points ``list_auto_renew_supported``.
+    """
+    fake_ctx.ext_settings.product_segments = (ProductSegment(id=allowed_product_id, segment="COM"),)
+    store_cls = mocker.patch("mpt_adobe_vipm_ef.services.renewal_auto_renew.SkuMappingStore")
+    store = store_cls.from_settings.return_value
+    store.list_auto_renew_supported.return_value = {_SKU: True, _NET_NEW_SKU: True}
     return store
 
 
@@ -863,3 +882,102 @@ async def test_preview_renewal_plan_rejects_non_client_account(
 
     with pytest.raises(ForbiddenError):
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+
+async def test_check_renewal_order_blocks_a_sku_without_auto_renewal_support(
+    fake_ctx, renewal_agreement, renewing_subscription, auto_renew_support_store
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: False}
+
+    with pytest.raises(ValidationError, match="cannot renew at the anniversary date"):
+        await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body())
+
+    auto_renew_support_store.list_auto_renew_supported.assert_called_once_with([_SKU], "COM")
+
+
+async def test_preview_renewal_plan_blocks_a_sku_without_auto_renewal_support(
+    fake_ctx, renewal_agreement, renewing_subscription, auto_renew_support_store
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: False}
+
+    with pytest.raises(ValidationError, match="cannot renew at the anniversary date"):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+
+async def test_preview_renewal_plan_blocks_a_net_new_sku_without_auto_renewal_support(
+    fake_ctx, renewal_agreement, renewing_subscription, auto_renew_support_store
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {
+        _SKU: True,
+        _NET_NEW_SKU: False,
+    }
+    body = _preview_body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
+
+    with pytest.raises(ValidationError) as exc_info:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
+    assert exc_info.value.errors[0].pointer == "#/netNewItems"
+
+
+async def test_create_renewal_order_blocks_a_sku_without_auto_renewal_support(
+    fake_ctx, submit_deps, auto_renew_support_store, create_order_mock
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: False}
+
+    with pytest.raises(ValidationError, match="cannot renew at the anniversary date"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
+
+    create_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_blocks_a_net_new_sku_without_auto_renewal_support(
+    fake_ctx, submit_deps, resolve_net_new_item, auto_renew_support_store, create_order_mock
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {
+        _SKU: True,
+        _NET_NEW_SKU: False,
+    }
+    body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
+
+    with pytest.raises(ValidationError) as exc_info:
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    assert exc_info.value.errors[0].pointer == "#/netNewItems"
+    create_order_mock.assert_not_awaited()
+
+
+async def test_get_renewal_auto_renew_support_reports_each_sku(
+    fake_ctx, renewal_agreement, auto_renew_support_store
+):
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: True}
+    body = SkuAutoRenewSupportRequest.model_validate({"skus": [_OFFER_ID, _NET_NEW_SKU]})
+
+    result = await get_renewal_auto_renew_support(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {"skus": {_SKU: True, _NET_NEW_SKU: False}}
+    auto_renew_support_store.list_auto_renew_supported.assert_called_once_with(
+        [_SKU, _NET_NEW_SKU], "COM"
+    )
+
+
+async def test_get_renewal_auto_renew_support_handles_an_empty_request(
+    fake_ctx, renewal_agreement, auto_renew_support_store
+):
+    body = SkuAutoRenewSupportRequest.model_validate({"skus": []})
+
+    result = await get_renewal_auto_renew_support(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload == {"skus": {}}
+    auto_renew_support_store.list_auto_renew_supported.assert_not_called()
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_get_renewal_auto_renew_support_rejects_non_client_account(
+    fake_ctx, renewal_agreement, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+    body = SkuAutoRenewSupportRequest.model_validate({"skus": [_OFFER_ID]})
+
+    with pytest.raises(ForbiddenError):
+        await get_renewal_auto_renew_support(_AGREEMENT_ID, fake_ctx, body)
