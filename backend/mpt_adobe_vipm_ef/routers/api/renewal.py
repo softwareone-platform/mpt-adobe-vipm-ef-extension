@@ -34,8 +34,10 @@ from mpt_adobe_vipm_ef.routers.api.discount_scope import resolve_market_segment
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 from mpt_adobe_vipm_ef.services.renewal import require_scheduled_creation_window
 from mpt_adobe_vipm_ef.services.renewal_order import (
+    build_configuration_order_subscriptions,
     build_renewal_order_lines,
     create_renewal_change_order,
+    create_renewal_configuration_order,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (
     Line,
@@ -43,6 +45,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_lines,
 )
@@ -135,15 +138,18 @@ async def preview_renewal_plan(
 async def create_renewal_order(  # noqa: WPS210, WPS217
     agreement_id: str, ctx: APIContext, body: RenewalOrderRequest
 ) -> APIResponse:
-    """Submit an at-anniversary renewal plan as a renewal-driven change order.
+    """Submit an at-anniversary renewal plan as a Change or Configuration order.
 
-    Validates the customer's plan, re-checks the 3YC commitment floors, gates
-    the plan through an Adobe ``PREVIEW_RENEWAL`` quote carrying the
-    selections (quantities and flexible discount codes), and only then creates
-    the change order (directly in Processing status) carrying the plan
-    snapshot — renew decisions, quantities, discount codes and the
-    recommendation tracker id — on the hidden ``renewalPayload`` order
-    parameter.
+    Validates the customer's plan and re-checks the 3YC commitment floors,
+    then dispatches on what actually changed: any subscription whose renewal
+    quantity differs from its current quantity, or any net-new product, is
+    submitted as a Change order (directly in Processing status) carrying only
+    the changed lines plus the plan snapshot — renew decisions, quantities,
+    discount codes and the recommendation tracker id — on the hidden
+    ``renewalPayload`` order parameter. Otherwise, when only AutoRenew
+    decisions changed, it is submitted as a Configuration order carrying only
+    the AutoRenew-changed subscriptions. The platform accepts neither order
+    type for a plan with no real change, so that case is rejected upfront.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -152,21 +158,26 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
+    require_renewal_changes(plan_subscriptions, net_new_lines)
+
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
     if net_new_lines:
         require_scheduled_creation_window(str(customer.get("cotermDate") or ""))
 
-    currency_code = agreement.authorization.currency or ""
-    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
-    preview_line_items = build_preview_renewal_line_items(
-        plan_subscriptions, body.flex_discount_codes
-    )
-    await _preview_renewal(ctx, agreement_id, currency_code, preview_line_items)
-
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
-    renewal_payload = build_renewal_payload(plan_subscriptions, net_new_lines, body, currency_code)
-    order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
+    if lines:
+        currency_code = agreement.authorization.currency or ""
+        plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
+        renewal_payload = build_renewal_payload(
+            plan_subscriptions, net_new_lines, body, currency_code
+        )
+        order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
+    else:
+        configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
+        order = await _create_configuration_order(
+            ctx, agreement_id, configuration_subscriptions, body
+        )
     return APIResponse.created(payload=order)
 
 
@@ -252,6 +263,7 @@ def _build_plan_subscription(
         current_quantity=line.quantity,
         adobe_subscription_id=adobe_subscription_id,
         offer_id=selection.offer_id,
+        subscription=subscription,
     )
 
 
@@ -402,6 +414,30 @@ async def _create_change_order(
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the renewal change order on agreement %s: status=%s %s",
+            agreement_id,
+            error.status_code,
+            error,
+        )
+        raise UpstreamServiceError(detail=mpt_order_error_detail(error))
+
+
+async def _create_configuration_order(
+    ctx: APIContext,
+    agreement_id: str,
+    subscriptions: list[Line],
+    body: RenewalOrderRequest,
+) -> dict[str, object]:
+    """Create the AutoRenew-only configuration order acting as the caller (client actor)."""
+    client = build_caller_client(ctx)
+    if client is None:
+        logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
+        raise ForbiddenError(detail="Caller authentication is required to place the order.")
+    try:
+        return await create_renewal_configuration_order(client, agreement_id, subscriptions, body)
+    except MPTHttpError as error:
+        logger.warning(
+            "MPT API error while placing the renewal configuration order on agreement %s: "
+            "status=%s %s",
             agreement_id,
             error.status_code,
             error,

@@ -3,7 +3,7 @@ from typing import Any, NamedTuple, cast
 
 from mpt_extension_sdk.api import ErrorDetail, ValidationError
 from mpt_extension_sdk.api.context import APIContext
-from mpt_extension_sdk.models import Agreement
+from mpt_extension_sdk.models import Agreement, Subscription
 
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
@@ -28,8 +28,13 @@ class PlanSubscription(NamedTuple):
     the partial vendor SKU, since that is all MPT's subscription and catalog
     data ever carries) and is overridden with Adobe's own full offer id, read
     off the customer's live subscriptions, before a renewing line is
-    previewed or ordered. See ``_resolve_renewal_offer_ids`` in
-    ``routers/api/renewal.py``.
+    ordered. See ``_resolve_renewal_offer_ids`` in ``routers/api/renewal.py``.
+
+    ``subscription`` is the raw MPT subscription as loaded from the
+    marketplace: its standing ``auto_renew`` preference is compared against
+    ``selection.renew`` to detect an AutoRenew change, and its current
+    ``lines``/``status``/``commitment_date`` snapshot feeds a Configuration
+    order when nothing about the quantities changed.
     """
 
     selection: RenewalSubscriptionSelection
@@ -37,6 +42,7 @@ class PlanSubscription(NamedTuple):
     current_quantity: int
     adobe_subscription_id: str
     offer_id: str
+    subscription: Subscription
 
 
 class NetNewLine(NamedTuple):
@@ -56,6 +62,31 @@ def require_renewal_selections(request: RenewalPlanRequest) -> None:
     if not request.subscriptions and not request.net_new_items:
         raise ValidationError(
             detail="The renewal plan must include at least one subscription or net-new product.",
+        )
+
+
+def require_renewal_changes(
+    plan_subscriptions: list[PlanSubscription], net_new_lines: list[NetNewLine]
+) -> None:
+    """Reject a plan that would create neither a Change nor a Configuration order.
+
+    The platform accepts a Change order only when at least one line's quantity
+    actually moves (a renewing subscription's renewal quantity differs from
+    its current quantity) or a net-new product is added, and a Configuration
+    order only when at least one subscription's renew decision differs from
+    its standing AutoRenew preference. A plan with none of these is a pure
+    no-op the wizard should never have let through.
+    """
+    has_quantity_change = any(
+        plan.selection.renew and plan.selection.renewal_quantity != plan.current_quantity
+        for plan in plan_subscriptions
+    )
+    has_autorenew_change = any(
+        plan.selection.renew != bool(plan.subscription.auto_renew) for plan in plan_subscriptions
+    )
+    if not (has_quantity_change or has_autorenew_change or net_new_lines):
+        raise ValidationError(
+            detail="The renewal plan has no changes to submit.",
         )
 
 

@@ -1,5 +1,6 @@
 import pytest
 from mpt_extension_sdk.api import ValidationError
+from mpt_extension_sdk.models import Subscription
 
 from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
 from mpt_adobe_vipm_ef.services.renewal_plan import (
@@ -7,6 +8,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    require_renewal_changes,
     require_renewal_selections,
 )
 
@@ -18,7 +20,7 @@ _ADOBE_SUBSCRIPTION_ID = "adobe-sub-1"
 _CURRENT_QUANTITY = 10
 
 
-def _request(subscriptions=None, net_new_items=None, codes=None, **extra):
+def _request(subscriptions=None, net_new_items=None, codes=None, **extra):  # noqa: WPS432
     return RenewalOrderRequest.model_validate({
         "subscriptions": [] if subscriptions is None else subscriptions,
         "netNewItems": [] if net_new_items is None else net_new_items,
@@ -27,7 +29,7 @@ def _request(subscriptions=None, net_new_items=None, codes=None, **extra):
     })
 
 
-def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID):
+def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID):  # noqa: WPS432
     return {
         "id": subscription_id,
         "offerId": _OFFER_ID,
@@ -36,14 +38,30 @@ def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID):
     }
 
 
-def _plan(request):
+def _subscription(*, subscription_id=_SUBSCRIPTION_ID, auto_renew=True):
+    return Subscription.model_validate({
+        "id": subscription_id,
+        "name": f"Subscription for {subscription_id}",
+        "autoRenew": auto_renew,
+        "lines": [
+            {
+                "id": _LINE_ID,
+                "quantity": _CURRENT_QUANTITY,
+                "item": {"id": "ITM-0001", "name": "Item One"},
+            }
+        ],
+    })
+
+
+def _plan(request, *, auto_renew=True, current_quantity=_CURRENT_QUANTITY):
     return [
         PlanSubscription(
             selection=selection,
             line_id=_LINE_ID,
-            current_quantity=_CURRENT_QUANTITY,
+            current_quantity=current_quantity,
             adobe_subscription_id=_ADOBE_SUBSCRIPTION_ID,
             offer_id=selection.offer_id,
+            subscription=_subscription(subscription_id=selection.id, auto_renew=auto_renew),
         )
         for selection in request.subscriptions
     ]
@@ -156,3 +174,38 @@ def test_build_renewal_payload_defaults_the_optional_fields():
     payload = result.to_dict()
     assert not payload["recommendationTrackerId"]
     assert payload["netNewItems"] == []
+
+
+def test_require_renewal_changes_accepts_a_quantity_change():
+    request = _request(subscriptions=[_selection(quantity=37)])  # noqa: WPS432
+
+    require_renewal_changes(_plan(request), [])  # act
+
+
+def test_require_renewal_changes_accepts_an_autorenew_change():
+    request = _request(subscriptions=[_selection(renew=False, quantity=_CURRENT_QUANTITY)])
+
+    require_renewal_changes(_plan(request, auto_renew=True), [])  # act
+
+
+def test_require_renewal_changes_accepts_a_net_new_only_plan():
+    net_new_request = _request(net_new_items=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
+    net_new_lines = [
+        NetNewLine(selection=net_new_request.net_new_items[0], item_id="ITM-NET-NEW"),
+    ]
+
+    require_renewal_changes([], net_new_lines)  # act
+
+
+def test_require_renewal_changes_rejects_a_pure_no_op_plan():
+    request = _request(subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY)])
+
+    with pytest.raises(ValidationError, match="no changes to submit"):
+        require_renewal_changes(_plan(request, auto_renew=True), [])
+
+
+def test_require_renewal_changes_rejects_an_unchanged_lapse():
+    request = _request(subscriptions=[_selection(renew=False, quantity=0)])
+
+    with pytest.raises(ValidationError, match="no changes to submit"):
+        require_renewal_changes(_plan(request, auto_renew=False), [])

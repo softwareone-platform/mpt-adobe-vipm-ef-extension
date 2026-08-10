@@ -9,11 +9,11 @@ import { useGuardedRequest } from './useGuardedRequest';
  * Validates the renewal plan before the wizard advances past the Items step.
  *
  * Runs the 3YC commitment floor pre-check over the whole plan (lapsing
- * subscriptions and net-new additions included), then gates the existing
- * items through an Adobe PREVIEW_RENEWAL quote so the renew decisions and
- * quantity changes fail here instead of on a rejected order. Net-new products
- * have no Adobe subscription to preview yet, and the discount codes ride on a
- * later step, so the preview carries the subscriptions only.
+ * subscriptions and net-new additions included), so a decrease or a disabled
+ * renewal that would breach a 3YC customer's committed minimum fails here
+ * instead of on a rejected order. The Adobe PREVIEW_RENEWAL quote is no
+ * longer part of this validation — the endpoint stays available for a future
+ * release, but this flow no longer gates on it.
  */
 export function useRenewalPlanValidation(agreementId: string) {
   const { run, reset, ...state } = useGuardedRequest('Errors:RenewalPlanValidation');
@@ -27,9 +27,6 @@ export function useRenewalPlanValidation(agreementId: string) {
       return run(async () => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
         await http.post(`${baseUrl}/3yc-check`, plan);
-        if (plan.subscriptions.some((subscription) => subscription.renew)) {
-          await http.post(`${baseUrl}/preview`, { subscriptions: plan.subscriptions });
-        }
         return true;
       });
     },
