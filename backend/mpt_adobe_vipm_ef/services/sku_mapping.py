@@ -11,13 +11,22 @@ at-anniversary path. Neither can be derived from Adobe data. All methods are
 synchronous and callers run them in a thread.
 """
 
+import asyncio
+import logging
 from types import MappingProxyType
+from typing import cast
 
+from mpt_extension_sdk.api import UpstreamServiceError
+from mpt_extension_sdk.api.context import APIContext
 from mpt_extension_sdk.errors.runtime import ConfigError
 from pyairtable import Api, Table
+from pyairtable.api.types import RecordDict
 from pyairtable.formulas import AND, EQ, OR, Field
+from requests import RequestException
 
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
+
+logger = logging.getLogger(__name__)
 
 SKU_MAPPING_TABLE = "SKU Mapping"
 
@@ -62,13 +71,7 @@ class SkuMappingStore:
         Keyed by partial SKU (the ``vendor_external_id`` column); SKUs without
         a mapping row are absent from the result.
         """
-        if not partial_skus:
-            return {}
-        formula = AND(
-            EQ(Field("segment"), _to_airtable_segment(market_segment)),
-            OR(*(EQ(Field("vendor_external_id"), sku) for sku in partial_skus)),
-        )
-        records = self._table(SKU_MAPPING_TABLE).all(formula=formula)
+        records = self._list_segment_rows(partial_skus, market_segment)
         return {
             record["fields"]["vendor_external_id"]: record["fields"].get("type_3yc", "")
             for record in records
@@ -100,8 +103,48 @@ class SkuMappingStore:
             if record.get("fields", {}).get("vendor_external_id")
         }
 
+    def list_full_skus(self, partial_skus: list[str], market_segment: str) -> dict[str, str]:
+        """Return the full Adobe SKU (``sku`` column) of each SKU within the segment.
+
+        Keyed by partial SKU (the ``vendor_external_id`` column); SKUs without
+        a mapping row or with a blank ``sku`` column are absent from the
+        result.
+        """
+        records = self._list_segment_rows(partial_skus, market_segment)
+        return {
+            record["fields"]["vendor_external_id"]: record["fields"]["sku"]
+            for record in records
+            if _has_full_sku(record)
+        }
+
+    def _list_segment_rows(self, partial_skus: list[str], market_segment: str) -> list[RecordDict]:
+        if not partial_skus:
+            return []
+        formula = AND(
+            EQ(Field("segment"), _to_airtable_segment(market_segment)),
+            OR(*(EQ(Field("vendor_external_id"), sku) for sku in partial_skus)),
+        )
+        return self._table(SKU_MAPPING_TABLE).all(formula=formula)
+
     def _table(self, table_name: str) -> Table:
         return self._api.table(self._base_id, table_name)
+
+
+async def load_full_skus(
+    ctx: APIContext, partial_skus: list[str], market_segment: str
+) -> dict[str, str]:
+    """Load the full Adobe SKU of each partial SKU from Airtable, mapping failures to 502."""
+    store = SkuMappingStore.from_settings(cast(ExtensionSettings, ctx.ext_settings))
+    try:
+        return await asyncio.to_thread(store.list_full_skus, partial_skus, market_segment)
+    except RequestException as error:
+        logger.warning("SKU mapping store request failed: %s", error)
+        raise UpstreamServiceError(detail="SKU mapping data store request failed")
+
+
+def _has_full_sku(record: RecordDict) -> bool:
+    fields = record.get("fields", {})
+    return bool(fields.get("vendor_external_id") and fields.get("sku"))
 
 
 def _to_airtable_segment(market_segment: str) -> str:
