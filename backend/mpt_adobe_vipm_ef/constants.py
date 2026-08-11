@@ -6,6 +6,7 @@ AGREEMENT_SELECT = (
     "parameters",
     "product",
     "seller",
+    "split.allocations",
     "vendor",
 )
 LINES_SELECT = ("lines",)

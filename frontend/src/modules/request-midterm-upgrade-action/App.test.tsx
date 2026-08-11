@@ -35,7 +35,25 @@ jest.mock('@mpt-extension/sdk', () => ({
               },
             ],
           },
-          agreement: { id: 'AGR-1' },
+          agreement: {
+            id: 'AGR-1',
+            split: {
+              id: 'SBA-1111-1111',
+              revision: 1,
+              allocations: [
+                {
+                  buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+                  percentage: 100,
+                  price: { currency: 'USD', SPxY: 100, SPxM: 10 },
+                },
+                {
+                  buyer: { id: 'BUY-2222-2222', name: 'Second Buyer Name' },
+                  percentage: 0,
+                  price: { currency: 'USD', SPxY: 0, SPxM: 0 },
+                },
+              ],
+            },
+          },
           product: { id: 'PRD-1' },
           lines: [{ quantity: 10 }],
         },
@@ -126,6 +144,8 @@ interface SplitBillingProps {
   selectedBuyer: unknown;
   onChange: (buyer: unknown) => void;
   split: { id?: string; allocations?: unknown[] } | null;
+  agreementSplit: { id?: string; allocations?: unknown[] } | null;
+  order: { billTo?: { id?: string; name?: string } | null };
 }
 let splitBillingProps: SplitBillingProps;
 
@@ -234,6 +254,23 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof splitBillingProps.onChange).toBe('function');
     expect(splitBillingProps.selectedBuyer).toBeDefined();
     expect(splitBillingProps.split?.id).toBe('SBS-1111-1111');
+    expect(splitBillingProps.agreementSplit?.id).toBe('SBA-1111-1111');
+    expect(splitBillingProps.agreementSplit?.allocations).toHaveLength(2);
+  });
+
+  it('bills the order to a buyer the subscription has no allocation for', async () => {
+    mockActiveStepIndex = 2;
+    render(<App />);
+    await screen.findByText('Split billing step');
+
+    await act(async () => {
+      await splitBillingProps.addBuyerToOrder({ id: 'BUY-2222-2222' });
+    });
+
+    expect(splitBillingProps.order.billTo).toEqual({
+      id: 'BUY-2222-2222',
+      name: 'Second Buyer Name',
+    });
   });
 
   it('skips the split-billing step when split billing is disabled', async () => {

@@ -9,8 +9,10 @@ export type SplitBillingOptionValue = 'percentages' | 'buyer';
 
 export function SplitBillingOption({
   onSelect,
+  isBuyerDisabled = false,
 }: {
   onSelect: (value: SplitBillingOptionValue) => void;
+  isBuyerDisabled?: boolean;
 }) {
   const { t } = useTranslation();
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -31,6 +33,7 @@ export function SplitBillingOption({
       <SelectionBox
         name="split-billing-option"
         value="buyer"
+        isDisabled={isBuyerDisabled}
         onChange={handleChange}
         title={t('MidtermUpgrade:SplitBilling:Buyer:Title')}
       >
