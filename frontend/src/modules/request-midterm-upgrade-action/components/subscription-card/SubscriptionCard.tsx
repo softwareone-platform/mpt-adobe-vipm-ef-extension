@@ -80,7 +80,7 @@ export function SubscriptionCard({
           title: t('Common:Seller'),
           content: (
             <EntityLink
-              entityDomain={EntityDomain.Accounts}
+              entityDomain={EntityDomain.Settings}
               entityType={EntityType.Sellers}
               entity={agreement?.seller}
             />
@@ -90,7 +90,7 @@ export function SubscriptionCard({
           title: t('Common:Buyer'),
           content: (
             <EntityLink
-              entityDomain={EntityDomain.Accounts}
+              entityDomain={EntityDomain.Settings}
               entityType={EntityType.Buyers}
               entity={agreement?.buyer}
             />
@@ -100,7 +100,7 @@ export function SubscriptionCard({
           title: t('Common:Licensee'),
           content: (
             <EntityLink
-              entityDomain={EntityDomain.Accounts}
+              entityDomain={EntityDomain.Settings}
               entityType={EntityType.Licensees}
               entity={agreement?.licensee}
             />

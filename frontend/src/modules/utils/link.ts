@@ -15,9 +15,16 @@ export function getEntityLink(
   if (!entityId) {
     return undefined;
   }
+  if (entityType === EntityType.Accounts) {
+    return getAccountLink(entityId);
+  }
   return entityDomain.toString() === entityType.toString()
     ? `/${entityDomain}/${entityId}`
     : `/${entityDomain}/${entityType}/${entityId}`;
+}
+
+export function getAccountLink(accountId: string | undefined): string | undefined {
+  return accountId ? `/administration/settings/account?account=${accountId}` : undefined;
 }
 
 export function getItemLink(itemId: string | undefined): string | undefined {

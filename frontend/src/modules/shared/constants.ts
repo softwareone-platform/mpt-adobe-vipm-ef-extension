@@ -35,6 +35,7 @@ export enum EntityDomain {
   Commerce = 'commerce',
   Catalog = 'catalog',
   Accounts = 'accounts',
+  Settings = 'administration/settings',
 }
 
 export enum EntityType {
