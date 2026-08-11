@@ -1,14 +1,11 @@
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import {
-  type Expression,
   Grid,
   GridCellActions,
   GridCellSimple,
   GridColumnDefinition,
   GridDefaultConfiguration,
-  GridFieldDefinition,
-  GridFieldSortOperation,
   useGridAsync,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import type { ListOption } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
@@ -139,21 +136,6 @@ const BASE_COLUMNS: GridColumnDefinition<Discount>[] = [
   },
 ];
 
-const fields: GridFieldDefinition[] = [
-  { name: 'code', title: i18n.t('Agreement:Discounts:Code') },
-  { name: 'source', title: i18n.t('Agreement:Discounts:Source') },
-  { name: 'status', title: i18n.t('Common:Status') },
-  { name: 'discountType', title: i18n.t('Agreement:Discounts:Type') },
-  { name: 'startDate', title: i18n.t('Agreement:Discounts:Valid') },
-  { name: 'endDate', title: i18n.t('Agreement:Discounts:Valid') },
-  { name: 'applicableOrderTypes', title: i18n.t('Agreement:Discounts:Order types') },
-  { name: 'redeemedAt', title: i18n.t('Agreement:Discounts:Redeemed') },
-];
-
-const sort: GridFieldSortOperation[] = [{ field: 'code', direction: 'asc' }];
-
-const ALLOWED_QUERY_FIELDS = new Set(fields.map((field) => field.name));
-
 export function Discounts() {
   const { t } = useTranslation();
   const context = useMPTContext<{ auth?: { account?: { type?: AccountType } } }>();
@@ -161,15 +143,7 @@ export function Discounts() {
   const canManageClosedDiscounts = canManageDiscountCodes(accountType);
   const agreementId = useAgreementId();
   const [paging, setPaging] = useState({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
-  const [sortQuery, setSortQuery] = useState<GridFieldSortOperation[]>(sort);
-  const [filtersQuery, setFiltersQuery] = useState<Expression | null>(null);
-  const primarySort = sortQuery[0];
-  const sortBy = primarySort?.field;
-  const discounts = useDiscounts(agreementId, paging.page, paging.pageSize, {
-    sortBy: sortBy && ALLOWED_QUERY_FIELDS.has(sortBy) ? sortBy : undefined,
-    sortDir: primarySort?.direction,
-    filters: filtersQuery == null ? undefined : JSON.stringify(filtersQuery),
-  });
+  const discounts = useDiscounts(agreementId, paging.page, paging.pageSize);
 
   const onAddClosedDiscount = useCallback(() => {
     // TODO: Open Add closed discount wizard when flow is implemented.
@@ -221,21 +195,11 @@ export function Discounts() {
     setPaging((prev) =>
       prev.page === page && prev.pageSize === pageSize ? prev : { page, pageSize },
     );
-    setSortQuery((prev) => {
-      const next = config.sort ?? [];
-      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-    });
-    setFiltersQuery((prev) => {
-      const next = config.filters ?? null;
-      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-    });
   }, []);
 
   const gridProps = useGridAsync<Discount>({
     id: 'modules__agreement__discounts--client',
     columns,
-    fields,
-    sort,
     data: discounts.data,
     total: discounts.total,
     isLoading: discounts.status === 'loading' || discounts.status === 'idle',
