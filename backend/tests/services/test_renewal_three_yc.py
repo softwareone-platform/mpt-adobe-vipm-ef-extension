@@ -43,7 +43,7 @@ def _plan_subscription(*, offer_id=_LICENSE_OFFER_ID, renew=True, quantity=7, su
 
 def _net_new_line(*, offer_id=_CONSUMABLE_OFFER_ID, quantity=_NET_NEW_CONSUMABLES):
     selection = NetNewItemSelection.model_validate({"offerId": offer_id, "quantity": quantity})
-    return NetNewLine(selection=selection, item_id="ITM-0001")
+    return NetNewLine(selection=selection, item_id="ITM-0001", offer_id=offer_id)
 
 
 def _customer(*, benefits=None, coterm=_COTERM_DATE):

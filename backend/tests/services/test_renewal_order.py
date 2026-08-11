@@ -100,7 +100,11 @@ def test_build_renewal_order_lines_carries_only_the_changed_quantities():
     )
     net_new_request = _request(net_new_items=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
     net_new_lines = [
-        NetNewLine(selection=net_new_request.net_new_items[0], item_id=_NET_NEW_ITEM_ID),
+        NetNewLine(
+            selection=net_new_request.net_new_items[0],
+            item_id=_NET_NEW_ITEM_ID,
+            offer_id=_NET_NEW_OFFER_ID,
+        ),
     ]
 
     result = build_renewal_order_lines(_plan(request), net_new_lines)
