@@ -86,9 +86,9 @@ describe('WizardHighlights', () => {
     const hrefs = getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs).toEqual([
       `${window.location.origin}/commerce/agreements/AGR-1111-1111`,
-      `${window.location.origin}/accounts/licensees/LIC-1111-1111`,
-      `${window.location.origin}/accounts/buyers/BUY-1111-1111`,
-      `${window.location.origin}/accounts/sellers/SEL-1111-1111`,
+      `${window.location.origin}/administration/settings/licensees/LIC-1111-1111`,
+      `${window.location.origin}/administration/settings/buyers/BUY-1111-1111`,
+      `${window.location.origin}/administration/settings/sellers/SEL-1111-1111`,
     ]);
   });
 
