@@ -50,7 +50,7 @@ def agreement_plugs() -> list[Plug]:
         Plug(
             id="request-discount-action",
             name="Discount",
-            description="Create or edit a closed discount code for the agreement's customer.",
+            description="Create a closed discount code for the agreement's customer.",
             socket="portal.commerce.agreements.agreement.modal",
             href="/static/request-discount-action/index.js",
             condition=agreement_condition,

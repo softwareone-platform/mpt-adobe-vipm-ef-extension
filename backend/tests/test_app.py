@@ -86,7 +86,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
     assert result.plugs[4].model_dump() == {
         "id": "request-discount-action",
         "name": "Discount",
-        "description": "Create or edit a closed discount code for the agreement's customer.",
+        "description": "Create a closed discount code for the agreement's customer.",
         "icon": None,
         "socket": "portal.commerce.agreements.agreement.modal",
         "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
