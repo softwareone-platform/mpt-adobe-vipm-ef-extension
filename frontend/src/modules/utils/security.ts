@@ -72,3 +72,22 @@ export function canRequestGlobalCustomer(
 ): boolean {
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
+
+export function canManageDiscountCodes(accountType: AccountType | undefined): boolean {
+  return accountType === 'Operations' || accountType === 'Vendor';
+}
+
+export function canEditDiscountCode(
+  accountType: AccountType | undefined,
+  source: string | null | undefined,
+): boolean {
+  if (accountType === 'Vendor') {
+    return true;
+  }
+
+  if (accountType === 'Operations') {
+    return (source ?? '').trim().toLowerCase() !== 'open';
+  }
+
+  return false;
+}

@@ -29,6 +29,34 @@ export function createChipMock() {
 // Renders rows through the real column cell definitions. Pass onUseGridAsync
 // to capture each grid config so tests can drive grid events (paging).
 export function createGridMock(onUseGridAsync?: (config: MockGridConfig) => void) {
+  const GridMock = ({
+    data,
+    configuration,
+    children,
+  }: {
+    data: object[];
+    configuration: { columns: MockGridColumn[] };
+    children?: ReactNode;
+  }) => (
+    <div data-testid="grid">
+      {children}
+      {configuration.columns.map((column) => (
+        <div key={column.name}>{column.title}</div>
+      ))}
+      {data.map((item, index) => (
+        <div key={index}>
+          {configuration.columns.map((column) => (
+            <div key={column.name}>{column.cell?.(item)}</div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  GridMock.Actions = ({ children: actionsChildren }: { children?: ReactNode }) => (
+    <div data-testid="grid-actions">{actionsChildren}</div>
+  );
+
   return {
     GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     GridCellActions: ({ actions }: { actions: MockActionOption[] }) => (
@@ -49,25 +77,6 @@ export function createGridMock(onUseGridAsync?: (config: MockGridConfig) => void
         onEvent: jest.fn(),
       };
     },
-    Grid: ({
-      data,
-      configuration,
-    }: {
-      data: object[];
-      configuration: { columns: MockGridColumn[] };
-    }) => (
-      <div data-testid="grid">
-        {configuration.columns.map((column) => (
-          <div key={column.name}>{column.title}</div>
-        ))}
-        {data.map((item, index) => (
-          <div key={index}>
-            {configuration.columns.map((column) => (
-              <div key={column.name}>{column.cell?.(item)}</div>
-            ))}
-          </div>
-        ))}
-      </div>
-    ),
+    Grid: GridMock,
   };
 }

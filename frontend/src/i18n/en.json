@@ -84,6 +84,7 @@
       "Redeemed": "Redeemed",
       "Actions": "Actions",
       "Edit": "Edit",
+      "Add closed discount": "Add closed discount",
       "Discount lock until": "Discount lock until: {{date}}",
       "PercentageOff": "{{value}}% off",
       "AmountOff": "{{amount}} off",

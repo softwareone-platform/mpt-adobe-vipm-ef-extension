@@ -1,5 +1,5 @@
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
-import type { ListOption } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
+import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
 import {
   type Expression,
   Grid,
@@ -11,18 +11,22 @@ import {
   GridFieldSortOperation,
   useGridAsync,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
+import type { ListOption } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMPTContext } from '@mpt-extension/sdk-react';
 
 import { i18n } from '../../../i18n/translations';
 import { useAgreementId } from '../../shared/hooks/useAgreementId';
 import { useDiscounts } from '../../shared/hooks/useDiscounts';
+import { canEditDiscountCode, canManageDiscountCodes } from '../../utils/security';
 
 import { TextCell } from './components/grid-cell/text-cell/TextCell';
 import { EM_DASH, formatDate, formatOrderTypes, formatSource, formatValue } from './format';
 
 import type { Discount } from '../../shared/model';
+import type { AccountType } from '../../shared/three-year-commitment';
 
 import './index.scss';
 
@@ -152,6 +156,9 @@ const ALLOWED_QUERY_FIELDS = new Set(fields.map((field) => field.name));
 
 export function Discounts() {
   const { t } = useTranslation();
+  const context = useMPTContext<{ auth?: { account?: { type?: AccountType } } }>();
+  const accountType = context.auth?.account?.type;
+  const canManageClosedDiscounts = canManageDiscountCodes(accountType);
   const agreementId = useAgreementId();
   const [paging, setPaging] = useState({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
   const [sortQuery, setSortQuery] = useState<GridFieldSortOperation[]>(sort);
@@ -164,32 +171,46 @@ export function Discounts() {
     filters: filtersQuery == null ? undefined : JSON.stringify(filtersQuery),
   });
 
+  const onAddClosedDiscount = useCallback(() => {
+    // TODO: Open Add closed discount wizard when flow is implemented.
+  }, []);
+
   const onDiscountAction = useCallback((action: string, item: Discount) => {
     if (action === 'edit') {
-      // TODO: Implement edit wizard flow when it is available.
       void item;
+      // TODO: Open Edit discount wizard when flow is implemented.
     }
   }, []);
 
   const columns = useMemo<GridColumnDefinition<Discount>[]>(
     () => [
       ...BASE_COLUMNS,
-      {
-        name: 'actions',
-        title: i18n.t('Agreement:Discounts:Actions'),
-        fields: ['id'],
-        initialWidth: 80,
-        cell: (item) => (
-          <GridCellActions
-            item={item}
-            actions={DISCOUNT_ACTIONS}
-            onAction={onDiscountAction}
-            testId={`discounts-action-${item.id}`}
-          />
-        ),
-      },
+      ...(canManageClosedDiscounts
+        ? [
+            {
+              name: 'actions',
+              title: i18n.t('Agreement:Discounts:Actions'),
+              fields: ['id'],
+              initialWidth: 80,
+              cell: (item: Discount) => {
+                if (!canEditDiscountCode(accountType, item.source)) {
+                  return <TextCell text={EM_DASH} />;
+                }
+
+                return (
+                  <GridCellActions
+                    item={item}
+                    actions={DISCOUNT_ACTIONS}
+                    onAction={onDiscountAction}
+                    testId={`discounts-action-${item.id}`}
+                  />
+                );
+              },
+            } as GridColumnDefinition<Discount>,
+          ]
+        : []),
     ],
-    [onDiscountAction],
+    [accountType, canManageClosedDiscounts, onDiscountAction],
   );
 
   // The grid owns the paging state; mirror page changes into the fetch so the
@@ -233,7 +254,17 @@ export function Discounts() {
         </MediumText>
       </header>
 
-      <Grid {...gridProps} containerClassName="discounts__grid" />
+      <Grid {...gridProps} containerClassName="discounts__grid">
+        {canManageClosedDiscounts && (
+          <Grid.Actions>
+            <div className="discounts__toolbar-actions">
+              <Button type="text" onClick={onAddClosedDiscount}>
+                {t('Agreement:Discounts:Add closed discount')}
+              </Button>
+            </div>
+          </Grid.Actions>
+        )}
+      </Grid>
     </div>
   );
 }

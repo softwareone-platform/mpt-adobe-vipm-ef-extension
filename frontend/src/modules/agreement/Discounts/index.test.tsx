@@ -41,6 +41,22 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/chip', () =>
     .createChipMock(),
 );
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => ({
+  Button: ({
+    children,
+    onClick,
+    isDisabled,
+  }: {
+    children?: import('react').ReactNode;
+    onClick?: () => void;
+    isDisabled?: boolean;
+  }) => (
+    <button onClick={onClick} disabled={isDisabled}>
+      {children}
+    </button>
+  ),
+}));
+
 // Captures every useGridAsync config so tests can drive grid events (paging)
 // and renders rows through the real column cell definitions.
 const mockGridConfigs: Array<Record<string, unknown>> = [];
@@ -103,6 +119,7 @@ describe('Discounts view', () => {
     mockGridConfigs.length = 0;
     mockBackend();
     mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Vendor' } },
       data: { agreement: { id: 'AGR-0000-0000-0000' } },
     });
   });
@@ -122,6 +139,7 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.getByRole('heading', { name: 'Discounts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
     for (const header of [
       'Code',
       'Source',
@@ -151,6 +169,32 @@ describe('Discounts view', () => {
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
     expect(screen.getAllByText('Edit')).toHaveLength(2);
+  });
+
+  it('hides Actions and Add closed discount for client actors', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Client' } },
+      data: { agreement: { id: 'AGR-0000-0000-0000' } },
+    });
+
+    await renderDiscounts();
+
+    expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+  });
+
+  it('shows Actions and Add closed discount for operations actors', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Operations' } },
+      data: { agreement: { id: 'AGR-0000-0000-0000' } },
+    });
+
+    await renderDiscounts();
+
+    expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit')).toHaveLength(1);
   });
 
   it('renders expired closed codes with the lock date and the Any order type', async () => {

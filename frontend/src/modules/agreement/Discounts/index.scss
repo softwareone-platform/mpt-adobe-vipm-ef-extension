@@ -11,6 +11,34 @@
     min-width: 0;
   }
 
+  &__toolbar-actions {
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: auto;
+      background-color: #e5e9ff;
+      border: none;
+      border-radius: 10px;
+      color: #2f45f5;
+      min-height: 36px;
+      padding: 8px 20px;
+      font-weight: 500;
+      line-height: 20px;
+      box-shadow: none;
+      text-decoration: none;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #dce2ff;
+    }
+
+    button:focus-visible {
+      outline: 2px solid #96a3ff;
+      outline-offset: 2px;
+    }
+  }
+
   &__cell {
     display: flex;
     flex-direction: column;
