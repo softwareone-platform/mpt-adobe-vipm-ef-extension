@@ -11,8 +11,10 @@ describe('getEntityLink', () => {
     );
   });
 
-  it('places an account directly under its domain', () => {
-    expect(getEntityLink(EntityDomain.Accounts, EntityType.Accounts, 'ACC-1')).toBe('/accounts/ACC-1');
+  it('scopes an account to the settings page by query parameter', () => {
+    expect(getEntityLink(EntityDomain.Accounts, EntityType.Accounts, 'ACC-1')).toBe(
+      '/administration/settings/account?account=ACC-1'
+    );
   });
 
   it('returns undefined without an id', () => {

@@ -40,9 +40,9 @@ export function WizardHighlights({ agreement, parties, order }: WizardHighlights
   const licensee = parties?.licensee ?? agreement?.licensee;
   const buyer = parties?.buyer ?? agreement?.buyer;
   const seller = parties?.seller ?? agreement?.seller;
-  const licenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, licensee?.id);
-  const buyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, buyer?.id);
-  const sellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, seller?.id);
+  const licenseeUrl = getEntityLink(EntityDomain.Settings, EntityType.Licensees, licensee?.id);
+  const buyerUrl = getEntityLink(EntityDomain.Settings, EntityType.Buyers, buyer?.id);
+  const sellerUrl = getEntityLink(EntityDomain.Settings, EntityType.Sellers, seller?.id);
   const baseCurrency = agreement?.price?.currency ?? '';
   const billingCurrency = agreement?.price?.billingCurrency ?? '';
 
@@ -56,9 +56,9 @@ export function WizardHighlights({ agreement, parties, order }: WizardHighlights
 
   const productUrl = getEntityLink(EntityDomain.Catalog, EntityType.Products, agreement?.product?.id);
   const clientUrl = getEntityLink(EntityDomain.Accounts, EntityType.Accounts, agreement?.client?.id);
-  const agreementSellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, agreement?.seller?.id);
-  const agreementBuyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, agreement?.buyer?.id);
-  const agreementLicenseeUrl = getEntityLink(EntityDomain.Accounts, EntityType.Licensees, agreement?.licensee?.id);
+  const agreementSellerUrl = getEntityLink(EntityDomain.Settings, EntityType.Sellers, agreement?.seller?.id);
+  const agreementBuyerUrl = getEntityLink(EntityDomain.Settings, EntityType.Buyers, agreement?.buyer?.id);
+  const agreementLicenseeUrl = getEntityLink(EntityDomain.Settings, EntityType.Licensees, agreement?.licensee?.id);
 
   const agreementInfoCard = (
     <InfoCard
@@ -81,8 +81,8 @@ export function WizardHighlights({ agreement, parties, order }: WizardHighlights
   );
 
   const licenseeAccountUrl = getEntityLink(EntityDomain.Accounts, EntityType.Accounts, licensee?.account?.id);
-  const licenseeBuyerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Buyers, licensee?.buyer?.id);
-  const licenseeSellerUrl = getEntityLink(EntityDomain.Accounts, EntityType.Sellers, licensee?.seller?.id);
+  const licenseeBuyerUrl = getEntityLink(EntityDomain.Settings, EntityType.Buyers, licensee?.buyer?.id);
+  const licenseeSellerUrl = getEntityLink(EntityDomain.Settings, EntityType.Sellers, licensee?.seller?.id);
 
   const licenseeInfoCard = (
     <InfoCard
