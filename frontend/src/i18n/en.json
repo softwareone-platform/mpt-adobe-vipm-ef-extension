@@ -129,6 +129,7 @@
     "LinkedMembershipRequest": "Linked membership request failed.",
     "CommitmentNoData": "Commitment response did not include customer data.",
     "CommitmentRequest": "Commitment request failed.",
+    "LoadAutoRenewSupport": "Failed to load which products can renew at the anniversary date.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated."
   },

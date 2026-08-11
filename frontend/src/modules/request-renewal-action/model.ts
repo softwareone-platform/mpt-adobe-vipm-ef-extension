@@ -87,6 +87,15 @@ export function getHeldSkus(subscriptions: Subscription[]): Set<string> {
   );
 }
 
+/** Whether the subscription's SKU can renew at the anniversary date. */
+export function canRenewAtAnniversary(
+  subscription: Subscription,
+  support: Record<string, boolean>,
+): boolean {
+  const sku = subscription.lines?.[0]?.item.externalIds?.vendor;
+  return sku ? support[getPartialSku(sku)] === true : false;
+}
+
 export interface OrderDetails {
   externalId: string;
   notes: string;

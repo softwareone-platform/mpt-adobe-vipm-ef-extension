@@ -15,6 +15,7 @@ import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscriptions';
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
 import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations';
+import { useAutoRenewSupport } from '../shared/hooks/useAutoRenewSupport';
 import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
 import { useSettingsResult } from '../shared/hooks/useSettings';
 import { getRecommendedOfferIds, readParameter } from '../shared/model';
@@ -34,6 +35,8 @@ import { TimingStep } from './TimingStep';
 import {
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
+  canRenewAtAnniversary,
+  getHeldSkus,
   getRenewalRowIds,
   getSelectedDiscountCodes,
   type DiscountSelections,
@@ -84,6 +87,15 @@ export default function App() {
     [subscriptions.data],
   );
   const recommendations = useAdobeRecommendations(agreementId, recommendationOffers);
+  const heldSkus = useMemo(() => getHeldSkus(subscriptions.data), [subscriptions.data]);
+  const autoRenewSupport = useAutoRenewSupport(agreementId, heldSkus);
+  const anniversarySubscriptions = useMemo(
+    () =>
+      subscriptions.data.filter((subscription) =>
+        canRenewAtAnniversary(subscription, autoRenewSupport.data),
+      ),
+    [subscriptions.data, autoRenewSupport.data],
+  );
   const recommendedSkus = useMemo(
     () => new Set(Array.from(getRecommendedOfferIds(recommendations.data), getPartialSku)),
     [recommendations.data],
@@ -107,7 +119,7 @@ export default function App() {
 
   const placeOrder = useCallback(async (): Promise<boolean> => {
     const plan = buildRenewalPlanRequest(
-      subscriptions.data,
+      anniversarySubscriptions,
       renewalSelections ?? {},
       renewalQuantities,
       netNewItems,
@@ -116,7 +128,7 @@ export default function App() {
       ...plan,
       flexDiscountCodes: getSelectedDiscountCodes(
         discountSelections,
-        getRenewalRowIds(subscriptions.data, renewalSelections ?? {}, netNewItems),
+        getRenewalRowIds(anniversarySubscriptions, renewalSelections ?? {}, netNewItems),
       ),
       recommendationTrackerId: recommendations.data?.xRecommendationTrackerId ?? '',
       notes: orderDetails.notes,
@@ -128,7 +140,7 @@ export default function App() {
     setOrder(placed);
     return true;
   }, [
-    subscriptions.data,
+    anniversarySubscriptions,
     renewalSelections,
     renewalQuantities,
     netNewItems,
@@ -219,7 +231,22 @@ export default function App() {
     );
   }
 
-  if (subscriptions.status !== 'success') {
+  if (autoRenewSupport.status === 'error') {
+    return (
+      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <InlineNotification status="error" isStandalone>
+          {autoRenewSupport.error || t('Errors:LoadAutoRenewSupport')}
+        </InlineNotification>
+        <Button onClick={autoRenewSupport.refresh}>
+          {t('Common:Retry')}
+        </Button>
+      </div>
+    );
+  }
+
+  const isAutoRenewSupportPending = heldSkus.size > 0 && autoRenewSupport.status !== 'success';
+
+  if (subscriptions.status !== 'success' || isAutoRenewSupportPending) {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Loader />
@@ -244,7 +271,7 @@ export default function App() {
       render: () => (
         <RenewalStep
           agreement={agreement}
-          subscriptions={subscriptions.data}
+          subscriptions={anniversarySubscriptions}
           selections={renewalSelections ?? {}}
           onRenewChange={onRenewChange}
         />
@@ -255,7 +282,7 @@ export default function App() {
       render: () => (
         <ItemsStep
           agreement={agreement}
-          subscriptions={subscriptions.data}
+          subscriptions={anniversarySubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}
@@ -270,7 +297,7 @@ export default function App() {
       render: () => (
         <PromotionsStep
           agreement={agreement}
-          subscriptions={subscriptions.data}
+          subscriptions={anniversarySubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}
@@ -298,7 +325,7 @@ export default function App() {
       render: () => (
         <ReviewOrderStep
           agreement={agreement}
-          subscriptions={subscriptions.data}
+          subscriptions={anniversarySubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}

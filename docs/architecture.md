@@ -35,11 +35,16 @@ frontend/                    TypeScript plug UI (esbuild)
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
   - `api/renewal.py` — at-anniversary renewal routes; restricted to client
-    accounts. `3yc-check` pre-checks the plan against the customer's 3YC
-    commitment floors (splitting licenses and consumables through the Airtable
-    SKU mapping), `preview` quotes the plan through an Adobe `PREVIEW_RENEWAL`
-    order (validating the selected flexible discount codes and returning the
-    renewal pricing), and the submit route repeats both gates and creates the
+    accounts. `auto-renew-support` reports which SKUs can renew at the
+    anniversary at all (the hand-curated `auto_renew_supported` column of the
+    Airtable SKU mapping), which the wizard uses to route: a subscription whose
+    SKU has no support is left out of the renewal plan. `3yc-check`
+    re-checks that routing and pre-checks the plan against the customer's 3YC
+    commitment floors (splitting licenses and consumables through the same SKU
+    mapping), `preview` re-checks the routing and quotes the plan through an
+    Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
+    codes and returning the renewal pricing), and the submit route repeats every
+    gate and creates the
     change order carrying the plan snapshot (renew decisions, quantities,
     discount codes and the recommendation tracker id) on the hidden
     `renewalPayload` order parameter

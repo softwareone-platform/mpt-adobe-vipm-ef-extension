@@ -2,6 +2,7 @@ import {
   appliesToRenewal,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
+  canRenewAtAnniversary,
   findDiscountByCode,
   getDefaultRenewalQuantity,
   getHeldSkus,
@@ -158,6 +159,32 @@ describe('getHeldSkus', () => {
     ]);
 
     expect(skus).toEqual(new Set(['65322587CA']));
+  });
+});
+
+describe('canRenewAtAnniversary', () => {
+  const subscription: Subscription = {
+    id: 'SUB-1',
+    lines: [
+      {
+        id: 'ALI-1',
+        quantity: 1,
+        item: { id: 'ITM-1', name: 'Item', externalIds: { vendor: '65322587CA01A12' } },
+      },
+    ],
+  };
+
+  it('accepts a subscription whose SKU supports auto-renewal', () => {
+    expect(canRenewAtAnniversary(subscription, { '65322587CA': true })).toBe(true);
+  });
+
+  it('rejects a SKU without support, and one that was never looked up', () => {
+    expect(canRenewAtAnniversary(subscription, { '65322587CA': false })).toBe(false);
+    expect(canRenewAtAnniversary(subscription, {})).toBe(false);
+  });
+
+  it('rejects a subscription carrying no SKU', () => {
+    expect(canRenewAtAnniversary({ id: 'SUB-2' }, { '65322587CA': true })).toBe(false);
   });
 });
 
