@@ -31,7 +31,9 @@ frontend/                    TypeScript plug UI (esbuild)
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
   - `events/order.py` — order event router (fulfilment)
-  - `plugs.py` — plug routes that expose plug metadata to the frontend
+  - `plugs.py` — plug routes that expose plug metadata to the frontend, serving
+    only the plugs the `EXT_FEATURES` flags leave enabled (see
+    [deployment.md](deployment.md))
 - `mpt_adobe_vipm_ef/flows/` — `pipelines/` and `steps/` that execute order
   processing.
 - `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including

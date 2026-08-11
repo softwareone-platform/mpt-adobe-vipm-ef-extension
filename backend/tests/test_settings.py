@@ -6,7 +6,7 @@ from mpt_extension_sdk.errors.runtime import ConfigError
 from adobe.dataclasses import Authorization
 from adobe.errors import AuthorizationNotFoundError
 from mpt_adobe_vipm_ef.models.product import ProductSegment
-from mpt_adobe_vipm_ef.settings import ExtensionSettings, get_settings
+from mpt_adobe_vipm_ef.settings import ExtensionSettings, get_settings, is_feature_enabled
 
 
 def _write_adobe_files(tmp_path, monkeypatch, credentials, authorizations):
@@ -98,6 +98,69 @@ def test_load_with_non_object_product_segments(monkeypatch):
 
     with pytest.raises(ConfigError):  # act
         ExtensionSettings.load()
+
+
+def test_is_feature_enabled_without_features(monkeypatch):
+    monkeypatch.delenv("EXT_FEATURES", raising=False)
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is True
+
+
+def test_is_feature_enabled_when_unlisted(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"agreement-adobe": {"enabled": False}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is True
+
+
+def test_is_feature_enabled_when_disabled(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": False}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is False
+
+
+def test_is_feature_enabled_when_enabled(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": True}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is True
+
+
+def test_is_feature_enabled_when_disabled_as_string(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": "False"}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is False
+
+
+def test_is_feature_enabled_with_unrecognised_flag(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": "fasle"}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is True
+
+
+def test_is_feature_enabled_with_null_flag(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": None}}))
+
+    result = is_feature_enabled("request-renewal-action")
+
+    assert result is True
+
+
+def test_is_feature_enabled_with_malformed_features(monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", "not-json")
+
+    with pytest.raises(ConfigError):  # act
+        is_feature_enabled("request-renewal-action")
 
 
 def test_load_without_adobe_endpoints_raises(monkeypatch):
