@@ -82,10 +82,11 @@ def test_plugs_omit_disabled_feature(plug_env, monkeypatch):
 def test_plugs_kept_without_features(plug_env):
     result = agreement_plugs()
 
-    assert len(result) == 6
+    assert len(result) == 7
 
 
 def test_plug_condition_empty(plug_env, monkeypatch):
+
     monkeypatch.delenv("EXT_PRODUCT_SEGMENTS", raising=False)
 
     plug = agreement_plugs()[0]  # act
