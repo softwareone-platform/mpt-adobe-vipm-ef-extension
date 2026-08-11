@@ -18,6 +18,7 @@ import { AgreementSplit, AgreementSplitAllocation, Subscription } from '../../sh
 export function SplitBillingStep({
   subscription,
   split,
+  agreementSplit,
   order,
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
@@ -25,6 +26,7 @@ export function SplitBillingStep({
 }: {
   subscription: Subscription;
   split: AgreementSplit | null;
+  agreementSplit: AgreementSplit | null;
   order: Order;
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: AgreementSplitAllocation | null;
@@ -41,6 +43,8 @@ export function SplitBillingStep({
 
   const agreementBuyerId = subscription?.buyer?.id ?? '';
   const allocations = split?.allocations ?? [];
+  const agreementAllocations = agreementSplit?.allocations ?? [];
+  const noBuyers = agreementAllocations.length === 0;
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
@@ -91,23 +95,23 @@ export function SplitBillingStep({
       <div className="split-billing-step__highlights">
         <WizardHighlights agreement={subscription.agreement} parties={subscription} />
       </div>
-      {error && (
+      {(error || noBuyers) && (
         <div className="split-billing-step__error">
           <InlineNotification status="error" isStandalone>
-            {error}
+            {error || t('MidtermUpgrade:SplitBilling:NoBuyers')}
           </InlineNotification>
         </div>
       )}
-      {option === null && <SplitBillingOption onSelect={setOption} />}
+      {option === null && <SplitBillingOption onSelect={setOption} isBuyerDisabled={noBuyers} />}
       {option === 'percentages' && (
         <SplitBillingAllocations allocations={allocations} agreementBuyerId={agreementBuyerId} />
       )}
-      {option === 'buyer' && (
+      {option === 'buyer' && !noBuyers && (
         <AllocateToBuyer
           agreementBuyerId={agreementBuyerId}
           selectedBuyerId={order?.billTo?.id ?? ''}
           onChange={changeSelectedBuyer}
-          allocations={allocations}
+          allocations={agreementAllocations}
         />
       )}
     </div>

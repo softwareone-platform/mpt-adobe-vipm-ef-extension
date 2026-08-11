@@ -140,6 +140,7 @@ export interface Agreement {
   buyer?: Buyer;
   licensee?: Licensee;
   price?: Price;
+  split?: AgreementSplit | null;
   audit?: Audit;
 }
 
