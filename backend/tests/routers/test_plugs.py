@@ -24,7 +24,6 @@ def test_request_discount_plug_metadata(monkeypatch):
     monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
     get_settings.cache_clear()
 
-def test_request_midterm_upgrade_plug_metadata(plug_env):
     plug = agreement_plugs()[4]  # act
 
     assert plug.id == "request-discount-action"
