@@ -6,7 +6,7 @@ jest.mock('../components/current-subscription-grid/CurrentSubscriptionGrid', () 
   CurrentSubscriptionGrid: () => <div data-testid="current-subscription-grid" />,
 }));
 
-jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
+jest.mock('../../shared/components/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
 }));
 

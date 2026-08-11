@@ -10,8 +10,14 @@ const buyerTwo: AgreementSplitAllocation = {
   price: { currency: 'USD', SPxY: 800, SPxM: 66.67 },
 };
 
+const buyerThree: AgreementSplitAllocation = {
+  buyer: { id: 'BUY-3333-3333', name: 'Third Buyer Name' },
+  percentage: 0,
+  price: { currency: 'USD', SPxY: 0, SPxM: 0 },
+};
+
 const subscriptionSplit: AgreementSplit = {
-  id: 'SBA-1111-1111',
+  id: 'SBS-1111-1111',
   revision: 1,
   allocations: [
     {
@@ -21,6 +27,12 @@ const subscriptionSplit: AgreementSplit = {
     },
     buyerTwo,
   ],
+};
+
+const agreementSplit: AgreementSplit = {
+  id: 'SBA-1111-1111',
+  revision: 1,
+  allocations: [...subscriptionSplit.allocations, buyerThree],
 };
 
 const order: Order = { id: 'ORD-1111-1111', status: 'New', type: 'Change' };
@@ -36,7 +48,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => ({
   useStepActions: () => ({ registerOnNextCallback }),
 }));
 
-jest.mock('../shared/WizardHighlights/WizardHighlights', () => ({
+jest.mock('../../shared/components/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
 }));
 
@@ -73,6 +85,7 @@ function renderStep(overrides: Partial<Parameters<typeof SplitBillingStep>[0]> =
   const props = {
     subscription: { id: 'SUB-1', buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' } } as Subscription,
     split: subscriptionSplit,
+    agreementSplit,
     order,
     addBuyerToOrder: jest.fn().mockResolvedValue(undefined),
     selectedBuyer: null,
@@ -102,14 +115,33 @@ describe('SplitBillingStep', () => {
     expect(queryByTestId('split-billing-option')).toBeNull();
   });
 
-  it('shows the buyer list when the specific-buyer option is chosen', () => {
+  it('lists every agreement split buyer when the specific-buyer option is chosen', () => {
     const { getByTestId } = renderStep();
 
     fireEvent.click(getByTestId('pick-buyer'));
 
     expect(getByTestId('allocate-to-buyer')).toBeTruthy();
     expect(allocateProps.agreementBuyerId).toBe('BUY-1111-1111');
-    expect(allocateProps.allocations).toHaveLength(2);
+    expect(allocateProps.allocations).toEqual(agreementSplit.allocations);
+  });
+
+  it('keeps the buyer list even when the subscription has no allocations', () => {
+    const { getByTestId } = renderStep({ split: null });
+
+    fireEvent.click(getByTestId('pick-buyer'));
+
+    expect(allocateProps.allocations).toHaveLength(3);
+  });
+
+  it('reports the missing buyers instead of an empty picker', () => {
+    const { getByText, getByTestId, queryByTestId } = renderStep({ agreementSplit: null });
+
+    fireEvent.click(getByTestId('pick-buyer'));
+
+    expect(queryByTestId('allocate-to-buyer')).toBeNull();
+    expect(
+      getByText('The buyers configured for split billing on this agreement could not be loaded.')
+    ).toBeTruthy();
   });
 
   it('blocks advancing when no option is selected', async () => {

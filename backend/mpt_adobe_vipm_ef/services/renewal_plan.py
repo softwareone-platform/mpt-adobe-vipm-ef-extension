@@ -3,7 +3,7 @@ from typing import Any, NamedTuple, cast
 
 from mpt_extension_sdk.api import ErrorDetail, ValidationError
 from mpt_extension_sdk.api.context import APIContext
-from mpt_extension_sdk.models import Agreement
+from mpt_extension_sdk.models import Agreement, Subscription
 
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
@@ -22,12 +22,27 @@ _FIRST_LINE_NUMBER = 1
 
 
 class PlanSubscription(NamedTuple):
-    """A requested subscription selection resolved against its MPT subscription."""
+    """A requested subscription selection resolved against its MPT subscription.
+
+    ``offer_id`` starts out as the client-supplied ``selection.offer_id`` (only
+    the partial vendor SKU, since that is all MPT's subscription and catalog
+    data ever carries) and is overridden with Adobe's own full offer id, read
+    off the customer's live subscriptions, before a renewing line is
+    ordered. See ``_resolve_renewal_offer_ids`` in ``routers/api/renewal.py``.
+
+    ``subscription`` is the raw MPT subscription as loaded from the
+    marketplace: its standing ``auto_renew`` preference is compared against
+    ``selection.renew`` to detect an AutoRenew change, and its current
+    ``lines``/``status``/``commitment_date`` snapshot feeds a Configuration
+    order when nothing about the quantities changed.
+    """
 
     selection: RenewalSubscriptionSelection
     line_id: str
     current_quantity: int
     adobe_subscription_id: str
+    offer_id: str
+    subscription: Subscription
 
 
 class NetNewLine(NamedTuple):
@@ -50,6 +65,31 @@ def require_renewal_selections(request: RenewalPlanRequest) -> None:
         )
 
 
+def require_renewal_changes(
+    plan_subscriptions: list[PlanSubscription], net_new_lines: list[NetNewLine]
+) -> None:
+    """Reject a plan that would create neither a Change nor a Configuration order.
+
+    The platform accepts a Change order only when at least one line's quantity
+    actually moves (a renewing subscription's renewal quantity differs from
+    its current quantity) or a net-new product is added, and a Configuration
+    order only when at least one subscription's renew decision differs from
+    its standing AutoRenew preference. A plan with none of these is a pure
+    no-op the wizard should never have let through.
+    """
+    has_quantity_change = any(
+        plan.selection.renew and plan.selection.renewal_quantity != plan.current_quantity
+        for plan in plan_subscriptions
+    )
+    has_autorenew_change = any(
+        plan.selection.renew != bool(plan.subscription.auto_renew) for plan in plan_subscriptions
+    )
+    if not (has_quantity_change or has_autorenew_change or net_new_lines):
+        raise ValidationError(
+            detail="The renewal plan has no changes to submit.",
+        )
+
+
 async def resolve_net_new_lines(
     ctx: APIContext, agreement: Agreement, selections: list[NetNewItemSelection]
 ) -> list[NetNewLine]:
@@ -69,14 +109,16 @@ def build_preview_renewal_line_items(
     Only renewing subscriptions can be previewed: a lapsing one has nothing to
     price and a net-new product has no Adobe subscription until fulfilment
     creates it. The selected flexible discount codes ride on every line so
-    Adobe validates their eligibility per subscription.
+    Adobe validates their eligibility per subscription. ``plan.offer_id``
+    must already carry the full Adobe offer id (resolved from the customer's
+    live subscriptions) or Adobe rejects the line.
     """
     line_items = []
     renewing = (plan for plan in plan_subscriptions if plan.selection.renew)
     for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER):
         line_item: Line = {
             "extLineItemNumber": line_number,
-            "offerId": plan.selection.offer_id,
+            "offerId": plan.offer_id,
             "subscriptionId": plan.adobe_subscription_id,
             "quantity": plan.selection.renewal_quantity,
         }
@@ -106,7 +148,7 @@ def build_renewal_payload(
         "subscriptions": [
             {
                 "subscriptionId": plan.adobe_subscription_id,
-                "offerId": plan.selection.offer_id,
+                "offerId": plan.offer_id,
                 "renew": plan.selection.renew,
                 "renewalQuantity": plan.selection.renewal_quantity,
                 "flexDiscountCodes": (

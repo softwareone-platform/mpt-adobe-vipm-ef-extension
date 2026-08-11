@@ -41,6 +41,17 @@ async def test_sync_requests_agreement_parameters(sync_setup):
     assert client.commerce.agreements.calls == [("AGR-1", AGREEMENT_SELECT)]
 
 
+async def test_sync_requests_the_agreement_split_buyers(sync_setup, split_payload):
+    payload = {"id": "SUB-1", "agreement": {"id": "AGR-1", "name": "stub"}}
+    agreement = {"id": "AGR-1", "split": split_payload}
+    ctx, _ = sync_setup(payload, related={"agreement": agreement})
+
+    result = await sync_subscription("SUB-1", ctx)  # act
+
+    assert "split.allocations" in AGREEMENT_SELECT
+    assert result.payload["agreement"]["split"] == split_payload
+
+
 async def test_sync_skips_entities_without_id(sync_setup):
     ctx, client = sync_setup({"id": "SUB-1", "agreement": None})
 

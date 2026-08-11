@@ -18,7 +18,7 @@ describe('useAgreementSync', () => {
   });
 
   it('posts the encoded agreement id and records successful completion', async () => {
-    mockPost.mockResolvedValue({ data: { data: {} } });
+    mockPost.mockResolvedValue({ data: { data: { id: 'AGR-1234-5678-9012' } } });
 
     const { result } = renderHook(() => useAgreementSync('AGR-1234-5678-9012'));
 
@@ -31,6 +31,7 @@ describe('useAgreementSync', () => {
     expect(result.current.lastStatus).toBe('success');
     expect(result.current.lastCompleted).toEqual(expect.any(String));
     expect(result.current.error).toBe('');
+    expect(result.current.agreement).toEqual({ id: 'AGR-1234-5678-9012' });
   });
 
   it('does not post when agreement id is missing', async () => {
@@ -57,5 +58,6 @@ describe('useAgreementSync', () => {
     expect(result.current.lastStatus).toBe('error');
     expect(result.current.lastCompleted).toEqual(expect.any(String));
     expect(result.current.error).toBe('Marketplace unavailable');
+    expect(result.current.agreement).toBeNull();
   });
 });

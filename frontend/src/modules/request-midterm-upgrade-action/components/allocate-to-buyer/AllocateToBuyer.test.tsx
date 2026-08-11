@@ -24,7 +24,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/list', () => ({
   useListInMemory: (model: { columns: unknown }) => ({ columns: model.columns }),
 }));
 
-jest.mock('../buyer-reference/BuyerReference', () => ({
+jest.mock('../../../shared/components/BuyerReference/BuyerReference', () => ({
   BuyerReference: ({ allocation, isOwner }: { allocation: AgreementSplitAllocation; isOwner: boolean }) => (
     <div data-testid="buyer-reference">{`${allocation.buyer.name} ${isOwner ? 'owner' : 'member'}`}</div>
   ),

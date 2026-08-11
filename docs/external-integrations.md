@@ -28,3 +28,9 @@ duplicate those tables.
   the sync reads it back with `select=split` using the caller's token, so
   allocation selling prices resolve. Allocations are per subscription, so the
   agreement split cannot stand in for them.
+- The sync also selects `split.allocations` on the agreement, because the two
+  splits answer different questions: the subscription split holds the
+  percentages this subscription is billed by, while the agreement split lists
+  every buyer configured for split billing, including those with no allocation.
+  Order-based billing can target any of them, so the buyer picker is driven by
+  the agreement split.

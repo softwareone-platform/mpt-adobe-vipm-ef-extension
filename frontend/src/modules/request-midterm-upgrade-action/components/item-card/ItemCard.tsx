@@ -5,10 +5,10 @@ import { EntityDomain, EntityType } from '../../../shared/constants';
 import { getItemLink } from '../../../utils/link';
 import { termLabel } from '../../../utils/terms';
 import { SubscriptionItem } from '../../model';
-import { EntityLink } from '../entity-link/EntityLink';
-import { InfoCard } from '../info-card/InfoCard';
-import { LinkReference } from '../link-reference/LinkReference';
-import { Timestamp } from '../timestamp/Timestamp';
+import { EntityLink } from '../../../shared/components/EntityLink/EntityLink';
+import { InfoCard } from '../../../shared/components/InfoCard/InfoCard';
+import { LinkReference } from '../../../shared/components/LinkReference/LinkReference';
+import { Timestamp } from '../../../shared/components/Timestamp/Timestamp';
 
 export function ItemCard({ item }: { item: SubscriptionItem }) {
   const { t } = useTranslation();

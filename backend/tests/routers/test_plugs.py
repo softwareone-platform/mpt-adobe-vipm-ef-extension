@@ -1,14 +1,9 @@
 import json
 
 from mpt_adobe_vipm_ef.routers.plugs import agreement_plugs
-from mpt_adobe_vipm_ef.settings import get_settings
 
 
-def test_agreement_plug_metadata(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
-    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
-    get_settings.cache_clear()
-
+def test_agreement_plug_metadata(plug_env):
     plug = agreement_plugs()[0]  # act
 
     assert plug.id == "agreement-adobe"
@@ -16,11 +11,7 @@ def test_agreement_plug_metadata(monkeypatch):
     assert plug.href == "/static/agreement/index.js"
 
 
-def test_request_commitment_modal_plug_metadata(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
-    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
-    get_settings.cache_clear()
-
+def test_request_commitment_modal_plug_metadata(plug_env):
     plug = agreement_plugs()[1]  # act
 
     assert plug.id == "request-commitment-action"
@@ -33,6 +24,7 @@ def test_request_discount_plug_metadata(monkeypatch):
     monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
     get_settings.cache_clear()
 
+def test_request_midterm_upgrade_plug_metadata(plug_env):
     plug = agreement_plugs()[4]  # act
 
     assert plug.id == "request-discount-action"
@@ -53,12 +45,10 @@ def test_request_midterm_upgrade_plug_metadata(monkeypatch):
     assert plug.href == "/static/request-midterm-upgrade-action/index.js"
 
 
-def test_subscription_plug_condition_lists_products(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+def test_subscription_plug_condition_lists_products(plug_env, monkeypatch):
     monkeypatch.setenv(
         "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
     )
-    get_settings.cache_clear()
 
     plug = agreement_plugs()[5]  # act
 
@@ -70,22 +60,33 @@ def test_subscription_plug_condition_lists_products(monkeypatch):
     )
 
 
-def test_plug_condition_lists_products(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+def test_plug_condition_lists_products(plug_env, monkeypatch):
     monkeypatch.setenv(
         "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
     )
-    get_settings.cache_clear()
 
     plug = agreement_plugs()[0]  # act
 
     assert plug.condition == "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))"
 
 
-def test_plug_condition_empty(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+def test_plugs_omit_disabled_feature(plug_env, monkeypatch):
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": False}}))
+
+    result = agreement_plugs()
+
+    assert "request-renewal-action" not in {plug.id for plug in result}
+    assert "agreement-adobe" in {plug.id for plug in result}
+
+
+def test_plugs_kept_without_features(plug_env):
+    result = agreement_plugs()
+
+    assert len(result) == 6
+
+
+def test_plug_condition_empty(plug_env, monkeypatch):
     monkeypatch.delenv("EXT_PRODUCT_SEGMENTS", raising=False)
-    get_settings.cache_clear()
 
     plug = agreement_plugs()[0]  # act
 

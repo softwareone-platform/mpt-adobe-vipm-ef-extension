@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Column, List, Row, useListInMemory, UseListInMemoryHookModel } from '@softwareone-platform/sdk-react-ui-v0/list';
 
 import { AgreementSplitAllocation } from '../../../shared/model';
-import { BuyerReference } from '../buyer-reference/BuyerReference';
+import { BuyerReference } from '../../../shared/components/BuyerReference/BuyerReference';
 
 import './SplitBillingAllocations.scss';
 

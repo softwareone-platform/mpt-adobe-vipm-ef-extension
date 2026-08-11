@@ -104,3 +104,12 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         ")",
         "href": "/static/request-midterm-upgrade-action/index.js",
     }
+    assert result.plugs[5].model_dump() == {
+        "id": "request-renewal-action",
+        "name": "Renew",
+        "description": "Request a renewal for the agreement.",
+        "icon": None,
+        "socket": "portal.commerce.agreements.agreement.actions",
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-renewal-action/index.js",
+    }

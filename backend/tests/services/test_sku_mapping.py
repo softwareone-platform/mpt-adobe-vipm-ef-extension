@@ -92,3 +92,39 @@ def test_list_three_yc_types_returns_empty_without_skus(api, store):
 def test_list_three_yc_types_rejects_an_unmapped_segment(store):
     with pytest.raises(ConfigError, match="no Airtable SKU mapping segment"):
         store.list_three_yc_types([_LICENSE_SKU], "UNKNOWN")
+
+
+def test_list_auto_renew_supported_queries_the_segment_rows(api, table, store):
+    table.all.return_value = [
+        {
+            "id": "rec1",
+            "fields": {"vendor_external_id": _LICENSE_SKU, "auto_renew_supported": True},
+        },
+        {"id": "rec2", "fields": {"vendor_external_id": _CONSUMABLE_SKU}},
+    ]
+
+    result = store.list_auto_renew_supported([_LICENSE_SKU, _CONSUMABLE_SKU], _MARKET_SEGMENT)
+
+    assert result == {_LICENSE_SKU: True, _CONSUMABLE_SKU: False}
+    api.return_value.table.assert_called_once_with(_BASE_ID, SKU_MAPPING_TABLE)
+    table.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("segment"), "Commercial"),
+            OR(
+                EQ(Field("vendor_external_id"), _LICENSE_SKU),
+                EQ(Field("vendor_external_id"), _CONSUMABLE_SKU),
+            ),
+        )
+    )
+
+
+def test_list_auto_renew_supported_returns_empty_without_skus(api, store):
+    result = store.list_auto_renew_supported([], _MARKET_SEGMENT)
+
+    assert result == {}
+    api.return_value.table.assert_not_called()
+
+
+def test_list_auto_renew_supported_rejects_an_unmapped_segment(store):
+    with pytest.raises(ConfigError, match="no Airtable SKU mapping segment"):
+        store.list_auto_renew_supported([_LICENSE_SKU], "UNKNOWN")

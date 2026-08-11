@@ -6,6 +6,7 @@ AGREEMENT_SELECT = (
     "parameters",
     "product",
     "seller",
+    "split.allocations",
     "vendor",
 )
 LINES_SELECT = ("lines",)
@@ -36,5 +37,6 @@ SCHEDULED_CREATION_WINDOW_OPENS_DAYS = 30
 SCHEDULED_CREATION_WINDOW_CLOSES_DAYS = 3
 
 CHANGE_ORDER_TYPE = "Change"
+CONFIGURATION_ORDER_TYPE = "Configuration"
 PROCESSING_ORDER_STATUS = "Processing"
 ACTIVE_AGREEMENT_STATUS = "Active"

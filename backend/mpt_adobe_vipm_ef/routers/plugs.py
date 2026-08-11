@@ -1,20 +1,20 @@
 from mpt_extension_sdk.routing import PlugRouter
 from mpt_extension_sdk.routing.plugs import Plug
 
-from mpt_adobe_vipm_ef.settings import load_product_segments
+from mpt_adobe_vipm_ef.settings import is_feature_enabled, load_product_segments
 
 plugs_router = PlugRouter()
 
 
 @plugs_router.register()
 def agreement_plugs() -> list[Plug]:
-    """Declare agreement UI plugs served from the static asset bridge."""
+    """Declare the agreement UI plugs that EXT_FEATURES leaves enabled."""
     product_ids = ",".join(segment.id for segment in load_product_segments())
     agreement_condition = f"in(agreement.product.id,({product_ids}))"
     subscription_condition = (
         f"and(in(subscription.product.id,({product_ids})),eq(subscription.status,Active))"
     )
-    return [
+    plugs = [
         Plug(
             id="agreement-adobe",
             name="Adobe",
@@ -63,4 +63,13 @@ def agreement_plugs() -> list[Plug]:
             href="/static/request-midterm-upgrade-action/index.js",
             condition=subscription_condition,
         ),
+        Plug(
+            id="request-renewal-action",
+            name="Renew",
+            description="Request a renewal for the agreement.",
+            socket="portal.commerce.agreements.agreement.actions",
+            href="/static/request-renewal-action/index.js",
+            condition=agreement_condition,
+        ),
     ]
+    return [plug for plug in plugs if is_feature_enabled(plug.id)]

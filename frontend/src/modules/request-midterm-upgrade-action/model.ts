@@ -1,4 +1,6 @@
-import type { Agreement, Audit, Buyer, Reference, Terms } from '../shared/model';
+import type { Audit, Buyer, Reference, Terms } from '../shared/model';
+
+export type { Order, OrderExternalIds } from '../shared/model';
 
 export type SplitBillingAllocationPrice = {
   currency?: string;
@@ -19,22 +21,6 @@ export type SplitBillingAgreement = {
   id?: string | null;
   buyer?: Buyer | null;
   allocations?: SplitBillingAgreementAllocation[] | null;
-}
-
-export type ExternalIds = {
-  client?: string | null;
-  operations?: string | null;
-  vendor?: string | null;
-}
-
-export type Order = {
-  id?: string | null;
-  status?: string | null;
-  type?: string | null;
-  agreement?: Agreement | null;
-  billTo?: Buyer | null;
-  externalIds?: ExternalIds | null;
-  notes?: string | null;
 }
 
 export type SubscriptionItem = {

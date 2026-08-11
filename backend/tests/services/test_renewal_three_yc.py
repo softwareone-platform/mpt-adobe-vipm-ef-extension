@@ -1,5 +1,6 @@
 import pytest
 from mpt_extension_sdk.api import UpstreamServiceError, ValidationError
+from mpt_extension_sdk.models import Subscription
 from requests import ConnectionError as RequestsConnectionError
 
 from mpt_adobe_vipm_ef.models.renewal import NetNewItemSelection, RenewalSubscriptionSelection
@@ -35,6 +36,8 @@ def _plan_subscription(*, offer_id=_LICENSE_OFFER_ID, renew=True, quantity=7, su
         line_id="ALI-0001",
         current_quantity=10,
         adobe_subscription_id="adobe-sub-1",
+        offer_id=offer_id,
+        subscription=Subscription.model_validate({"id": sub_id, "name": sub_id}),
     )
 
 
