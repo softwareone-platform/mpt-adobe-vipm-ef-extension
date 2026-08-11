@@ -5,14 +5,14 @@ import type { DiscountDraft } from "./discountDraft";
 function draftWith(overrides: Partial<DiscountDraft> = {}): DiscountDraft {
   return {
     ...EMPTY_DRAFT,
-    code: "SUMMER25",
-    name: "Summer 2025",
+    code: "DUMMYCODE123",
+    name: "Dummy Discount draft",
     category: "STANDARD",
     discountType: "PERCENTAGE",
-    value: "20",
-    startDate: "2026-06-01T00:00:00Z",
-    endDate: "2026-08-31T23:59:59Z",
-    targetItems: "65322651CA02A12",
+    value: "8",
+    startDate: "2026-01-01T00:00:00Z",
+    endDate: "2027-10-31T23:59:59Z",
+    targetItems: "ITEM-001",
     applicableOrderTypes: ["RENEWAL"],
     ...overrides,
   };
@@ -89,11 +89,11 @@ describe("toCreatePayload", () => {
 
   it("trims the free-text fields", () => {
     const payload = toCreatePayload(
-      draftWith({ code: "  SUMMER25  ", name: "  Summer 2025  ", description: "  Note  " }),
+      draftWith({ code: "  DUMMYCODE123  ", name: "  Dummy Discount  ", description: "  Note  " }),
     );
 
-    expect(payload.code).toBe("SUMMER25");
-    expect(payload.name).toBe("Summer 2025");
+    expect(payload.code).toBe("DUMMYCODE123");
+    expect(payload.name).toBe("Dummy Discount");
     expect(payload.description).toBe("Note");
   });
 
