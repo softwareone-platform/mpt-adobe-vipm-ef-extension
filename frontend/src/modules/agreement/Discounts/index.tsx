@@ -1,9 +1,12 @@
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import {
+  type Expression,
   Grid,
   GridCellSimple,
   GridColumnDefinition,
   GridDefaultConfiguration,
+  GridFieldDefinition,
+  GridFieldSortOperation,
   useGridAsync,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
@@ -121,11 +124,34 @@ const columns: GridColumnDefinition<Discount>[] = [
   },
 ];
 
+const fields: GridFieldDefinition[] = [
+  { name: 'code', title: i18n.t('Agreement:Discounts:Code') },
+  { name: 'source', title: i18n.t('Agreement:Discounts:Source') },
+  { name: 'status', title: i18n.t('Common:Status') },
+  { name: 'discountType', title: i18n.t('Agreement:Discounts:Type') },
+  { name: 'startDate', title: i18n.t('Agreement:Discounts:Valid') },
+  { name: 'endDate', title: i18n.t('Agreement:Discounts:Valid') },
+  { name: 'applicableOrderTypes', title: i18n.t('Agreement:Discounts:Order types') },
+  { name: 'redeemedAt', title: i18n.t('Agreement:Discounts:Redeemed') },
+];
+
+const sort: GridFieldSortOperation[] = [{ field: 'code', direction: 'asc' }];
+
+const ALLOWED_QUERY_FIELDS = new Set(fields.map((field) => field.name));
+
 export function Discounts() {
   const { t } = useTranslation();
   const agreementId = useAgreementId();
   const [paging, setPaging] = useState({ page: 1, pageSize: DEFAULT_PAGE_SIZE });
-  const discounts = useDiscounts(agreementId, paging.page, paging.pageSize);
+  const [sortQuery, setSortQuery] = useState<GridFieldSortOperation[]>(sort);
+  const [filtersQuery, setFiltersQuery] = useState<Expression | null>(null);
+  const primarySort = sortQuery[0];
+  const sortBy = primarySort?.field;
+  const discounts = useDiscounts(agreementId, paging.page, paging.pageSize, {
+    sortBy: sortBy && ALLOWED_QUERY_FIELDS.has(sortBy) ? sortBy : undefined,
+    sortDir: primarySort?.direction,
+    filters: filtersQuery == null ? undefined : JSON.stringify(filtersQuery),
+  });
 
   // The grid owns the paging state; mirror page changes into the fetch so the
   // backend receives the matching `offset`/`limit` query parameters.
@@ -135,11 +161,21 @@ export function Discounts() {
     setPaging((prev) =>
       prev.page === page && prev.pageSize === pageSize ? prev : { page, pageSize },
     );
+    setSortQuery((prev) => {
+      const next = config.sort ?? [];
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+    setFiltersQuery((prev) => {
+      const next = config.filters ?? null;
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
   }, []);
 
   const gridProps = useGridAsync<Discount>({
     id: 'modules__agreement__discounts--client',
     columns,
+    fields,
+    sort,
     data: discounts.data,
     total: discounts.total,
     isLoading: discounts.status === 'loading' || discounts.status === 'idle',

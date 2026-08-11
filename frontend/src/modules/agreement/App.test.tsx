@@ -388,7 +388,7 @@ describe('agreement plug app', () => {
       expect(mockGet).toHaveBeenCalledWith(
         '/api/v2/discount-codes',
         expect.objectContaining({
-          params: { agreement: 'AGR-1234-5678-9012', limit: 10, offset: 0 },
+          params: expect.objectContaining({ agreement: 'AGR-1234-5678-9012', limit: 10, offset: 0 }),
         }),
       );
     });

@@ -48,7 +48,7 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 }),
       }),
     );
   });
@@ -62,7 +62,7 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 5, offset: 10 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 5, offset: 10 }),
       }),
     );
   });
@@ -83,7 +83,38 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenLastCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 }),
+      }),
+    );
+  });
+
+  it('sends sort and filters query params when provided', async () => {
+    mockGet.mockResolvedValue(paginatedResponse(DISCOUNTS, 2));
+    const filters = {
+      type: 'and',
+      expressions: [{ type: 'binary', field: 'source', operator: 'eq', value: 'Open' }],
+    };
+
+    renderHook(() =>
+      useDiscounts('AGR-0000-0000-0000', 1, 10, {
+        sortBy: 'source',
+        sortDir: 'desc',
+        filters: JSON.stringify(filters),
+      }),
+    );
+
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v2/discount-codes',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          agreement: 'AGR-0000-0000-0000',
+          limit: 10,
+          offset: 0,
+          sortBy: 'source',
+          sortDir: 'desc',
+          filters: JSON.stringify(filters),
+        }),
       }),
     );
   });

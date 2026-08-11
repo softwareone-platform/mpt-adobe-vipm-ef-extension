@@ -6,6 +6,14 @@ import { i18n } from '../../../i18n/translations';
 
 import type { Discount, DiscountsPage } from '../model';
 
+type SortDirection = 'asc' | 'desc';
+
+export interface DiscountQueryOptions {
+  sortBy?: string;
+  sortDir?: SortDirection;
+  filters?: string;
+}
+
 const INITIAL_STATE: DiscountsPage = {
   status: 'idle',
   error: null,
@@ -22,6 +30,7 @@ export function useDiscounts(
   agreementId: string,
   page: number,
   pageSize: number,
+  query?: DiscountQueryOptions,
 ): DiscountsPage & {
   refresh: () => Promise<void>;
   abort: (reason?: unknown) => void;
@@ -29,6 +38,9 @@ export function useDiscounts(
   const [state, setState] = useState<DiscountsPage>(INITIAL_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
+  const sortBy = query?.sortBy?.trim() || undefined;
+  const sortDir = query?.sortDir;
+  const filters = query?.filters;
 
   useEffect(() => {
     if (!agreementId) return;
@@ -37,13 +49,22 @@ export function useDiscounts(
     controllerRef.current = controller;
     setState((prev) => ({ ...prev, status: 'loading', error: null }));
 
+    const params: Record<string, string | number> = {
+      agreement: agreementId,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    };
+    if (sortBy) {
+      params.sortBy = sortBy;
+      params.sortDir = sortDir ?? 'asc';
+    }
+    if (filters) {
+      params.filters = filters;
+    }
+
     http
       .get('/api/v2/discount-codes', {
-        params: {
-          agreement: agreementId,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-        },
+        params,
         signal: controller.signal,
       })
       .then((response) => {
@@ -60,7 +81,7 @@ export function useDiscounts(
       });
 
     return () => controller.abort();
-  }, [agreementId, page, pageSize, refreshToken]);
+  }, [agreementId, page, pageSize, sortBy, sortDir, filters, refreshToken]);
 
   const refresh = useCallback(async () => {
     setRefreshToken((t) => t + 1);

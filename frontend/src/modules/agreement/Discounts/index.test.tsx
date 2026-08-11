@@ -113,7 +113,7 @@ describe('Discounts view', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 }),
       }),
     );
   });
@@ -171,7 +171,46 @@ describe('Discounts view', () => {
     expect(mockGet).toHaveBeenLastCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 }),
+      }),
+    );
+  });
+
+  it('re-fetches with sort and filters when the grid config changes', async () => {
+    await renderDiscounts();
+
+    const lastConfig = mockGridConfigs[mockGridConfigs.length - 1] as {
+      onConfigChange: (config: {
+        paging: { page: number; pageSize: number };
+        sort?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+        filters?: unknown;
+      }) => void;
+    };
+    const filters = {
+      type: 'and',
+      expressions: [{ type: 'binary', field: 'source', operator: 'eq', value: 'Open' }],
+    };
+
+    act(() => {
+      lastConfig.onConfigChange({
+        paging: { page: 1, pageSize: 10 },
+        sort: [{ field: 'source', direction: 'desc' }],
+        filters,
+      });
+    });
+
+    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+    expect(mockGet).toHaveBeenLastCalledWith(
+      '/api/v2/discount-codes',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          agreement: 'AGR-0000-0000-0000',
+          limit: 10,
+          offset: 0,
+          sortBy: 'source',
+          sortDir: 'desc',
+          filters: JSON.stringify(filters),
+        }),
       }),
     );
   });
@@ -183,6 +222,27 @@ describe('Discounts view', () => {
     expect(lastConfig.total).toBe(DISCOUNTS.length);
     expect(lastConfig.isLoading).toBe(false);
     expect(lastConfig.error).toBeUndefined();
+  });
+
+  it('configures fields and default sort so filter and sort controls can render inputs', async () => {
+    await renderDiscounts();
+
+    const lastConfig = mockGridConfigs[mockGridConfigs.length - 1] as {
+      fields?: Array<{ name: string }>;
+      sort?: Array<{ field: string; direction: string }>;
+    };
+
+    expect(lastConfig.fields?.map((field) => field.name)).toEqual([
+      'code',
+      'source',
+      'status',
+      'discountType',
+      'startDate',
+      'endDate',
+      'applicableOrderTypes',
+      'redeemedAt',
+    ]);
+    expect(lastConfig.sort).toEqual([{ field: 'code', direction: 'asc' }]);
   });
 
   it('surfaces fetch errors to the grid', async () => {
