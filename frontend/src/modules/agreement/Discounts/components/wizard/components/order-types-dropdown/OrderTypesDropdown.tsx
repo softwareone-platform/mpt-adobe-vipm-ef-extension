@@ -98,7 +98,7 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
 
   return (
     <div className="order-types">
-      <RegularText as="span" size={2} className="order-types__label">
+      <RegularText as="span" id="order-types-label" size={2} className="order-types__label">
         {t("Agreement:Discounts:Wizard:Fields:ApplicableOrderTypes")}
       </RegularText>
       <Dropdown<OrderTypeSelection>
@@ -111,6 +111,7 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
         value={value}
       >
         <button
+          aria-labelledby="order-types-label"
           className="order-types__control"
           data-testid="order-types-control"
           type="button"
