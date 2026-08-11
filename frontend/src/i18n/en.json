@@ -74,7 +74,7 @@
     },
     "Discounts": {
       "Title": "Discounts",
-      "Description": "The details of this customer's discounts codes are below.",
+      "Description": "The details of this customer's discount codes are below.",
       "Code": "Code",
       "Source": "Source",
       "Type": "Type",
