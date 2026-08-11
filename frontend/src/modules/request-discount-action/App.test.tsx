@@ -187,7 +187,7 @@ describe('request-discount-action App', () => {
     expect(capturedProps!.steps[2].nextButton?.isDisabled).toBe(true);
   });
 
-  it('enables the definition step once its fields carry a value', async () => {
+  it('keeps the definition step disabled while the category is unset', async () => {
     await renderApp();
 
     fireEvent.change(codeInput(), { target: { value: 'SUMMER25' } });
