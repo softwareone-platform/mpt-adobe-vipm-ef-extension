@@ -352,6 +352,7 @@ export default function App() {
           onActiveStepIndexChange={setActiveStepIndex}
           onClose={onClose}
           onSave={viewOrder}
+          isToDisableSideNavigation={Boolean(order.id)}
         >
           <Wizard.Header>{t('MidtermUpgrade:Header')}</Wizard.Header>
           <Wizard.Content>
