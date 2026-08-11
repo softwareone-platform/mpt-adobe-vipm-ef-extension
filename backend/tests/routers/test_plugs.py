@@ -78,6 +78,7 @@ def test_plugs_kept_without_features(plug_env):
 
 
 def test_plug_condition_empty(plug_env, monkeypatch):
+
     monkeypatch.delenv("EXT_PRODUCT_SEGMENTS", raising=False)
 
     plug = agreement_plugs()[0]  # act
