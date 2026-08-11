@@ -13,16 +13,16 @@ jest.mock('@mpt-extension/sdk', () => ({
 const mockPost = jest.mocked(http.post);
 
 const PAYLOAD = {
-  code: 'SUMMER25',
-  name: 'Summer 2025',
+  code: 'DUMMYCODE123',
+  name: 'Dummy Create Discount',
   category: 'STANDARD',
   discountType: 'PERCENTAGE',
-  value: 20,
-  startDate: '2026-06-01T00:00:00Z',
-  endDate: '2026-08-31T23:59:59Z',
+  value: 5,
+  startDate: '2026-01-01T00:00:00Z',
+  endDate: '2026-06-31T23:59:59Z',
   reusable: false,
-  targetOfferIds: ['65322651CA02A12'],
-  qualifyingOfferIds: [],
+  targetOfferIds: ['ITEM-001', 'ITEM-002', 'ITEM-003'],
+  qualifyingOfferIds: ['ITEM-001', 'ITEM-002', 'ITEM-003', 'ITEM-004'],
   applicableOrderTypes: ['RENEWAL'],
   supportsAnnual: false,
   supports3yc: false,
@@ -36,7 +36,7 @@ describe('useCreateDiscountRequest', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('posts the payload scoped to the agreement', async () => {
-    mockPost.mockResolvedValue({ data: { data: { id: 'rec1', code: 'SUMMER25' } } });
+    mockPost.mockResolvedValue({ data: { data: { id: 'rec1', code: 'DUMMYCODE123' } } });
     const { result } = renderHook(() => useCreateDiscountRequest('AGR-0000-0000-0000'));
 
     await act(async () => {
@@ -59,7 +59,7 @@ describe('useCreateDiscountRequest', () => {
       created = await result.current.submitRequest(PAYLOAD);
     });
 
-    expect(created).toEqual({ id: 'rec1', code: 'SUMMER25' });
+    expect(created).toEqual({ id: 'rec1', code: 'DUMMYCODE123' });
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
 

@@ -12,17 +12,17 @@ jest.mock("@softwareone-platform/sdk-react-ui-v0/icon", () => ({
 
 const CREATED_DRAFT: DiscountDraft = {
   ...EMPTY_DRAFT,
-  code: "F3ZN8WR5KM7QX2DJ9VC4LBPT",
-  name: "Acrobat Studio Ent 25% 3YC Upsell",
+  code: "DUMMYCODE1234567890",
+  name: "Dummy Discount Name",
   category: "STANDARD",
   discountType: "PERCENTAGE",
   value: "25",
-  startDate: "2026-06-01T00:00:00.000Z",
-  endDate: "2026-10-01T00:00:00.000Z",
+  startDate: "2026-01-01T00:00:00.000Z",
+  endDate: "2026-04-01T00:00:00.000Z",
   reusable: true,
-  discountLockEndDate: "2027-03-01T00:00:00.000Z",
-  targetItems: "30013593CB, 30013600CB",
-  prerequisiteItems: "30001838CB",
+  discountLockEndDate: "2026-07-01T00:00:00.000Z",
+  targetItems: "ITEM-001, ITEM-002",
+  prerequisiteItems: "ITEM-003",
   applicableOrderTypes: [ANY_ORDER_TYPE],
   supportsAnnual: true,
   supportsThreeYc: false,
@@ -36,7 +36,9 @@ describe("SummaryStep", () => {
   it("confirms the discount was created", () => {
     renderStep();
 
-    expect(screen.getByRole("heading", { name: "Summary" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Summary" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByText(
         "The customer's closed discount has been created and can be used in future orders.",
@@ -48,17 +50,19 @@ describe("SummaryStep", () => {
     renderStep();
 
     for (const section of ["Definition", "Validity", "Scope"]) {
-      expect(screen.getByRole("heading", { name: section })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: section }),
+      ).toBeInTheDocument();
     }
   });
 
   it("shows the saved values", () => {
     renderStep();
 
-    expect(screen.getByText("F3ZN8WR5KM7QX2DJ9VC4LBPT")).toBeInTheDocument();
+    expect(screen.getByText("DUMMYCODE1234567890")).toBeInTheDocument();
     expect(screen.getByText("25% off")).toBeInTheDocument();
-    expect(screen.getByText("01 JUN 2026")).toBeInTheDocument();
-    expect(screen.getByText("30013593CB, 30013600CB")).toBeInTheDocument();
+    expect(screen.getByText("01 JAN 2026")).toBeInTheDocument();
+    expect(screen.getByText("ITEM-001, ITEM-002")).toBeInTheDocument();
     expect(screen.getByText("Any")).toBeInTheDocument();
   });
 
