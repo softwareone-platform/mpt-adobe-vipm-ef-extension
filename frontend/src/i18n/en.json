@@ -372,6 +372,7 @@
         "Description": "Billing for this order will be allocated to an individual buyer from the buyers configured for split billing within this agreement"
       },
       "AllocationInfo": "Billing for subscription changes will be allocated between buyers as follows",
+      "NoBuyers": "The buyers configured for split billing on this agreement could not be loaded.",
       "Allocation %": "Allocation %",
       "Validation": {
         "SelectOption": "Select a split billing option.",
