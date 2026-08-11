@@ -3,6 +3,7 @@ import json
 from mpt_adobe_vipm_ef.routers.plugs import agreement_plugs
 from mpt_adobe_vipm_ef.settings import get_settings
 
+
 def test_agreement_plug_metadata(plug_env):
     plug = agreement_plugs()[0]  # act
 
