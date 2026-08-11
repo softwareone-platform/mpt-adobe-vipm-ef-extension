@@ -338,6 +338,7 @@ export default function App() {
     },
     {
       title: t('Renewal:Steps:Summary'),
+      nextButton: { label: t('Renewal:Summary:View order') },
       render: () => <SummaryStep agreement={agreement} order={order} />,
     },
   ];
@@ -354,6 +355,7 @@ export default function App() {
           onActiveStepIndexChange={setActiveStepIndex}
           onClose={onClose}
           onSave={viewOrder}
+          isToDisableSideNavigation={Boolean(order?.id)}
         >
           <Wizard.Header>
             {t('Renewal:Header', { product: agreement.product?.name ?? '' })}

@@ -99,15 +99,21 @@ interface MockChildren {
 }
 interface MockWizardProps extends MockChildren {
   onClose?: () => void;
+  isToDisableSideNavigation?: boolean;
 }
+let wizardProps: MockWizardProps;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => {
-  const Wizard = ({ children, onClose }: MockWizardProps) => (
-    <div>
-      {children as ReactNode}
-      <button onClick={onClose}>Close</button>
-    </div>
-  );
+  const Wizard = (props: MockWizardProps) => {
+    wizardProps = props;
+    const { children, onClose } = props;
+    return (
+      <div>
+        {children as ReactNode}
+        <button onClick={onClose}>Close</button>
+      </div>
+    );
+  };
   Wizard.Header = ({ children }: MockChildren) => <div>{children as ReactNode}</div>;
   const Content = ({ children }: MockChildren) => <div>{children as ReactNode}</div>;
   Content.Steps = () => <div />;
@@ -677,6 +683,45 @@ describe('request-midterm-upgrade-action App', () => {
 
     expect(placed).toBe(false);
     expect(reviewOrderProps.errorMessage).toBe('Adobe rejected the switch preview.');
+  });
+
+  it('locks the side navigation once the order is placed', async () => {
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+
+    const selectedTarget = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: false,
+      currentQuantity: 0,
+      newQuantity: 6,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+
+    await act(async () => {
+      await reviewOrderProps.onPlaceOrder();
+    });
+    rerender(<App />);
+
+    expect(wizardProps.isToDisableSideNavigation).toBe(true);
   });
 
   it('renders the summary step on the sixth step and wires its order', async () => {

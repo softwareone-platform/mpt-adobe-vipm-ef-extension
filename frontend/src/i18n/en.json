@@ -319,6 +319,7 @@
       }
     },
     "Summary": {
+      "View order": "View order",
       "Title": "Your renewal order is being processed",
       "StatusBody": "Your renewal order is currently being processed. No action is required from you at this stage.",
       "NextHeading": "What happens next",
