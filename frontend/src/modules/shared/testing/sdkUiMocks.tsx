@@ -13,6 +13,11 @@ type MockGridColumn = {
   cell?: (item: object) => ReactNode;
 };
 
+type MockActionOption = {
+  label?: string;
+  type?: 'divider' | 'group';
+};
+
 export type MockGridConfig = Record<string, unknown>;
 
 export function createChipMock() {
@@ -26,6 +31,15 @@ export function createChipMock() {
 export function createGridMock(onUseGridAsync?: (config: MockGridConfig) => void) {
   return {
     GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    GridCellActions: ({ actions }: { actions: MockActionOption[] }) => (
+      <div>
+        {actions
+          .filter((action) => action.type !== 'divider' && action.type !== 'group')
+          .map((action, index) => (
+            <span key={index}>{action.label}</span>
+          ))}
+      </div>
+    ),
     useGridAsync: (config: MockGridConfig) => {
       onUseGridAsync?.(config);
       return {

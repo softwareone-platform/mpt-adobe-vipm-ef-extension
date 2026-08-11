@@ -1,4 +1,4 @@
-import { EM_DASH, formatDate, formatOrderTypes, formatValue } from './format';
+import { EM_DASH, formatDate, formatOrderTypes, formatSource, formatValue } from './format';
 
 import type { Discount } from '../../shared/model';
 
@@ -60,5 +60,22 @@ describe('formatOrderTypes', () => {
 
   it('joins the translated labels for the given order types', () => {
     expect(formatOrderTypes(['NEW', 'RENEWAL'])).toBe('Add seats, Renewal');
+  });
+});
+
+describe('formatSource', () => {
+  it('keeps Open and Closed as-is', () => {
+    expect(formatSource('Open')).toBe('Open');
+    expect(formatSource('Closed')).toBe('Closed');
+  });
+
+  it('preserves unknown values as-is', () => {
+    expect(formatSource('API')).toBe('API');
+    expect(formatSource('Ops/Vendor')).toBe('Ops/Vendor');
+  });
+
+  it('falls back to em dash when source is missing', () => {
+    expect(formatSource()).toBe(EM_DASH);
+    expect(formatSource(null)).toBe(EM_DASH);
   });
 });

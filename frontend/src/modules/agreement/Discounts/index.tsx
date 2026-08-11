@@ -1,7 +1,9 @@
 import { Chip, ChipColor } from '@softwareone-platform/sdk-react-ui-v0/chip';
+import type { ListOption } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
 import {
   type Expression,
   Grid,
+  GridCellActions,
   GridCellSimple,
   GridColumnDefinition,
   GridDefaultConfiguration,
@@ -10,7 +12,7 @@ import {
   useGridAsync,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '../../../i18n/translations';
@@ -18,7 +20,7 @@ import { useAgreementId } from '../../shared/hooks/useAgreementId';
 import { useDiscounts } from '../../shared/hooks/useDiscounts';
 
 import { TextCell } from './components/grid-cell/text-cell/TextCell';
-import { EM_DASH, formatDate, formatOrderTypes, formatValue } from './format';
+import { EM_DASH, formatDate, formatOrderTypes, formatSource, formatValue } from './format';
 
 import type { Discount } from '../../shared/model';
 
@@ -26,12 +28,21 @@ import './index.scss';
 
 const DEFAULT_PAGE_SIZE = 10;
 
+type DiscountAction = 'edit';
+
 const STATUS_CHIP_COLORS: Record<string, ChipColor> = {
   ACTIVE: 'success',
   EXPIRED: 'danger',
 };
 
-const columns: GridColumnDefinition<Discount>[] = [
+const DISCOUNT_ACTIONS: ListOption<DiscountAction>[] = [
+  {
+    value: 'edit',
+    label: i18n.t('Agreement:Discounts:Edit'),
+  },
+];
+
+const BASE_COLUMNS: GridColumnDefinition<Discount>[] = [
   {
     name: 'code',
     title: i18n.t('Agreement:Discounts:Code'),
@@ -66,7 +77,7 @@ const columns: GridColumnDefinition<Discount>[] = [
     title: i18n.t('Agreement:Discounts:Source'),
     fields: ['source'],
     initialWidth: 110,
-    cell: (item) => <TextCell text={item.source ?? EM_DASH} />,
+    cell: (item) => <TextCell text={formatSource(item.source)} />,
   },
   {
     name: 'type',
@@ -152,6 +163,34 @@ export function Discounts() {
     sortDir: primarySort?.direction,
     filters: filtersQuery == null ? undefined : JSON.stringify(filtersQuery),
   });
+
+  const onDiscountAction = useCallback((action: string, item: Discount) => {
+    if (action === 'edit') {
+      // TODO: Implement edit wizard flow when it is available.
+      void item;
+    }
+  }, []);
+
+  const columns = useMemo<GridColumnDefinition<Discount>[]>(
+    () => [
+      ...BASE_COLUMNS,
+      {
+        name: 'actions',
+        title: i18n.t('Agreement:Discounts:Actions'),
+        fields: ['id'],
+        initialWidth: 80,
+        cell: (item) => (
+          <GridCellActions
+            item={item}
+            actions={DISCOUNT_ACTIONS}
+            onAction={onDiscountAction}
+            testId={`discounts-action-${item.id}`}
+          />
+        ),
+      },
+    ],
+    [onDiscountAction],
+  );
 
   // The grid owns the paging state; mirror page changes into the fetch so the
   // backend receives the matching `offset`/`limit` query parameters.

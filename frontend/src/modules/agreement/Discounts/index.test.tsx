@@ -122,7 +122,16 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.getByRole('heading', { name: 'Discounts' })).toBeInTheDocument();
-    for (const header of ['Code', 'Source', 'Type', 'Value', 'Valid', 'Order types', 'Redeemed']) {
+    for (const header of [
+      'Code',
+      'Source',
+      'Type',
+      'Value',
+      'Valid',
+      'Order types',
+      'Redeemed',
+      'Actions',
+    ]) {
       expect(screen.getByText(header)).toBeInTheDocument();
     }
   });
@@ -141,6 +150,7 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit')).toHaveLength(2);
   });
 
   it('renders expired closed codes with the lock date and the Any order type', async () => {
