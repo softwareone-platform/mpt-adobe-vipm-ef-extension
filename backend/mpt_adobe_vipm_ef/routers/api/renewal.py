@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import replace
 from http import HTTPStatus
 
 from mpt_api_client.exceptions import MPTHttpError
@@ -46,7 +47,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
     create_renewal_change_order,
     create_renewal_configuration_order,
 )
-from mpt_adobe_vipm_ef.services.renewal_plan import (
+from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     Line,
     NetNewLine,
     PlanSubscription,
@@ -55,6 +56,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (
     require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_lines,
+    resolve_net_new_offer_ids,
 )
 from mpt_adobe_vipm_ef.services.renewal_three_yc import check_renewal_plan_three_yc_floor
 from mpt_adobe_vipm_ef.services.switch_order import (
@@ -213,6 +215,9 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     if lines:
         currency_code = agreement.authorization.currency or ""
         plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
+        net_new_lines = await resolve_net_new_offer_ids(
+            ctx, net_new_lines, lambda: resolve_market_segment(ctx, agreement)
+        )
         renewal_payload = build_renewal_payload(
             plan_subscriptions, net_new_lines, body, currency_code
         )
@@ -371,7 +376,8 @@ async def _resolve_renewal_offer_ids(
         return plan_subscriptions
     offer_ids_by_subscription = await _load_adobe_subscription_offer_ids(ctx, agreement_id)
     return [
-        plan._replace(
+        replace(
+            plan,
             offer_id=offer_ids_by_subscription.get(plan.adobe_subscription_id) or plan.offer_id,
         )
         for plan in plan_subscriptions
