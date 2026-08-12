@@ -2,9 +2,7 @@ import { MediumText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useTranslation } from "react-i18next";
 
 import {
-  EM_DASH,
   formatReviewCategory,
-  formatReviewDate,
   formatReviewDiscountType,
   formatReviewItems,
   formatReviewOrderTypes,
@@ -15,6 +13,7 @@ import { ReviewBooleanField, ReviewField } from "../review-field/ReviewField";
 import type { DiscountDraft } from "../../discountDraft";
 
 import "./DiscountSummary.scss";
+import { EM_DASH, formatReviewDate } from "../../../../../../utils/date";
 
 export interface DiscountSummaryProps {
   draft: DiscountDraft;
@@ -30,7 +29,11 @@ export function DiscountSummary({ draft }: DiscountSummaryProps) {
   return (
     <>
       <section className="discount-summary__section">
-        <MediumText as="h4" size={2} className="discount-summary__section-title">
+        <MediumText
+          as="h4"
+          size={2}
+          className="discount-summary__section-title"
+        >
           {t("Agreement:Discounts:Wizard:Create:Steps:Definition")}
         </MediumText>
         <div className="discount-summary__row">
@@ -58,7 +61,11 @@ export function DiscountSummary({ draft }: DiscountSummaryProps) {
       </section>
 
       <section className="discount-summary__section">
-        <MediumText as="h4" size={2} className="discount-summary__section-title">
+        <MediumText
+          as="h4"
+          size={2}
+          className="discount-summary__section-title"
+        >
           {t("Agreement:Discounts:Wizard:Create:Steps:Validity")}
         </MediumText>
         <div className="discount-summary__row">
@@ -84,7 +91,11 @@ export function DiscountSummary({ draft }: DiscountSummaryProps) {
       </section>
 
       <section className="discount-summary__section">
-        <MediumText as="h4" size={2} className="discount-summary__section-title">
+        <MediumText
+          as="h4"
+          size={2}
+          className="discount-summary__section-title"
+        >
           {t("Agreement:Discounts:Wizard:Create:Steps:Scope")}
         </MediumText>
         <div className="discount-summary__row">

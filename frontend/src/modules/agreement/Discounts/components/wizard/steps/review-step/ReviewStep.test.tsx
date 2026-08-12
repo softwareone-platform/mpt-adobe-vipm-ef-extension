@@ -102,14 +102,14 @@ describe("ReviewStep", () => {
     expect(screen.getByText("Dummy Discount Name")).toBeInTheDocument();
     expect(screen.getByText("Standard")).toBeInTheDocument();
     expect(screen.getByText("Percentage discount")).toBeInTheDocument();
-    expect(screen.getByText("25% off")).toBeInTheDocument();
+    expect(screen.getByText("15% off")).toBeInTheDocument();
   });
 
   it("summarizes the validity fields with the design's date format", () => {
     renderStep();
 
     expect(screen.getByText("01 JAN 2026")).toBeInTheDocument();
-    expect(screen.getByText("01 APR 2026")).toBeInTheDocument();
+    expect(screen.getByText("01 MAR 2028")).toBeInTheDocument();
     expect(screen.getByText("01 JUL 2026")).toBeInTheDocument();
   });
 

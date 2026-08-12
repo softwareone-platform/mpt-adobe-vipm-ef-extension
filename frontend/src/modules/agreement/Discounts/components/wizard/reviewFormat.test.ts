@@ -1,8 +1,6 @@
 import { ANY_ORDER_TYPE, EMPTY_DRAFT } from "./discountDraft";
 import {
-  EM_DASH,
   formatReviewCategory,
-  formatReviewDate,
   formatReviewDiscountType,
   formatReviewItems,
   formatReviewOrderTypes,
@@ -10,6 +8,7 @@ import {
 } from "./reviewFormat";
 
 import type { DiscountDraft } from "./discountDraft";
+import { EM_DASH, formatReviewDate } from "../../../../utils/date";
 
 function draftWith(overrides: Partial<DiscountDraft> = {}): DiscountDraft {
   return { ...EMPTY_DRAFT, ...overrides };

@@ -22,12 +22,13 @@ import { useSettings } from "../../shared/hooks/useSettings";
 import { canManageDiscountCodes } from "../../utils/security";
 
 import { TextCell } from "./components/grid-cell/text-cell/TextCell";
-import { EM_DASH, formatDate, formatOrderTypes, formatValue } from "./format";
+import { formatDate, formatOrderTypes, formatValue } from "./format";
 
 import type { AccountType } from "../../shared/three-year-commitment";
 import type { Discount } from "../../shared/model";
 
 import "./index.scss";
+import { EM_DASH } from "../../utils/date";
 
 const DEFAULT_PAGE_SIZE = 10;
 

@@ -1,4 +1,4 @@
-import { daysUntil, formatDate, formatDateOnly, formatTime } from './date';
+import { daysUntil, EM_DASH, formatDate, formatDateOnly, formatReviewDate, formatTime } from './date';
 
 describe('formatDate', () => {
   it('formats an ISO timestamp as a localized date', () => {
@@ -60,5 +60,22 @@ describe('formatTime', () => {
     expect(formatTime(undefined)).toBeUndefined();
     expect(formatTime('')).toBeUndefined();
     expect(formatTime('not-a-date')).toBeUndefined();
+  });
+
+  describe("formatReviewDate", () => {
+    it.each([
+      ["2026-06-01T00:00:00.000Z", "01 JUN 2026"],
+      ["2026-10-01T00:00:00.000Z", "01 OCT 2026"],
+      ["2027-03-01T00:00:00.000Z", "01 MAR 2027"],
+    ])("renders %s as %s", (iso, expected) => {
+      expect(formatReviewDate(iso)).toBe(expected);
+    });
+
+    it.each([
+      ["an empty string", ""],
+      ["an unparseable value", "not-a-date"],
+    ])("falls back to a dash for %s", (_label, value) => {
+      expect(formatReviewDate(value)).toBe(EM_DASH);
+    });
   });
 });
