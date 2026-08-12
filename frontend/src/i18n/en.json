@@ -173,7 +173,6 @@
     "Send invitation": "Send invitation",
     "Validation": {
       "AtLeastOne": "At least one quantity is required.",
-      "AboveMinimum": "{{label}} must be greater than the current minimum ({{minimum}}).",
       "AlreadyCommitted": "The customer is already committed. Select recommitment instead."
     }
   },
