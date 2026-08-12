@@ -2,6 +2,8 @@ import { MS_PER_DAY } from '../shared/constants';
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+export const EM_DASH = "—";
+
 function toLocalDate(value: string): Date | undefined {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -50,3 +52,16 @@ export function formatTime(value?: string): string | undefined {
     minute: '2-digit',
   });
 }
+
+/** `2026-06-01T00:00:00Z` becomes `01 JUN 2026`, matching the design. */
+export function formatReviewDate(value: string): string {
+  if (!value) return EM_DASH;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return EM_DASH;
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = date
+    .toLocaleString("en-US", { month: "short", timeZone: "UTC" })
+    .toUpperCase();
+  return `${day} ${month} ${date.getUTCFullYear()}`;
+}
+

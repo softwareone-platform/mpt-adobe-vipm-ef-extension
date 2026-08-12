@@ -1,31 +1,10 @@
 import { i18n } from "../../../../../i18n/translations";
+import { EM_DASH } from "../../../../utils/date";
+import { formatCurrency } from "../../../../utils/price";
 
 import { parseItemList } from "./discountDraft";
 
 import type { DiscountDraft } from "./discountDraft";
-
-export const EM_DASH = "—";
-
-/** `2026-06-01T00:00:00Z` becomes `01 JUN 2026`, matching the design. */
-export function formatReviewDate(value: string): string {
-  if (!value) return EM_DASH;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return EM_DASH;
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = date
-    .toLocaleString("en-US", { month: "short", timeZone: "UTC" })
-    .toUpperCase();
-  return `${day} ${month} ${date.getUTCFullYear()}`;
-}
-
-function formatCurrency(amount: number, currency: string): string {
-  if (!currency) return String(amount);
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
-  } catch {
-    return `${amount} ${currency}`;
-  }
-}
 
 /** Renders the amount the way the discounts grid does, from the draft's raw fields. */
 export function formatReviewValue(draft: DiscountDraft): string {

@@ -51,7 +51,7 @@ describe('useCreateDiscountRequest', () => {
   });
 
   it('returns the created discount and reports success', async () => {
-    mockPost.mockResolvedValue({ data: { data: { id: 'rec1', code: 'SUMMER25' } } });
+    mockPost.mockResolvedValue({ data: { data: { id: 'rec1', code: 'DUMMYCODE123' } } });
     const { result } = renderHook(() => useCreateDiscountRequest('AGR-1'));
 
     let created;
