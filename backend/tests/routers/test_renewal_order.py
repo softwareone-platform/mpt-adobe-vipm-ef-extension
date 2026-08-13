@@ -260,6 +260,16 @@ def auto_renew_support_store(mocker, fake_ctx, allowed_product_id):
 
 
 @pytest.fixture
+def net_new_sku_mapping(mocker, fake_ctx, allowed_product_id):
+    """Stub the Airtable full-SKU lookup for net-new offers and the segment config."""
+    fake_ctx.ext_settings.product_segments = (ProductSegment(id=allowed_product_id, segment="COM"),)
+    store_cls = mocker.patch("mpt_adobe_vipm_ef.services.sku_mapping.SkuMappingStore")
+    store = store_cls.from_settings.return_value
+    store.list_full_skus.return_value = {_NET_NEW_SKU: _NET_NEW_OFFER_ID}
+    return store
+
+
+@pytest.fixture
 def submit_deps(  # noqa: WPS211
     renewal_agreement,
     renewing_subscription,
@@ -350,16 +360,23 @@ async def test_create_renewal_order_passes_the_renewal_payload(
 
 @freeze_time(_TODAY)
 async def test_create_renewal_order_snapshots_the_net_new_offers_in_the_payload(
-    fake_ctx, submit_deps, create_order_mock, adobe_call
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
+    """The wizard only ever holds the partial vendor SKU.
+
+    The Airtable SKU mapping carries the full Adobe offer id the
+    ``renewalPayload`` snapshot needs, since a net-new product has no Adobe
+    subscription to read it from.
+    """
     adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
-    body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
+    body = _body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}])
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
     call_args, _ = create_order_mock.await_args
     payload = call_args[3].to_dict()
     assert payload["netNewItems"] == [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}]
+    net_new_sku_mapping.list_full_skus.assert_called_once_with([_NET_NEW_SKU], "COM")
 
 
 async def test_create_renewal_order_forwards_the_customer_details(
@@ -375,7 +392,7 @@ async def test_create_renewal_order_forwards_the_customer_details(
 
 @freeze_time(_TODAY)
 async def test_create_renewal_order_adds_net_new_lines_within_the_window(
-    fake_ctx, submit_deps, create_order_mock, adobe_call
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
     adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
     body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
@@ -404,7 +421,7 @@ async def test_create_renewal_order_rejects_net_new_outside_the_window(
 
 @freeze_time(_TODAY)
 async def test_create_renewal_order_creates_change_order_for_a_net_new_only_plan(
-    fake_ctx, submit_deps, create_order_mock, adobe_call
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
     adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
     body = _body(
@@ -440,6 +457,20 @@ async def test_create_renewal_order_maps_customer_load_errors_on_net_new(
     body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
 
     with pytest.raises(expected):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+
+
+@freeze_time(_TODAY)
+async def test_create_renewal_order_rejects_a_net_new_offer_without_a_full_sku(
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
+):
+    net_new_sku_mapping.list_full_skus.return_value = {}
+    adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
+    body = _body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}])
+
+    with pytest.raises(ValidationError, match="SKU mapping"):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
     create_order_mock.assert_not_awaited()

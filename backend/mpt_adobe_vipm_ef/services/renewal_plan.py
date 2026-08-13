@@ -1,5 +1,7 @@
 import logging
-from typing import Any, NamedTuple, cast
+from collections.abc import Callable
+from dataclasses import dataclass, replace
+from typing import Any, cast
 
 from mpt_extension_sdk.api import ErrorDetail, ValidationError
 from mpt_extension_sdk.api.context import APIContext
@@ -13,6 +15,7 @@ from mpt_adobe_vipm_ef.models.renewal import (
     RenewalSubscriptionSelection,
 )
 from mpt_adobe_vipm_ef.services.items import get_partial_sku, resolve_items_by_sku
+from mpt_adobe_vipm_ef.services.sku_mapping import load_full_skus
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +24,9 @@ Line = dict[str, Any]
 _FIRST_LINE_NUMBER = 1
 
 
-class PlanSubscription(NamedTuple):
-    """A requested subscription selection resolved against its MPT subscription.
-
-    ``offer_id`` starts out as the client-supplied ``selection.offer_id`` (only
-    the partial vendor SKU, since that is all MPT's subscription and catalog
-    data ever carries) and is overridden with Adobe's own full offer id, read
-    off the customer's live subscriptions, before a renewing line is
-    ordered. See ``_resolve_renewal_offer_ids`` in ``routers/api/renewal.py``.
-
-    ``subscription`` is the raw MPT subscription as loaded from the
-    marketplace: its standing ``auto_renew`` preference is compared against
-    ``selection.renew`` to detect an AutoRenew change, and its current
-    ``lines``/``status``/``commitment_date`` snapshot feeds a Configuration
-    order when nothing about the quantities changed.
-    """
+@dataclass(frozen=True)
+class PlanSubscription:
+    """A requested subscription selection resolved against its MPT subscription."""
 
     selection: RenewalSubscriptionSelection
     line_id: str
@@ -45,11 +36,13 @@ class PlanSubscription(NamedTuple):
     subscription: Subscription
 
 
-class NetNewLine(NamedTuple):
+@dataclass(frozen=True)
+class NetNewLine:
     """A requested net-new product resolved to its MPT catalog item."""
 
     selection: NetNewItemSelection
     item_id: str
+    offer_id: str
 
 
 def require_renewal_selections(request: RenewalPlanRequest) -> None:
@@ -101,6 +94,31 @@ async def resolve_net_new_lines(
     return [_build_net_new_line(selection, product_items) for selection in selections]
 
 
+async def resolve_net_new_offer_ids(
+    ctx: APIContext,
+    net_new_lines: list[NetNewLine],
+    resolve_market_segment: Callable[[], str],
+) -> list[NetNewLine]:
+    """Override each net-new line's offer id with the full Adobe SKU, before it is ordered.
+
+    The wizard only ever holds the partial (10-char) vendor SKU on
+    ``selection.offer_id``, and a net-new product has no Adobe subscription to
+    read the full offer id from (unlike a renewing one), so the Airtable ``SKU
+    Mapping`` master data is the only source. Fulfilment needs
+    the full offer id to create the scheduled subscription, so an offer
+    without a mapping row cannot be ordered and fails the plan. The market
+    segment is resolved lazily: it is only needed for the SKU lookup, so a
+    plan without net-new lines never requires it.
+    """
+    if not net_new_lines:
+        return net_new_lines
+    partial_skus = sorted({
+        get_partial_sku(net_new.selection.offer_id) for net_new in net_new_lines
+    })
+    full_skus = await load_full_skus(ctx, partial_skus, resolve_market_segment())
+    return [_resolve_net_new_offer_id(net_new, full_skus) for net_new in net_new_lines]
+
+
 def build_preview_renewal_line_items(
     plan_subscriptions: list[PlanSubscription], flex_discount_codes: list[str]
 ) -> list[Line]:
@@ -139,8 +157,9 @@ def build_renewal_payload(
     Every selected subscription is recorded with its Adobe id, offer id, renew
     decision and renewal quantity; the selected flexible discount codes ride on
     each renewing entry, matching Adobe's auto-renewal preference object. The
-    net-new products keep their full offer ids so fulfilment can create the
-    scheduled subscriptions without re-resolving them.
+    net-new products carry their full offer ids (resolved from the Airtable
+    SKU mapping, see ``resolve_net_new_offer_ids``) so fulfilment can create
+    the scheduled subscriptions without re-resolving them.
     """
     return RenewalPayload.from_payload({
         "recommendationTrackerId": request.recommendation_tracker_id,
@@ -159,7 +178,7 @@ def build_renewal_payload(
         ],
         "netNewItems": [
             {
-                "offerId": net_new.selection.offer_id,
+                "offerId": net_new.offer_id,
                 "quantity": net_new.selection.quantity,
             }
             for net_new in net_new_lines
@@ -182,4 +201,25 @@ def _build_net_new_line(
                 ),
             ],
         )
-    return NetNewLine(selection=selection, item_id=cast(str, product_item["id"]))
+    return NetNewLine(
+        selection=selection,
+        item_id=cast(str, product_item["id"]),
+        offer_id=selection.offer_id,
+    )
+
+
+def _resolve_net_new_offer_id(net_new: NetNewLine, full_skus: dict[str, str]) -> NetNewLine:
+    offer_id = net_new.selection.offer_id
+    full_sku = full_skus.get(get_partial_sku(offer_id))
+    if not full_sku:
+        logger.warning("Net-new offer %s has no full SKU mapping", offer_id)
+        raise ValidationError(
+            detail="A net-new offer has no full Adobe SKU mapping.",
+            errors=[
+                ErrorDetail(
+                    pointer="#/netNewItems",
+                    detail=f"Offer {offer_id} has no full Adobe SKU mapping.",
+                ),
+            ],
+        )
+    return replace(net_new, offer_id=full_sku)
