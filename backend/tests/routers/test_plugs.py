@@ -54,20 +54,18 @@ def test_plug_condition_lists_products(plug_env, monkeypatch):
 
 
 def test_plugs_omit_disabled_feature(plug_env, monkeypatch):
-    monkeypatch.setenv(
-        "EXT_FEATURES", json.dumps({"request-midterm-upgrade-action": {"enabled": False}})
-    )
+    monkeypatch.setenv("EXT_FEATURES", json.dumps({"request-renewal-action": {"enabled": False}}))
 
     result = agreement_plugs()
 
-    assert "request-midterm-upgrade-action" not in {plug.id for plug in result}
+    assert "request-renewal-action" not in {plug.id for plug in result}
     assert "agreement-adobe" in {plug.id for plug in result}
 
 
 def test_plugs_kept_without_features(plug_env):
     result = agreement_plugs()
 
-    assert len(result) == 5
+    assert len(result) == 6
 
 
 def test_plug_condition_empty(plug_env, monkeypatch):
