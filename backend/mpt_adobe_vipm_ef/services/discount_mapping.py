@@ -4,7 +4,11 @@ import datetime as dt
 from types import MappingProxyType
 from typing import Any
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountCodeUpdateRequest
+from mpt_adobe_vipm_ef.models.discount import (
+    DiscountCodeCreateRequest,
+    DiscountCodeUpdateRequest,
+    DiscountOrderType,
+)
 from mpt_adobe_vipm_ef.services.discounts import (
     ACTIVE_STATUS,
     CODE_FIELD,
@@ -42,6 +46,39 @@ def is_visible(record: AirtableRecord, market_segment: str, customer_id: str) ->
     if fields.get("market_segment") != market_segment:
         return False
     return not is_closed(record) or fields.get("target_customer_id") == customer_id
+
+
+def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.datetime) -> bool:
+    """Return whether an order of ``order_type`` can still apply the code.
+
+    The row must not be retired, must list the order type among its applicable
+    ones, and ``now`` must sit inside its usable window: the
+    ``start_date``/``end_date`` range for a single-use code, extended to
+    ``discount_lock_end_date`` for a reusable one (the lock keeps a redeemed
+    code applicable past its end date). A missing or unreadable bound leaves
+    that side of the window open.
+    """
+    fields = record["fields"]
+    if fields.get("retired_at"):
+        return False
+    applicable = fields.get("applicable_order_types") or []
+    if order_type.value not in applicable:
+        return False
+    return _is_within(now, _read_date(fields.get("start_date")), _usable_until(fields))
+
+
+def filter_offerable(
+    records: list[AirtableRecord], order_type: DiscountOrderType | None
+) -> list[AirtableRecord]:
+    """Keep the codes an order of ``order_type`` can still apply today.
+
+    Without an order type the rows are returned untouched: the discounts tab
+    curates codes of every order type and validity, expired ones included.
+    """
+    if order_type is None:
+        return records
+    now = dt.datetime.now(tz=dt.UTC)
+    return [record for record in records if is_offerable(record, order_type, now)]
 
 
 def build_update_fields(body: DiscountCodeUpdateRequest, now: dt.datetime) -> dict[str, Any]:
@@ -164,6 +201,31 @@ def to_api_payload(
         "createdAt": fields.get("created_at"),
         "updatedAt": fields.get("updated_at"),
     }
+
+
+def _usable_until(fields: dict[str, Any]) -> dt.datetime | None:
+    """The last moment the code can be applied, honouring the discount lock."""
+    end_date = _read_date(fields.get("end_date"))
+    if not fields.get("reusable"):
+        return end_date
+    return _read_date(fields.get("discount_lock_end_date")) or end_date
+
+
+def _is_within(moment: dt.datetime, start: dt.datetime | None, end: dt.datetime | None) -> bool:
+    if start is not None and moment < start:
+        return False
+    return end is None or moment <= end
+
+
+def _read_date(raw_date: Any) -> dt.datetime | None:
+    """Read an Airtable date cell as an aware UTC datetime, or None."""
+    if not isinstance(raw_date, str) or not raw_date:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(raw_date)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
 
 
 def _iso(moment: dt.datetime | None) -> str | None:

@@ -202,10 +202,20 @@ describe('isDiscountAvailable', () => {
     expect(isDiscountAvailable({ ...discount, redeemedAt: null })).toBe(true);
   });
 
-  it('takes a redeemed code out of play', () => {
+  it('takes a redeemed single-use code out of play', () => {
     expect(isDiscountAvailable({ ...discount, redeemedAt: '2026-03-04T10:00:00+00:00' })).toBe(
       false,
     );
+  });
+
+  it('keeps a reusable code in play after its redemption', () => {
+    expect(
+      isDiscountAvailable({
+        ...discount,
+        reusable: true,
+        redeemedAt: '2026-03-04T10:00:00+00:00',
+      }),
+    ).toBe(true);
   });
 });
 

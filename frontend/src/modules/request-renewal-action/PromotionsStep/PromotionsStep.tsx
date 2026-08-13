@@ -350,7 +350,7 @@ export function PromotionsStep({
   onDiscountChange,
 }: PromotionsStepProps) {
   const { t } = useTranslation();
-  const discounts = useAllDiscounts(agreement.id);
+  const discounts = useAllDiscounts(agreement.id, 'RENEWAL');
   const { registerOnNextCallback } = useStepActions();
 
   // A code that cannot apply to a renewal is never offered on this step.
