@@ -109,9 +109,11 @@ describe('buildRenewalPlanRequest', () => {
       { 'SUB-2': false },
       { 'SUB-1': 53 },
       [],
+      'anniversary',
     );
 
     expect(plan).toEqual({
+      renewalPath: 'anniversary',
       subscriptions: [
         { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 53 },
         { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
@@ -120,23 +122,35 @@ describe('buildRenewalPlanRequest', () => {
     });
   });
 
+  it('carries the early-renewal path the customer picked on the first step', () => {
+    const plan = buildRenewalPlanRequest(subscriptions, {}, {}, [], 'now');
+
+    expect(plan.renewalPath).toBe('now');
+  });
+
   it('maps the net-new additions onto their offer selections', () => {
-    const plan = buildRenewalPlanRequest(subscriptions, {}, {}, [
-      {
-        itemId: 'ITM-9',
-        itemName: 'Premiere Pro',
-        sku: '65304578CA01A12',
-        unitSP: 234,
-        quantity: 5,
-        recommended: false,
-      },
-    ]);
+    const plan = buildRenewalPlanRequest(
+      subscriptions,
+      {},
+      {},
+      [
+        {
+          itemId: 'ITM-9',
+          itemName: 'Premiere Pro',
+          sku: '65304578CA01A12',
+          unitSP: 234,
+          quantity: 5,
+          recommended: false,
+        },
+      ],
+      'anniversary',
+    );
 
     expect(plan.netNewItems).toEqual([{ offerId: '65304578CA01A12', quantity: 5 }]);
   });
 
   it('skips a subscription without a vendor SKU', () => {
-    const plan = buildRenewalPlanRequest([{ id: 'SUB-3' }], {}, {}, []);
+    const plan = buildRenewalPlanRequest([{ id: 'SUB-3' }], {}, {}, [], 'anniversary');
 
     expect(plan.subscriptions).toEqual([]);
   });

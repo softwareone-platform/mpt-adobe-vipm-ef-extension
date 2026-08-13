@@ -1,10 +1,12 @@
 import {
   CommerceParameter,
   ProductSegments,
+  RenewalPlanBody,
   findLinkedMembership,
   getRecommendedOfferIds,
   hasThreeYearCommitment,
   isGlobalSalesEnabled,
+  isRenewalPreviewRequired,
   readParameter,
   resolveAgreementId,
   resolveSubscriptionId,
@@ -186,5 +188,40 @@ describe('ProductSegments', () => {
     expect(ProductSegments.EDU).toBe('EDU');
     expect(ProductSegments.GOV).toBe('GOV');
     expect(ProductSegments.LGA).toBe('LGA');
+  });
+});
+
+describe('isRenewalPreviewRequired', () => {
+  const plan = (overrides: Partial<RenewalPlanBody> = {}): RenewalPlanBody => ({
+    renewalPath: 'now',
+    subscriptions: [{ id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 5 }],
+    netNewItems: [],
+    ...overrides,
+  });
+
+  it('previews an early renewal that renews a subscription', () => {
+    expect(isRenewalPreviewRequired(plan())).toBe(true);
+  });
+
+  it('previews an early renewal that only adds a product', () => {
+    const result = isRenewalPreviewRequired(
+      plan({ subscriptions: [], netNewItems: [{ offerId: 'OFFER-2', quantity: 3 }] }),
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('does not preview an at-anniversary plan', () => {
+    expect(isRenewalPreviewRequired(plan({ renewalPath: 'anniversary' }))).toBe(false);
+  });
+
+  it('does not preview an early renewal with no line Adobe could price', () => {
+    const result = isRenewalPreviewRequired(
+      plan({
+        subscriptions: [{ id: 'SUB-1', offerId: 'OFFER-1', renew: false, renewalQuantity: 0 }],
+      }),
+    );
+
+    expect(result).toBe(false);
   });
 });
