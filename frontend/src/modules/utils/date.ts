@@ -56,8 +56,17 @@ export function formatTime(value?: string): string | undefined {
 /** `2026-06-01T00:00:00Z` becomes `01 JUN 2026`, matching the design. */
 export function formatReviewDate(value: string): string {
   if (!value) return EM_DASH;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return EM_DASH;
+
+  const date = DATE_ONLY.test(value)
+    ? (() => {
+        const [year, month, day] = value.split("-").map(Number);
+        if (!toLocalDate(value)) return undefined;
+        return new Date(Date.UTC(year, month - 1, day));
+      })()
+    : new Date(value);
+
+  if (!date || Number.isNaN(date.getTime())) return EM_DASH;
+
   const day = String(date.getUTCDate()).padStart(2, "0");
   const month = date
     .toLocaleString("en-US", { month: "short", timeZone: "UTC" })

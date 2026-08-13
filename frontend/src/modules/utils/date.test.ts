@@ -77,5 +77,9 @@ describe('formatTime', () => {
     ])("falls back to a dash for %s", (_label, value) => {
       expect(formatReviewDate(value)).toBe(EM_DASH);
     });
+
+    it('returns a dash for invalid calendar dates', () => {
+      expect(formatReviewDate('2026-02-30')).toBe(EM_DASH);
+    });
   });
 });
