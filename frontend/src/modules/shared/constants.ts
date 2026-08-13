@@ -2,8 +2,8 @@ import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/
 
 import type { Status } from './model';
 
-export const SCREEN_HEIGHT_FACTOR = 0.85;
-export const SCREEN_WIDTH_FACTOR = 0.90;
+export const SCREEN_HEIGHT_FACTOR = 0.80;
+export const SCREEN_WIDTH_FACTOR = 0.85;
 
 export const MS_PER_DAY = 86400000;
 
