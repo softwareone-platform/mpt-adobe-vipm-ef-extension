@@ -72,6 +72,10 @@ function openOrderTypes() {
   fireEvent.click(screen.getByTestId("order-types-control"));
 }
 
+function pickOrderType(value: string) {
+  fireEvent.mouseDown(screen.getByTestId(`order-type-${value}`));
+}
+
 describe("ScopeStep", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -131,7 +135,7 @@ describe("ScopeStep", () => {
     const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW"] });
 
     openOrderTypes();
-    fireEvent.click(screen.getByTestId("order-type-RENEWAL"));
+    pickOrderType("RENEWAL");
 
     expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: ["NEW", "RENEWAL"] });
   });
@@ -140,7 +144,7 @@ describe("ScopeStep", () => {
     const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW", "RENEWAL"] });
 
     openOrderTypes();
-    fireEvent.click(screen.getByTestId("order-type-NEW"));
+    pickOrderType("NEW");
 
     expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: ["RENEWAL"] });
   });
@@ -149,7 +153,7 @@ describe("ScopeStep", () => {
     const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW", "RENEWAL"] });
 
     openOrderTypes();
-    fireEvent.click(screen.getByTestId(`order-type-${ANY_ORDER_TYPE}`));
+    pickOrderType(ANY_ORDER_TYPE);
 
     expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: [ANY_ORDER_TYPE] });
   });
@@ -158,7 +162,7 @@ describe("ScopeStep", () => {
     const { updateDraft } = renderStep({ applicableOrderTypes: [ANY_ORDER_TYPE] });
 
     openOrderTypes();
-    fireEvent.click(screen.getByTestId("order-type-NEW"));
+    pickOrderType("NEW");
 
     expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: ["NEW"] });
   });
@@ -167,7 +171,7 @@ describe("ScopeStep", () => {
     renderStep({ applicableOrderTypes: [] });
 
     openOrderTypes();
-    fireEvent.click(screen.getByTestId("order-type-NEW"));
+    pickOrderType("NEW");
 
     expect(screen.getByTestId("order-type-RENEWAL")).toBeInTheDocument();
   });
