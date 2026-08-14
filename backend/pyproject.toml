@@ -92,7 +92,9 @@ per-file-ignores = [
   "mpt_adobe_vipm_ef/services/renewal_three_yc.py: WPS202",
   "mpt_adobe_vipm_ef/services/discount_mapping.py: WPS202",
   "mpt_adobe_vipm_ef/services/discounts.py: WPS214",
-  "mpt_adobe_vipm_ef/services/renewal_plan.py: WPS202"
+  "mpt_adobe_vipm_ef/services/renewal_plan.py: WPS202",
+  "mpt_adobe_vipm_ef/services/sku_mapping.py: WPS214",
+  "mpt_adobe_vipm_ef/settings.py: WPS202"
 ]
 
 [tool.ruff]

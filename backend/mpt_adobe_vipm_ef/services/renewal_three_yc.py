@@ -49,6 +49,17 @@ def get_three_yc_commitment(customer: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def has_three_yc_in_force(customer: dict[str, Any]) -> bool:
+    """Whether the customer holds a three-year commitment covering the anniversary.
+
+    The same notion the floor check enforces on, reused so the early-renewal
+    rules that depend on being a 3YC customer — the end-of-life SKU allowance —
+    cannot drift from it.
+    """
+    commitment = get_three_yc_commitment(customer)
+    return _is_enforceable(commitment, str(customer.get("cotermDate") or ""))
+
+
 async def check_renewal_plan_three_yc_floor(  # noqa: WPS210
     ctx: APIContext,
     customer: dict[str, Any],
