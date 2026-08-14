@@ -4,6 +4,8 @@ import type { Status } from './model';
 
 export const SCREEN_HEIGHT_FACTOR = 0.80;
 export const SCREEN_WIDTH_FACTOR = 0.85;
+export const MAX_MODAL_HEIGHT = 920;
+export const MAX_MODAL_WIDTH = 1760;
 
 export const MS_PER_DAY = 86400000;
 

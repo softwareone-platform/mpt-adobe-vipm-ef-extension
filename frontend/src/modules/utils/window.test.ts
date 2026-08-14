@@ -1,4 +1,9 @@
-import { SCREEN_HEIGHT_FACTOR, SCREEN_WIDTH_FACTOR } from '../shared/constants';
+import {
+  MAX_MODAL_HEIGHT,
+  MAX_MODAL_WIDTH,
+  SCREEN_HEIGHT_FACTOR,
+  SCREEN_WIDTH_FACTOR,
+} from '../shared/constants';
 import { relativeScreenHeight, relativeScreenWidth } from './window';
 
 function setScreen(availHeight: number, availWidth: number): void {
@@ -21,6 +26,11 @@ describe('relativeScreenHeight', () => {
     setScreen(101, 101);
     expect(relativeScreenHeight(0.5)).toBe(51);
   });
+
+  it('never exceeds the modal height ceiling', () => {
+    setScreen(4000, 4000);
+    expect(relativeScreenHeight()).toBe(MAX_MODAL_HEIGHT);
+  });
 });
 
 describe('relativeScreenWidth', () => {
@@ -37,5 +47,10 @@ describe('relativeScreenWidth', () => {
   it('rounds to the nearest pixel', () => {
     setScreen(101, 101);
     expect(relativeScreenWidth(0.5)).toBe(51);
+  });
+
+  it('never exceeds the modal width ceiling', () => {
+    setScreen(4000, 4000);
+    expect(relativeScreenWidth()).toBe(MAX_MODAL_WIDTH);
   });
 });
