@@ -2,10 +2,11 @@ import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 import { i18n } from '../../../i18n/translations';
-import { INITIAL_SYNC_STATE, SyncState } from '../model';
+import { Agreement, INITIAL_SYNC_STATE, SyncState } from '../model';
 
 export function useAgreementSync(agreementId: string) {
   const [state, setState] = useState<SyncState>(INITIAL_SYNC_STATE);
+  const [agreement, setAgreement] = useState<Agreement | null>(null);
 
   const syncAgreement = useCallback(async () => {
     if (!agreementId) {
@@ -16,7 +17,8 @@ export function useAgreementSync(agreementId: string) {
 
     try {
       const encodedAgreementId = encodeURIComponent(agreementId);
-      await http.post(`/api/v2/agreements/${encodedAgreementId}/sync`);
+      const response = await http.post(`/api/v2/agreements/${encodedAgreementId}/sync`);
+      setAgreement((response.data as { data?: Agreement } | undefined)?.data ?? null);
       setState({
         error: '',
         lastCompleted: new Date().toLocaleString(),
@@ -25,6 +27,7 @@ export function useAgreementSync(agreementId: string) {
       });
     } catch (syncError) {
       const error = syncError instanceof Error ? syncError.message : i18n.t('Errors:AgreementSync');
+      setAgreement(null);
       setState({
         error,
         lastCompleted: new Date().toLocaleString(),
@@ -34,5 +37,5 @@ export function useAgreementSync(agreementId: string) {
     }
   }, [agreementId]);
 
-  return { ...state, syncAgreement };
+  return { ...state, agreement, syncAgreement };
 }

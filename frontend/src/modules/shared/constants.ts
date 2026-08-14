@@ -1,7 +1,28 @@
 import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/utils';
 
+import type { Status } from './model';
+
 export const SCREEN_HEIGHT_FACTOR = 0.85;
 export const SCREEN_WIDTH_FACTOR = 0.90;
+
+export const MS_PER_DAY = 86400000;
+
+export const RENEWAL_LEARN_MORE_URL = 'https://docs.softwareone.com';
+
+export const COTERM_DATE_PARAM = 'cotermDate';
+
+export const WIZARD_GRID_PAGE_SIZE = 10;
+export const DISCOUNTS_FETCH_SIZE = 100;
+
+export interface RequestState {
+  error: string;
+  status: Status;
+}
+
+export const INITIAL_REQUEST_STATE: RequestState = {
+  error: '',
+  status: 'idle',
+};
 
 export const DESIGN_SYSTEM_OPTIONS: Partial<DesignSystemOptions> = {
   dateFormat: 'dd MMM yyyy',
@@ -14,6 +35,7 @@ export enum EntityDomain {
   Commerce = 'commerce',
   Catalog = 'catalog',
   Accounts = 'accounts',
+  Settings = 'administration/settings',
 }
 
 export enum EntityType {
@@ -27,6 +49,11 @@ export enum EntityType {
   Buyers = 'buyers',
   Licensees = 'licensees',
 }
+
+export const BILLING_MODEL_LABELS: Record<string, string> = {
+  'quantity': 'Quantity',
+  'one-time': 'One-time',
+};
 
 export const TERM_PERIOD_LABELS: Record<string, string> = {
   '1m': 'Monthly billing',

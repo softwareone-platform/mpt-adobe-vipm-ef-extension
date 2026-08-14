@@ -71,6 +71,18 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/icon', () => {
   };
 });
 
+jest.mock('@softwareone-platform/sdk-react-ui-v0/chip', () =>
+  jest
+    .requireActual<typeof import('../shared/testing/sdkUiMocks')>('../shared/testing/sdkUiMocks')
+    .createChipMock(),
+);
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () =>
+  jest
+    .requireActual<typeof import('../shared/testing/sdkUiMocks')>('../shared/testing/sdkUiMocks')
+    .createGridMock(),
+);
+
 jest.mock('@softwareone-platform/sdk-react-ui-v0/status-indicator', () => {
   const React = jest.requireActual<typeof import('react')>('react');
 
@@ -91,7 +103,7 @@ const mockUseMPTContext = jest.mocked(useMPTContext);
 const mockUseMPTModal = jest.mocked(useMPTModal);
 const mockGet = jest.mocked(http.get);
 
-const NAV_LABELS = ['3-year commitment', 'Linked membership', 'Global customer'];
+const NAV_LABELS = ['3-year commitment', 'Linked membership', 'Global customer', 'Discounts'];
 
 const SETTINGS_PAYLOAD = { products: [{ id: 'PRD-1111-1111', segment: 'COM' }] };
 
@@ -123,10 +135,34 @@ const ADOBE_CUSTOMER = {
   ],
 };
 
+// Paginated discounts payload returned by the backend's /discount-codes endpoint.
+const DISCOUNTS_PAGE = {
+  data: [
+    {
+      id: 'rec1',
+      code: 'DISCOUNT-CODE-1',
+      name: 'Sample Percentage Discount Promotion - Add Seats',
+      source: 'Open',
+      status: 'ACTIVE',
+      discountType: 'PERCENTAGE',
+      startDate: '2026-02-01T00:00:00+00:00',
+      endDate: '2026-10-29T00:00:00+00:00',
+      applicableOrderTypes: ['NEW'],
+      values: [{ country: 'US', currency: 'USD', value: 15 }],
+      redeemedAt: '2026-03-14T00:00:00+00:00',
+    },
+  ],
+  $meta: { pagination: { offset: 0, limit: 10, total: 1 } },
+};
+
 // Routes the shared http.get mock by endpoint: the settings fetch returns the
-// product allowlist, the customer fetch returns the Adobe 3YC payload.
+// product allowlist, the customer fetch returns the Adobe 3YC payload and the
+// discount-codes fetch returns a paginated discounts page.
 function mockBackend(customer: unknown = ADOBE_CUSTOMER, settings: unknown = SETTINGS_PAYLOAD) {
   mockGet.mockImplementation((url: string) => {
+    if (url.includes('/discount-codes')) {
+      return Promise.resolve({ data: DISCOUNTS_PAGE });
+    }
     const payload = url.endsWith('/customer') ? customer : settings;
     return Promise.resolve({ data: { data: payload } });
   });
@@ -325,6 +361,47 @@ describe('agreement plug app', () => {
     await renderApp();
 
     expect(screen.queryByRole('button', { name: 'Request commitment' })).not.toBeInTheDocument();
+  });
+
+  describe('discounts section', () => {
+    async function openDiscounts() {
+      await renderApp();
+      fireEvent.click(screen.getByRole('link', { name: 'Discounts' }));
+      // The section mounts on navigation and fetches the first discounts page;
+      // flush that fetch so the grid rows can resolve.
+      await act(async () => {});
+    }
+
+    it('activates the Discounts nav item and renders the section title', async () => {
+      await openDiscounts();
+
+      expect(screen.getByRole('link', { name: 'Discounts' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('heading', { name: 'Discounts' })).toBeInTheDocument();
+    });
+
+    it('fetches the first discounts page scoped to the agreement', async () => {
+      await openDiscounts();
+
+      expect(mockGet).toHaveBeenCalledWith(
+        '/api/v2/discount-codes',
+        expect.objectContaining({
+          params: { agreement: 'AGR-1234-5678-9012', limit: 10, offset: 0 },
+        }),
+      );
+    });
+
+    it('renders the discounts returned by the backend', async () => {
+      await openDiscounts();
+
+      expect(screen.getByText('DISCOUNT-CODE-1')).toBeInTheDocument();
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('Open')).toBeInTheDocument();
+      expect(screen.getByText('15% off')).toBeInTheDocument();
+      expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
+    });
   });
 
   describe('global customer section', () => {

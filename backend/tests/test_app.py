@@ -23,6 +23,11 @@ def test_app_registers_event_routes():
     [
         "/api/v2/agreements/{agreement_id}/sync",
         "/api/v2/settings",
+        "/api/v2/discount-codes",
+        "/api/v2/discount-codes/{discount_id}",
+        "/api/v2/agreements/{agreement_id}/renewal-order",
+        "/api/v2/agreements/{agreement_id}/renewal-order/3yc-check",
+        "/api/v2/agreements/{agreement_id}/renewal-order/preview",
     ],
 )
 def test_app_registers_api_route(path):
@@ -41,7 +46,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
-    assert len(result.plugs) == 5
+    assert len(result.plugs) == 6
     assert result.plugs[0].model_dump() == {
         "id": "agreement-adobe",
         "name": "Adobe",
@@ -89,4 +94,13 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         "eq(subscription.status,Active)"
         ")",
         "href": "/static/request-midterm-upgrade-action/index.js",
+    }
+    assert result.plugs[5].model_dump() == {
+        "id": "request-renewal-action",
+        "name": "Renew",
+        "description": "Request a renewal for the agreement.",
+        "icon": None,
+        "socket": "portal.commerce.agreements.agreement.actions",
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-renewal-action/index.js",
     }

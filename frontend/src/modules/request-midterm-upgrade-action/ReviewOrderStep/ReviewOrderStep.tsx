@@ -14,10 +14,10 @@ import {
   useGridInMemory,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 
-import { WizardHighlights } from '../shared/WizardHighlights/WizardHighlights';
-import { PopoverCell } from '../components/grid-cell/popover-cell/PopoverCell';
-import { TextCell } from '../components/grid-cell/text-cell/TextCell';
-import { ChipCell } from '../components/grid-cell/chip-cell/ChipCell';
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
+import { PopoverCell } from '../../shared/components/GridCell/PopoverCell/PopoverCell';
+import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
+import { ChipCell } from '../../shared/components/GridCell/ChipCell/ChipCell';
 import { ItemCard } from '../components/item-card/ItemCard';
 import { SubscriptionCard } from '../components/subscription-card/SubscriptionCard';
 import { Order, TargetSubscription } from '../model';
@@ -279,7 +279,7 @@ export function ReviewOrderStep({
         </div>
       ) : null}
       <div className="review-order-step__highlights">
-        <WizardHighlights subscription={subscription} order={order} />
+        <WizardHighlights agreement={subscription.agreement} parties={subscription} order={order} />
       </div>
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('MidtermUpgrade:Review:Tabs:Items')}>

@@ -6,6 +6,7 @@ AGREEMENT_SELECT = (
     "parameters",
     "product",
     "seller",
+    "split.allocations",
     "vendor",
 )
 LINES_SELECT = ("lines",)
@@ -19,6 +20,7 @@ SUBSCRIPTION_AUDIT_SELECT = ("audit",)
 
 CUSTOMER_ID_PARAM = "customerId"
 SWITCH_PAYLOAD_PARAM = "switchPayload"
+RENEWAL_PAYLOAD_PARAM = "renewalPayload"
 MIN_LENGTH = 1
 MAX_LENGTH = 255
 NOTES_MAX_LENGTH = 4000
@@ -31,6 +33,10 @@ THREE_YC_STATUS_REQUESTED = "REQUESTED"
 
 RECOMMENDATION_TRACKER_HEADER = "x-recommendation-tracker-id"
 
+SCHEDULED_CREATION_WINDOW_OPENS_DAYS = 30
+SCHEDULED_CREATION_WINDOW_CLOSES_DAYS = 3
+
 CHANGE_ORDER_TYPE = "Change"
+CONFIGURATION_ORDER_TYPE = "Configuration"
 PROCESSING_ORDER_STATUS = "Processing"
 ACTIVE_AGREEMENT_STATUS = "Active"

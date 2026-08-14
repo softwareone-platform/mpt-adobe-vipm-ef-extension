@@ -15,9 +15,9 @@ import { getItemLink, getSubscriptionLink } from '../../../utils/link';
 
 import { i18n } from '../../../../i18n/translations';
 import { SubscriptionItem } from '../../model';
-import { ChipCell } from '../grid-cell/chip-cell/ChipCell';
-import { PopoverCell } from '../grid-cell/popover-cell/PopoverCell';
-import { TextCell } from '../grid-cell/text-cell/TextCell';
+import { ChipCell } from '../../../shared/components/GridCell/ChipCell/ChipCell';
+import { PopoverCell } from '../../../shared/components/GridCell/PopoverCell/PopoverCell';
+import { TextCell } from '../../../shared/components/GridCell/TextCell/TextCell';
 import { ItemCard } from '../item-card/ItemCard';
 import { SubscriptionCard } from '../subscription-card/SubscriptionCard';
 

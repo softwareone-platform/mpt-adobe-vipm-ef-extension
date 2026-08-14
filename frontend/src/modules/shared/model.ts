@@ -132,6 +132,7 @@ export interface Agreement {
     ordering?: CommerceParameter[];
     fulfillment?: CommerceParameter[];
   };
+  listing?: Reference;
   product?: Product;
   vendor?: Reference;
   client?: Reference;
@@ -139,10 +140,12 @@ export interface Agreement {
   buyer?: Buyer;
   licensee?: Licensee;
   price?: Price;
+  split?: AgreementSplit | null;
   audit?: Audit;
 }
 
 export interface Terms {
+  model?: string | null;
   period?: string | null;
   commitment?: string | null;
 }
@@ -151,6 +154,7 @@ export interface Subscription {
   id: string;
   name?: string;
   status?: string;
+  autoRenew?: boolean;
   splitStatus?: string;
   split?: AgreementSplit | null;
   externalIds?: ExternalIds;
@@ -334,6 +338,57 @@ export enum ProductSegments {
 
 export type OrderStatus = 'New' | 'Draft' | 'Deleted' | 'Processing' | 'Querying' | 'Failed' | 'Completed' | 'Quoted';
 
+export interface OrderExternalIds {
+  client?: string | null;
+  operations?: string | null;
+  vendor?: string | null;
+}
+
+export interface Order {
+  id?: string | null;
+  status?: string | null;
+  type?: string | null;
+  agreement?: Agreement | null;
+  billTo?: Buyer | null;
+  externalIds?: OrderExternalIds | null;
+  notes?: string | null;
+}
+
+/** One existing subscription's renewal decision as the renewal endpoints expect it. */
+export interface RenewalPlanSubscriptionSelection {
+  id: string;
+  offerId: string;
+  renew: boolean;
+  renewalQuantity: number;
+}
+
+/** A net-new product selection as the renewal endpoints expect it. */
+export interface RenewalPlanNetNewItemSelection {
+  offerId: string;
+  quantity: number;
+}
+
+/** The renewal plan body shared by the 3YC check, preview and submission endpoints. */
+export interface RenewalPlanBody {
+  subscriptions: RenewalPlanSubscriptionSelection[];
+  netNewItems: RenewalPlanNetNewItemSelection[];
+}
+
+/** The renewal order body: the plan plus everything only the submission carries. */
+export interface RenewalOrderInput extends RenewalPlanBody {
+  flexDiscountCodes: string[];
+  recommendationTrackerId?: string;
+  notes?: string;
+  externalIds?: { client?: string };
+}
+
+/** The order the renewal submission endpoint returns. */
+export interface RenewalOrderResult {
+  id?: string | null;
+  status?: string | null;
+  type?: string | null;
+}
+
 export function resolveAgreementId(context?: AgreementContext): string {
   return context?.data?.agreement?.id?.trim() ?? '';
 }
@@ -417,6 +472,20 @@ export function isGlobalSalesEnabled(
 
 export type Status = 'idle' | 'loading' | 'success' | 'error';
 
+/**
+ * A price list entry from the platform catalog, as the extension backend
+ * returns it: the public API payload plus the Adobe-recommended badge the
+ * backend crosses in.
+ */
+export interface PriceListItem {
+  id: string;
+  status?: string;
+  unitLP?: number;
+  unitSP?: number;
+  item?: ProductItem;
+  recommended?: boolean;
+}
+
 export interface SyncState {
   error: string;
   lastCompleted: string | null;
@@ -448,4 +517,51 @@ export interface AgreementSplit {
   id: string;
   revision: number;
   allocations: AgreementSplitAllocation[];
+}
+
+export type DiscountType = 'PERCENTAGE' | 'FIXED_DISCOUNT' | 'FIXED_PRICE';
+
+export type DiscountOrderType = 'NEW' | 'RENEWAL' | 'SWITCH';
+
+export interface DiscountValueEntry {
+  country?: string;
+  currency?: string;
+  value?: number;
+}
+
+export interface Discount {
+  id: string;
+  code: string;
+  adobeDiscountId?: string | null;
+  name?: string | null;
+  description?: string | null;
+  source?: string | null;
+  category?: string | null;
+  status?: string | null;
+  discountType?: DiscountType | null;
+  marketSegment?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  reusable?: boolean;
+  discountLockEndDate?: string | null;
+  targetOfferIds?: string[];
+  qualifyingOfferIds?: string[];
+  applicableOrderTypes?: DiscountOrderType[];
+  supportsAnnual?: boolean;
+  supports3yc?: boolean;
+  targetCustomerId?: string | null;
+  values?: DiscountValueEntry[];
+  redeemedAt?: string | null;
+  retiredAt?: string | null;
+  enrichmentStatus?: string | null;
+  synchronizedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface DiscountsPage {
+  status: Status;
+  error: string | null;
+  data: Discount[];
+  total: number;
 }

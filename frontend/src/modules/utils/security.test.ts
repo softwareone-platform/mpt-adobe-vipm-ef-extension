@@ -3,6 +3,7 @@ import {
   canRequestGlobalCustomer,
   canRequestLinkedMembership,
   canRequestMidtermUpgradeAction,
+  canRequestRenewalAction,
   canRequestThreeYearCommitment,
 } from './security';
 
@@ -10,6 +11,20 @@ const products: ProductSegment[] = [
   { id: 'PRD-1111-1111', segment: 'COM' },
   { id: 'PRD-2222-2222', segment: 'LGA' },
 ];
+
+describe('canRequestRenewalAction', () => {
+  it('returns true for a client account with a matching product', () => {
+    expect(canRequestRenewalAction('Client', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns false for an operations account', () => {
+    expect(canRequestRenewalAction('Operations', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canRequestRenewalAction('Client', products, 'PRD-9999-9999')).toBe(false);
+  });
+});
 
 describe('canRequestMidtermUpgradeAction', () => {
   it('returns true for a client account with a matching product', () => {

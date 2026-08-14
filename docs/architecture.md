@@ -28,8 +28,26 @@ frontend/                    TypeScript plug UI (esbuild)
   routers below on the SDK app (`ext_app.routes`).
 - `mpt_adobe_vipm_ef/routers/` — route definitions:
   - `api/agreements.py`, `api/customer.py`, `api/settings.py` — API routes
+  - `api/agreement_subscriptions.py` — lists an agreement's live subscriptions
+    with their lines; the agreement payload's own lines do not carry the item
+    vendor SKU. The lines expand the item's product, terms and audit trail so
+    the wizard grids can show the item info card without a second call
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
+  - `api/renewal.py` — at-anniversary renewal routes; restricted to client
+    accounts. `auto-renew-support` reports which SKUs can renew at the
+    anniversary at all (the hand-curated `auto_renew_supported` column of the
+    Airtable SKU mapping), which the wizard uses to route: a subscription whose
+    SKU has no support is left out of the renewal plan. `3yc-check`
+    re-checks that routing and pre-checks the plan against the customer's 3YC
+    commitment floors (splitting licenses and consumables through the same SKU
+    mapping), `preview` re-checks the routing and quotes the plan through an
+    Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
+    codes and returning the renewal pricing), and the submit route repeats every
+    gate and creates the
+    change order carrying the plan snapshot (renew decisions, quantities,
+    discount codes and the recommendation tracker id) on the hidden
+    `renewalPayload` order parameter
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend, serving
     only the plugs the `EXT_FEATURES` flags leave enabled (see

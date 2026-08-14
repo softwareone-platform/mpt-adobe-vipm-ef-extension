@@ -22,7 +22,26 @@ def _subscriptions_query(ctx: APIContext, agreement_id: str) -> Any:
     agreement_filter = RQLQuery().n("agreement.id").eq(agreement_id)
     status_filter = RQLQuery().n("status").in_(targetable_statuses)
     subscriptions = ctx.mpt_api_service.client.commerce.subscriptions
-    return subscriptions.filter(agreement_filter & status_filter).select("lines", "audit")
+    return subscriptions.filter(agreement_filter & status_filter).select(
+        "lines",
+        "audit",
+        "lines.item.product",
+        "lines.item.terms",
+        "lines.item.audit",
+    )
+
+
+async def fetch_agreement_subscriptions(ctx: APIContext, agreement_id: str) -> list[dict[str, Any]]:
+    """Return the payloads of the agreement's live subscriptions, lines included.
+
+    The renewal wizard opens on every subscription it may renew, so this keeps
+    them all instead of mapping them by SKU. The subscriptions have to be
+    queried separately because the agreement payload's own lines do not carry
+    the item vendor SKU.
+    Raises :class:`MPTError` on API failure — the caller maps it.
+    """
+    query = _subscriptions_query(ctx, agreement_id)
+    return [subscription.to_dict() async for subscription in query.iterate()]
 
 
 async def fetch_agreement_subscriptions_by_sku(

@@ -106,6 +106,9 @@ class ExtensionSettings(BaseExtensionSettings):
     product_segments: tuple[ProductSegment, ...]
     adobe_auth_endpoint_url: str
     adobe_api_base_url: str
+    airtable_api_token: str
+    airtable_discounts_base_id: str
+    airtable_sku_mapping_base_id: str
 
     @cached_property
     def adobe_authorizations(self) -> dict[str, Authorization]:
@@ -144,6 +147,9 @@ class ExtensionSettings(BaseExtensionSettings):
             product_segments=load_product_segments(),
             adobe_auth_endpoint_url=os.getenv("EXT_ADOBE_AUTH_ENDPOINT_URL", ""),
             adobe_api_base_url=os.getenv("EXT_ADOBE_API_BASE_URL", ""),
+            airtable_api_token=os.getenv("EXT_AIRTABLE_API_TOKEN", ""),
+            airtable_discounts_base_id=os.getenv("EXT_AIRTABLE_DISCOUNTS_ID", ""),
+            airtable_sku_mapping_base_id=os.getenv("EXT_AIRTABLE_SKU_MAPPING_ID", ""),
         )
 
 

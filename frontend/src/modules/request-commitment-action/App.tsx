@@ -14,7 +14,7 @@ import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useThreeYearCommitmentRequest } from '../shared/hooks/useThreeYearCommitmentRequest';
 import { useSettings } from '../shared/hooks/useSettings';
-import { findThreeYearBenefit, readMinimumQuantity } from '../shared/model';
+import { findThreeYearBenefit } from '../shared/model';
 import type {
   AccountType,
   MinimumQuantity,
@@ -48,18 +48,6 @@ function validateAtLeastOneQuantity(
   return hasLicenses || hasConsumables ? null : i18n.t('Commitment:Validation:AtLeastOne');
 }
 
-function validateAboveMinimum(
-  label: string,
-  value: number | null,
-  currentMinimum: number | null,
-): string | null {
-  if (currentMinimum == null || value == null) return null;
-  if (value <= currentMinimum) {
-    return i18n.t('Commitment:Validation:AboveMinimum', { label, minimum: currentMinimum });
-  }
-  return null;
-}
-
 function validateRequestType(
   requestType: 'commitment' | 'recommitment',
   currentEnrollStatus: string | null,
@@ -89,8 +77,6 @@ export default function App() {
 
   const currentCommitment = findThreeYearBenefit(adobeCustomer.data)?.commitment;
   const currentEnrollStatus = currentCommitment?.status ?? null;
-  const currentMinimumLicenses = readMinimumQuantity(currentCommitment, 'LICENSE');
-  const currentMinimumConsumables = readMinimumQuantity(currentCommitment, 'CONSUMABLES');
   const disableCommitmentOption = currentEnrollStatus === 'COMMITTED';
 
   const { error, status, submitRequest } = useThreeYearCommitmentRequest(agreementId);
@@ -120,9 +106,7 @@ export default function App() {
 
     const validationError =
       validateRequestType(requestType, currentEnrollStatus) ??
-      validateAtLeastOneQuantity(effectiveLicenses, effectiveConsumables) ??
-      validateAboveMinimum(t('Commitment:Licenses'), effectiveLicenses, currentMinimumLicenses) ??
-      validateAboveMinimum(t('Commitment:Consumables'), effectiveConsumables, currentMinimumConsumables);
+      validateAtLeastOneQuantity(effectiveLicenses, effectiveConsumables);
 
     if (validationError) {
       setLocalError(validationError);

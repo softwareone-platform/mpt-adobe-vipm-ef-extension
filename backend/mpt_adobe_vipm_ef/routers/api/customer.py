@@ -4,9 +4,9 @@ import inspect
 import logging
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
-from mpt_api_client.exceptions import MPTHttpError
+from mpt_api_client.exceptions import MPTError, MPTHttpError
 from mpt_extension_sdk.api import (
     APIContext,
     APIResponse,
@@ -38,6 +38,25 @@ from mpt_adobe_vipm_ef.settings import ExtensionSettings
 logger = logging.getLogger(__name__)
 
 
+def _raise_agreement_load_error(error: MPTError, agreement_id: str) -> NoReturn:
+    """Map an MPT failure while loading the agreement onto an API error.
+
+    Transport failures (``MPTMaxRetryError`` for instance) carry no status code,
+    so they fall through to the upstream error instead of escaping as a 500.
+    """
+    status_code = getattr(error, "status_code", None)
+    if status_code == HTTPStatus.NOT_FOUND:
+        logger.warning("Agreement %s not found or not accessible: %s", agreement_id, error)
+        raise NotFoundError(detail="Agreement not found.")
+    logger.warning(
+        "MPT request failed while loading agreement %s: status=%s %s",
+        agreement_id,
+        status_code,
+        error,
+    )
+    raise UpstreamServiceError(detail="MPT service request failed")
+
+
 async def load_agreement(ctx: APIContext, agreement_id: str) -> Any:
     """Fetch the agreement once per request and cache it in ``ctx.state``.
 
@@ -46,24 +65,15 @@ async def load_agreement(ctx: APIContext, agreement_id: str) -> Any:
 
     The MPT API client is account-scoped, so a caller without access to the
     agreement (or a missing agreement) gets a 404 from MPT. That is mapped to a
-    :class:`NotFoundError`; any other MPT HTTP failure becomes an upstream error.
+    :class:`NotFoundError`; every other MPT failure becomes an upstream error.
     """
     cache = ctx.state.setdefault(AGREEMENT_CACHE_KEY, {})
     agreement = cache.get(agreement_id)
     if agreement is None:
         try:
             agreement = await ctx.mpt_api_service.agreements.get_by_id(agreement_id)
-        except MPTHttpError as error:
-            if error.status_code == HTTPStatus.NOT_FOUND:
-                logger.warning("Agreement %s not found or not accessible: %s", agreement_id, error)
-                raise NotFoundError(detail="Agreement not found.")
-            logger.warning(
-                "MPT API error while loading agreement %s: status=%s %s",
-                agreement_id,
-                error.status_code,
-                error,
-            )
-            raise UpstreamServiceError(detail="MPT service request failed")
+        except MPTError as error:
+            _raise_agreement_load_error(error, agreement_id)
         cache[agreement_id] = agreement
     return agreement
 

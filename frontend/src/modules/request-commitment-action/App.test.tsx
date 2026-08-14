@@ -281,7 +281,7 @@ describe('request-commitment-action App', () => {
     expect(mockSubmit).not.toHaveBeenCalled();
   });
 
-  it('rejects a quantity that is not above the current minimum', () => {
+  it('allows a recommitment below the current committed minimum', async () => {
     mockCustomerData = committedCustomer(50);
     const utils = setup();
 
@@ -289,10 +289,18 @@ describe('request-commitment-action App', () => {
     selectLicenses(utils, '10');
     clickSend(utils);
 
-    expect(
-      utils.getByText('Licenses must be greater than the current minimum (50).'),
-    ).toBeTruthy();
-    expect(mockSubmit).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith({
+        benefits: [
+          {
+            type: 'THREE_YEAR_COMMIT',
+            recommitmentRequest: {
+              minimumQuantities: [{ offerType: 'LICENSE', quantity: 10 }],
+            },
+          },
+        ],
+      }),
+    );
   });
 
   it('does not close when submission fails', async () => {

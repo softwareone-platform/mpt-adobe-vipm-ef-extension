@@ -4,6 +4,7 @@ from mpt_extension_sdk.api.context import APIContext
 from mpt_extension_sdk.api.errors import UpstreamServiceError
 
 from mpt_adobe_vipm_ef.services.subscriptions import (
+    fetch_agreement_subscriptions,
     fetch_agreement_subscriptions_by_sku,
     find_existing_target_line,
     resolve_agreement_subscriptions_by_sku,
@@ -53,6 +54,24 @@ def _subscription(mocker, sub_id, name, vendor_id, lines):
 def _line(mocker, sku, quantity, line_id="ALI-0002"):
     external_ids = mocker.Mock(vendor=sku)
     return mocker.Mock(id=line_id, item=mocker.Mock(external_ids=external_ids), quantity=quantity)
+
+
+async def test_fetch_agreement_subscriptions_returns_the_live_subscription_payloads(mocker):
+    payload = {"id": "SUB-1", "status": "Active", "lines": [{"id": "ALI-0002"}]}
+    subscription = mocker.Mock()
+    subscription.to_dict.return_value = payload
+    ctx = _build_ctx(mocker, [subscription])
+
+    result = await fetch_agreement_subscriptions(ctx, _AGREEMENT_ID)
+
+    assert result == [payload]
+
+
+async def test_fetch_agreement_subscriptions_propagates_mpt_errors(mocker):
+    ctx = _build_ctx(mocker, [], error=MPTError("boom"))
+
+    with pytest.raises(MPTError):
+        await fetch_agreement_subscriptions(ctx, _AGREEMENT_ID)
 
 
 async def test_resolve_agreement_subscriptions_by_sku_maps_lines_to_subscriptions(mocker):
