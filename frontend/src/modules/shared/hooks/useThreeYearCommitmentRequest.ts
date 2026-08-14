@@ -3,19 +3,10 @@ import { useCallback, useState } from 'react';
 import { http } from '@mpt-extension/sdk';
 import { i18n } from '../../../i18n/translations';
 
+import { INITIAL_REQUEST_STATE } from '../constants';
+import type { RequestState } from '../constants';
 import type { AdobeCustomerData } from '../model';
 import type { ThreeYearCommitmentRequestInput } from '../three-year-commitment';
-import type { Status } from '../model';
-
-interface RequestState {
-  error: string;
-  status: Status;
-}
-
-const INITIAL_REQUEST_STATE: RequestState = {
-  error: '',
-  status: 'idle',
-};
 
 function toBackendPayload(input: ThreeYearCommitmentRequestInput) {
   const benefit = input.benefits[0];

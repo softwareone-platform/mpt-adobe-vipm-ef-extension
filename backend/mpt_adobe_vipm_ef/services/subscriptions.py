@@ -22,7 +22,13 @@ def _subscriptions_query(ctx: APIContext, agreement_id: str) -> Any:
     agreement_filter = RQLQuery().n("agreement.id").eq(agreement_id)
     status_filter = RQLQuery().n("status").in_(targetable_statuses)
     subscriptions = ctx.mpt_api_service.client.commerce.subscriptions
-    return subscriptions.filter(agreement_filter & status_filter).select("lines", "audit")
+    return subscriptions.filter(agreement_filter & status_filter).select(
+        "lines",
+        "audit",
+        "lines.item.product",
+        "lines.item.terms",
+        "lines.item.audit",
+    )
 
 
 async def fetch_agreement_subscriptions(ctx: APIContext, agreement_id: str) -> list[dict[str, Any]]:

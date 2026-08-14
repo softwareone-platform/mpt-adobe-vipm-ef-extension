@@ -71,6 +71,12 @@ interface Row {
   renewalQuantity: number | null;
   defaultQuantity: number | null;
   unitSP: number | null;
+  spxM: number | null;
+  spxY: number | null;
+}
+
+function totalPrice(unitSP: number | null, quantity: number | null, months: number): number | null {
+  return unitSP == null || !quantity ? null : (unitSP * quantity) / months;
 }
 
 function toSubscriptionRows(
@@ -98,6 +104,16 @@ function toSubscriptionRows(
         renewalQuantity: getRenewalQuantity(subscription, quantities),
         defaultQuantity: getDefaultRenewalQuantity(subscription),
         unitSP: line?.price?.unitSP ?? null,
+        spxM: totalPrice(
+          line?.price?.unitSP ?? null,
+          getRenewalQuantity(subscription, quantities),
+          12,
+        ),
+        spxY: totalPrice(
+          line?.price?.unitSP ?? null,
+          getRenewalQuantity(subscription, quantities),
+          1,
+        ),
       };
     });
 }
@@ -117,6 +133,8 @@ function toNetNewRows(netNewItems: NetNewItem[]): Row[] {
     renewalQuantity: item.quantity,
     defaultQuantity: null,
     unitSP: item.unitSP,
+    spxM: totalPrice(item.unitSP, item.quantity, 12),
+    spxY: totalPrice(item.unitSP, item.quantity, 1),
   }));
 }
 
@@ -142,7 +160,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['item'],
+      fields: ['itemName'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -157,7 +175,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     {
       name: 'subscription',
       title: i18n.t('Common:Subscription'),
-      fields: ['subscription'],
+      fields: ['subscriptionName'],
       cell: (row) =>
         row.kind === 'net-new' ? (
           <ChipCell label={i18n.t('Renewal:Items:New')} color="gray" />
@@ -174,7 +192,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     },
     {
       name: 'terms',
-      title: i18n.t('Common:Terms'),
+      title: i18n.t('Common:Terms title'),
       fields: ['terms'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
@@ -262,9 +280,9 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'item', title: i18n.t('Common:Item') },
-  { name: 'subscription', title: i18n.t('Common:Subscription') },
-  { name: 'terms', title: i18n.t('Common:Terms') },
+  { name: 'itemName', title: i18n.t('Common:Item') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'terms', title: i18n.t('Common:Terms title') },
   { name: 'currentQuantity', title: i18n.t('Renewal:Grid:Current qty'), type: 'number' },
   { name: 'renewalQuantity', title: i18n.t('Renewal:Items:Renewal qty'), type: 'number' },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
@@ -272,7 +290,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'spxY', title: i18n.t('Renewal:Grid:SPxY'), type: 'number' },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'item', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [{ field: 'itemName', direction: 'asc' }];
 
 export function ItemsStep({
   agreement,

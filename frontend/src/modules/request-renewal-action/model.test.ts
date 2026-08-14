@@ -1,13 +1,20 @@
 import {
+  appliesToRenewal,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
+  canRenewAtAnniversary,
+  findDiscountByCode,
   getDefaultRenewalQuantity,
   getHeldSkus,
   getRenewalQuantity,
+  getRenewalRowIds,
+  getSelectedDiscountCodes,
+  isDiscountAvailable,
   isRenewedByDefault,
   isRenewing,
+  normalizeDiscountCode,
 } from './model';
-import type { Subscription } from '../shared/model';
+import type { Discount, Subscription } from '../shared/model';
 
 describe('isRenewedByDefault', () => {
   it('renews a subscription whose autoRenewal preference is on', () => {
@@ -154,3 +161,130 @@ describe('getHeldSkus', () => {
     expect(skus).toEqual(new Set(['65322587CA']));
   });
 });
+
+describe('canRenewAtAnniversary', () => {
+  const subscription: Subscription = {
+    id: 'SUB-1',
+    lines: [
+      {
+        id: 'ALI-1',
+        quantity: 1,
+        item: { id: 'ITM-1', name: 'Item', externalIds: { vendor: '65322587CA01A12' } },
+      },
+    ],
+  };
+
+  it('accepts a subscription whose SKU supports auto-renewal', () => {
+    expect(canRenewAtAnniversary(subscription, { '65322587CA': true })).toBe(true);
+  });
+
+  it('rejects a SKU without support, and one that was never looked up', () => {
+    expect(canRenewAtAnniversary(subscription, { '65322587CA': false })).toBe(false);
+    expect(canRenewAtAnniversary(subscription, {})).toBe(false);
+  });
+
+  it('rejects a subscription carrying no SKU', () => {
+    expect(canRenewAtAnniversary({ id: 'SUB-2' }, { '65322587CA': true })).toBe(false);
+  });
+});
+
+describe('normalizeDiscountCode', () => {
+  it('trims and upper-cases the typed code', () => {
+    expect(normalizeDiscountCode('  code-one ')).toBe('CODE-ONE');
+  });
+});
+
+describe('isDiscountAvailable', () => {
+  const discount: Discount = { id: 'DSC-1', code: 'CODE-ONE' };
+
+  it('offers a code the customer has not redeemed', () => {
+    expect(isDiscountAvailable(discount)).toBe(true);
+    expect(isDiscountAvailable({ ...discount, redeemedAt: null })).toBe(true);
+  });
+
+  it('takes a redeemed code out of play', () => {
+    expect(isDiscountAvailable({ ...discount, redeemedAt: '2026-03-04T10:00:00+00:00' })).toBe(
+      false,
+    );
+  });
+});
+
+describe('appliesToRenewal', () => {
+  const discount: Discount = { id: 'DSC-1', code: 'CODE-ONE' };
+
+  it('applies an unrestricted code to a renewal', () => {
+    expect(appliesToRenewal(discount)).toBe(true);
+    expect(appliesToRenewal({ ...discount, applicableOrderTypes: [] })).toBe(true);
+  });
+
+  it('applies a code listing the renewal order type', () => {
+    expect(appliesToRenewal({ ...discount, applicableOrderTypes: ['NEW', 'RENEWAL'] })).toBe(true);
+  });
+
+  it('leaves out a code restricted to other order types', () => {
+    expect(appliesToRenewal({ ...discount, applicableOrderTypes: ['NEW'] })).toBe(false);
+  });
+});
+
+describe('getRenewalRowIds', () => {
+  const subscriptions: Subscription[] = [
+    { id: 'SUB-1', autoRenew: true },
+    { id: 'SUB-2', autoRenew: false },
+  ];
+
+  it('carries the renewing subscriptions and the net-new products', () => {
+    expect(
+      getRenewalRowIds(subscriptions, {}, [
+        {
+          itemId: 'ITM-9',
+          itemName: 'Item',
+          sku: 'OFFER-9',
+          unitSP: 10,
+          quantity: 1,
+          recommended: false,
+        },
+      ]),
+    ).toEqual(['SUB-1', 'ITM-9']);
+  });
+});
+
+describe('getSelectedDiscountCodes', () => {
+  it('lists each applied code once, skipping the lines without one', () => {
+    expect(
+      getSelectedDiscountCodes({ 'SUB-1': 'CODE-ONE', 'SUB-2': '', 'ITM-1': 'CODE-ONE' }, [
+        'SUB-1',
+        'SUB-2',
+        'ITM-1',
+      ]),
+    ).toEqual(['CODE-ONE']);
+  });
+
+  it('has nothing to send when no line carries a code', () => {
+    expect(getSelectedDiscountCodes({}, [])).toEqual([]);
+  });
+
+  it('sends one entry for the same code written differently', () => {
+    expect(
+      getSelectedDiscountCodes({ 'SUB-1': ' code-one ', 'SUB-2': 'CODE-ONE' }, ['SUB-1', 'SUB-2']),
+    ).toEqual(['CODE-ONE']);
+  });
+
+  it('drops the code of a line the renewal no longer carries', () => {
+    expect(
+      getSelectedDiscountCodes({ 'SUB-1': 'CODE-ONE', 'SUB-2': 'CODE-TWO' }, ['SUB-1']),
+    ).toEqual(['CODE-ONE']);
+  });
+});
+
+describe('findDiscountByCode', () => {
+  const discounts: Discount[] = [{ id: 'DSC-1', code: 'CODE-ONE' }];
+
+  it('matches a known code regardless of its case', () => {
+    expect(findDiscountByCode('code-one', discounts)?.id).toBe('DSC-1');
+  });
+
+  it('returns nothing for a code the store does not hold', () => {
+    expect(findDiscountByCode('CODE-TWO', discounts)).toBeUndefined();
+  });
+});
+

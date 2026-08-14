@@ -35,7 +35,25 @@ jest.mock('@mpt-extension/sdk', () => ({
               },
             ],
           },
-          agreement: { id: 'AGR-1' },
+          agreement: {
+            id: 'AGR-1',
+            split: {
+              id: 'SBA-1111-1111',
+              revision: 1,
+              allocations: [
+                {
+                  buyer: { id: 'BUY-1111-1111', name: 'Buyer Name' },
+                  percentage: 100,
+                  price: { currency: 'USD', SPxY: 100, SPxM: 10 },
+                },
+                {
+                  buyer: { id: 'BUY-2222-2222', name: 'Second Buyer Name' },
+                  percentage: 0,
+                  price: { currency: 'USD', SPxY: 0, SPxM: 0 },
+                },
+              ],
+            },
+          },
           product: { id: 'PRD-1' },
           lines: [{ quantity: 10 }],
         },
@@ -81,15 +99,21 @@ interface MockChildren {
 }
 interface MockWizardProps extends MockChildren {
   onClose?: () => void;
+  isToDisableSideNavigation?: boolean;
 }
+let wizardProps: MockWizardProps;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => {
-  const Wizard = ({ children, onClose }: MockWizardProps) => (
-    <div>
-      {children as ReactNode}
-      <button onClick={onClose}>Close</button>
-    </div>
-  );
+  const Wizard = (props: MockWizardProps) => {
+    wizardProps = props;
+    const { children, onClose } = props;
+    return (
+      <div>
+        {children as ReactNode}
+        <button onClick={onClose}>Close</button>
+      </div>
+    );
+  };
   Wizard.Header = ({ children }: MockChildren) => <div>{children as ReactNode}</div>;
   const Content = ({ children }: MockChildren) => <div>{children as ReactNode}</div>;
   Content.Steps = () => <div />;
@@ -126,6 +150,8 @@ interface SplitBillingProps {
   selectedBuyer: unknown;
   onChange: (buyer: unknown) => void;
   split: { id?: string; allocations?: unknown[] } | null;
+  agreementSplit: { id?: string; allocations?: unknown[] } | null;
+  order: { billTo?: { id?: string; name?: string } | null };
 }
 let splitBillingProps: SplitBillingProps;
 
@@ -234,6 +260,23 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof splitBillingProps.onChange).toBe('function');
     expect(splitBillingProps.selectedBuyer).toBeDefined();
     expect(splitBillingProps.split?.id).toBe('SBS-1111-1111');
+    expect(splitBillingProps.agreementSplit?.id).toBe('SBA-1111-1111');
+    expect(splitBillingProps.agreementSplit?.allocations).toHaveLength(2);
+  });
+
+  it('bills the order to a buyer the subscription has no allocation for', async () => {
+    mockActiveStepIndex = 2;
+    render(<App />);
+    await screen.findByText('Split billing step');
+
+    await act(async () => {
+      await splitBillingProps.addBuyerToOrder({ id: 'BUY-2222-2222' });
+    });
+
+    expect(splitBillingProps.order.billTo).toEqual({
+      id: 'BUY-2222-2222',
+      name: 'Second Buyer Name',
+    });
   });
 
   it('skips the split-billing step when split billing is disabled', async () => {
@@ -640,6 +683,45 @@ describe('request-midterm-upgrade-action App', () => {
 
     expect(placed).toBe(false);
     expect(reviewOrderProps.errorMessage).toBe('Adobe rejected the switch preview.');
+  });
+
+  it('locks the side navigation once the order is placed', async () => {
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+
+    const selectedTarget = {
+      id: null,
+      name: null,
+      status: '',
+      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+      targetBaseOfferId: '65322651CA02A12',
+      recommended: false,
+      currentQuantity: 0,
+      newQuantity: 6,
+      delta: 6,
+      unitSP: '',
+      spxM: '',
+      spxY: '',
+      terms: '',
+      commitment: '',
+    };
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([selectedTarget]);
+      upgradeToProps.onSelectedTargetChange(selectedTarget);
+    });
+    mockActiveStepIndex = 4;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+
+    await act(async () => {
+      await reviewOrderProps.onPlaceOrder();
+    });
+    rerender(<App />);
+
+    expect(wizardProps.isToDisableSideNavigation).toBe(true);
   });
 
   it('renders the summary step on the sixth step and wires its order', async () => {

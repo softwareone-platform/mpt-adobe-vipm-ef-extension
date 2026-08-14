@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import replace
 from http import HTTPStatus
 
 from mpt_api_client.exceptions import MPTHttpError
@@ -17,11 +18,13 @@ from mpt_extension_sdk.routing import APIRouter
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.renewal import (
+    NetNewItemSelection,
     RenewalOrderRequest,
     RenewalPayload,
     RenewalPlanRequest,
     RenewalPreviewRequest,
     RenewalSubscriptionSelection,
+    SkuAutoRenewSupportRequest,
 )
 from mpt_adobe_vipm_ef.routers.api.customer import (
     get_authorization_id,
@@ -32,19 +35,28 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import resolve_market_segment
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
+from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.services.renewal import require_scheduled_creation_window
+from mpt_adobe_vipm_ef.services.renewal_auto_renew import (
+    check_renewal_plan_auto_renew_support,
+    load_auto_renew_support,
+)
 from mpt_adobe_vipm_ef.services.renewal_order import (
+    build_configuration_order_subscriptions,
     build_renewal_order_lines,
     create_renewal_change_order,
+    create_renewal_configuration_order,
 )
-from mpt_adobe_vipm_ef.services.renewal_plan import (
+from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     Line,
     NetNewLine,
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_lines,
+    resolve_net_new_offer_ids,
 )
 from mpt_adobe_vipm_ef.services.renewal_three_yc import check_renewal_plan_three_yc_floor
 from mpt_adobe_vipm_ef.services.switch_order import (
@@ -60,13 +72,45 @@ _ADOBE_REQUEST_FAILED_DETAIL = "Adobe service request failed"
 
 
 @renewal_router.post(
+    path="/{agreement_id}/renewal-order/auto-renew-support",
+    name="agreements-renewal-order-auto-renew-support",
+    body_validator=SkuAutoRenewSupportRequest,
+)
+@validate_agreement_access
+@log_inputs
+async def get_renewal_auto_renew_support(
+    agreement_id: str, ctx: APIContext, body: SkuAutoRenewSupportRequest
+) -> APIResponse:
+    """Report which of the given SKUs can renew at the anniversary date.
+
+    Auto-renewal support is the at-anniversary path's routing input, so the
+    wizard reads it before it offers anything: a subscription whose SKU has no
+    support is left out of the renewal plan rather than shown with its Renew
+    toggle off. Keyed by partial SKU; an unmapped SKU comes back
+    unsupported. The market segment behind the lookup is resolved from the
+    agreement server-side.
+    """
+    _require_client_account(ctx)
+    agreement = await load_agreement(ctx, agreement_id)
+    partial_skus = sorted({get_partial_sku(sku) for sku in body.skus if sku})
+    if not partial_skus:
+        return APIResponse.ok(payload={"skus": {}})
+    support = await load_auto_renew_support(
+        ctx, partial_skus, resolve_market_segment(ctx, agreement)
+    )
+    return APIResponse.ok(
+        payload={"skus": {sku: support.get(sku, False) for sku in partial_skus}},
+    )
+
+
+@renewal_router.post(
     path="/{agreement_id}/renewal-order/3yc-check",
     name="agreements-renewal-order-3yc-check",
     body_validator=RenewalPlanRequest,
 )
 @validate_agreement_access
 @log_inputs
-async def check_renewal_order_three_yc(
+async def check_renewal_order_three_yc(  # noqa: WPS217
     agreement_id: str, ctx: APIContext, body: RenewalPlanRequest
 ) -> APIResponse:
     """Pre-check the renewal plan against the customer's 3YC minimum quantities.
@@ -74,7 +118,8 @@ async def check_renewal_order_three_yc(
     The wizard calls this while the customer selects the plan's items, before
     the discount codes step: a decrease or a disabled renewal that would place
     a committed customer below the three-year commitment floors fails here
-    with a wizard-friendly message instead of a rejected order. Returns the
+    with a wizard-friendly message instead of a rejected order, as does a
+    product whose SKU cannot renew at the anniversary at all. Returns the 3YC
     check summary (the totals compared and the floors) when the plan holds.
     """
     _require_client_account(ctx)
@@ -84,6 +129,7 @@ async def check_renewal_order_three_yc(
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
     customer = await _load_adobe_customer(ctx, agreement_id)
     summary = await _check_three_yc_floor(
         ctx, agreement, customer, plan_subscriptions, net_new_lines
@@ -107,13 +153,16 @@ async def preview_renewal_plan(
     discount codes ride on every renewing line, so Adobe validates their
     eligibility and returns the renewal pricing the wizard shows as the
     estimate. Net-new products have no Adobe subscription to preview yet and
-    are priced only at fulfilment.
+    are priced only at fulfilment. A SKU that cannot renew at the anniversary is
+    rejected here too, so no route quotes a plan the submit route would refuse.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     line_items = build_preview_renewal_line_items(plan_subscriptions, body.flex_discount_codes)
     if not line_items:
         raise ValidationError(
@@ -134,15 +183,18 @@ async def preview_renewal_plan(
 async def create_renewal_order(  # noqa: WPS210, WPS217
     agreement_id: str, ctx: APIContext, body: RenewalOrderRequest
 ) -> APIResponse:
-    """Submit an at-anniversary renewal plan as a renewal-driven change order.
+    """Submit an at-anniversary renewal plan as a Change or Configuration order.
 
-    Validates the customer's plan, re-checks the 3YC commitment floors, gates
-    the plan through an Adobe ``PREVIEW_RENEWAL`` quote carrying the
-    selections (quantities and flexible discount codes), and only then creates
-    the change order (directly in Processing status) carrying the plan
-    snapshot — renew decisions, quantities, discount codes and the
-    recommendation tracker id — on the hidden ``renewalPayload`` order
-    parameter.
+    Validates the customer's plan and re-checks the 3YC commitment floors,
+    then dispatches on what actually changed: any subscription whose renewal
+    quantity differs from its current quantity, or any net-new product, is
+    submitted as a Change order (directly in Processing status) carrying only
+    the changed lines plus the plan snapshot — renew decisions, quantities,
+    discount codes and the recommendation tracker id — on the hidden
+    ``renewalPayload`` order parameter. Otherwise, when only AutoRenew
+    decisions changed, it is submitted as a Configuration order carrying only
+    the AutoRenew-changed subscriptions. The platform accepts neither order
+    type for a plan with no real change, so that case is rejected upfront.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -151,20 +203,30 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
+    require_renewal_changes(plan_subscriptions, net_new_lines)
+    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
     if net_new_lines:
         require_scheduled_creation_window(str(customer.get("cotermDate") or ""))
 
-    currency_code = agreement.authorization.currency or ""
-    preview_line_items = build_preview_renewal_line_items(
-        plan_subscriptions, body.flex_discount_codes
-    )
-    await _preview_renewal(ctx, agreement_id, currency_code, preview_line_items)
-
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
-    renewal_payload = build_renewal_payload(plan_subscriptions, net_new_lines, body, currency_code)
-    order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
+    if lines:
+        currency_code = agreement.authorization.currency or ""
+        plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
+        net_new_lines = await resolve_net_new_offer_ids(
+            ctx, net_new_lines, lambda: resolve_market_segment(ctx, agreement)
+        )
+        renewal_payload = build_renewal_payload(
+            plan_subscriptions, net_new_lines, body, currency_code
+        )
+        order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
+    else:
+        configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
+        order = await _create_configuration_order(
+            ctx, agreement_id, configuration_subscriptions, body
+        )
     return APIResponse.created(payload=order)
 
 
@@ -173,6 +235,20 @@ def _require_client_account(ctx: APIContext) -> None:
         raise ForbiddenError(
             detail="The at-anniversary renewal is available to client accounts only.",
         )
+
+
+async def _check_auto_renew_support(
+    ctx: APIContext,
+    agreement: Agreement,
+    plan_subscriptions: list[PlanSubscription],
+    net_new_items: list[NetNewItemSelection],
+) -> None:
+    return await check_renewal_plan_auto_renew_support(
+        ctx,
+        lambda: resolve_market_segment(ctx, agreement),
+        plan_subscriptions,
+        net_new_items,
+    )
 
 
 async def _check_three_yc_floor(
@@ -249,6 +325,8 @@ def _build_plan_subscription(
         line_id=line.id,
         current_quantity=line.quantity,
         adobe_subscription_id=adobe_subscription_id,
+        offer_id=selection.offer_id,
+        subscription=subscription,
     )
 
 
@@ -281,6 +359,67 @@ async def _load_adobe_customer(ctx: APIContext, agreement_id: str) -> dict[str, 
     except AdobeError as error:
         logger.warning("Adobe configuration error loading customer %s: %s", customer_id, error)
         raise ValidationError(detail=str(error))
+
+
+async def _resolve_renewal_offer_ids(
+    ctx: APIContext, agreement_id: str, plan_subscriptions: list[PlanSubscription]
+) -> list[PlanSubscription]:
+    """Override each renewing line's offer id with Adobe's own, before it is previewed.
+
+    MPT's subscription and catalog data only ever carries the partial
+    (10-char) vendor SKU on ``selection.offer_id``; Adobe's PREVIEW_RENEWAL
+    (and the order it gates) needs the full offer id, which only the
+    customer's live Adobe subscriptions have. Skipped when nothing renews, so
+    a lapse-only or net-new-only plan does not pay for the extra Adobe call.
+    """
+    if not any(plan.selection.renew for plan in plan_subscriptions):
+        return plan_subscriptions
+    offer_ids_by_subscription = await _load_adobe_subscription_offer_ids(ctx, agreement_id)
+    return [
+        replace(
+            plan,
+            offer_id=offer_ids_by_subscription.get(plan.adobe_subscription_id) or plan.offer_id,
+        )
+        for plan in plan_subscriptions
+    ]
+
+
+async def _load_adobe_subscription_offer_ids(ctx: APIContext, agreement_id: str) -> dict[str, str]:
+    """Map each Adobe subscription id to its current full offer id.
+
+    ``GET /v3/customers/{customer_id}/subscriptions`` is the only source of
+    the full offer id: MPT's subscription and its catalog item both only ever
+    carry the partial vendor SKU.
+    """
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
+    try:
+        subscriptions = await asyncio.to_thread(
+            adobe_client(ctx).subscription.get_subscriptions,
+            authorization_id,
+            customer_id,
+        )
+    except AdobeAPIError as error:
+        logger.warning("Adobe API error loading subscriptions for %s: %s", customer_id, error)
+        raise UpstreamServiceError(detail=_ADOBE_REQUEST_FAILED_DETAIL)
+    except AdobeHttpError as error:
+        logger.warning(
+            "Adobe HTTP error loading subscriptions for %s: status=%s body=%r",
+            customer_id,
+            error.status_code if hasattr(error, "status_code") else "?",
+            error.response_content,
+        )
+        raise UpstreamServiceError(detail=_ADOBE_REQUEST_FAILED_DETAIL)
+    except AdobeError as error:
+        logger.warning(
+            "Adobe configuration error loading subscriptions for %s: %s", customer_id, error
+        )
+        raise ValidationError(detail=str(error))
+    return {
+        subscription_item["subscriptionId"]: subscription_item["offerId"]
+        for subscription_item in subscriptions.get("items") or []
+        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
+    }
 
 
 async def _preview_renewal(
@@ -339,6 +478,30 @@ async def _create_change_order(
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the renewal change order on agreement %s: status=%s %s",
+            agreement_id,
+            error.status_code,
+            error,
+        )
+        raise UpstreamServiceError(detail=mpt_order_error_detail(error))
+
+
+async def _create_configuration_order(
+    ctx: APIContext,
+    agreement_id: str,
+    subscriptions: list[Line],
+    body: RenewalOrderRequest,
+) -> dict[str, object]:
+    """Create the AutoRenew-only configuration order acting as the caller (client actor)."""
+    client = build_caller_client(ctx)
+    if client is None:
+        logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
+        raise ForbiddenError(detail="Caller authentication is required to place the order.")
+    try:
+        return await create_renewal_configuration_order(client, agreement_id, subscriptions, body)
+    except MPTHttpError as error:
+        logger.warning(
+            "MPT API error while placing the renewal configuration order on agreement %s: "
+            "status=%s %s",
             agreement_id,
             error.status_code,
             error,

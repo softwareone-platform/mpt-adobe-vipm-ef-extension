@@ -86,11 +86,13 @@ per-file-ignores = [
   "adobe/config.py: WPS121 WPS122 WPS214 WPS420",
   "mpt_adobe_vipm_ef/models/renewal.py: WPS202",
   "mpt_adobe_vipm_ef/routers/api/customer.py: WPS202 WPS238",
-  "mpt_adobe_vipm_ef/routers/api/renewal.py: WPS201 WPS202",
+  "mpt_adobe_vipm_ef/routers/api/renewal.py: WPS201 WPS202 WPS203",
   "mpt_adobe_vipm_ef/services/discount_codes.py: WPS202",
   "mpt_adobe_vipm_ef/services/renewal_three_yc.py: WPS202",
   "mpt_adobe_vipm_ef/services/discount_mapping.py: WPS202",
-  "mpt_adobe_vipm_ef/services/discounts.py: WPS214"
+  "mpt_adobe_vipm_ef/services/discounts.py: WPS214",
+  "mpt_adobe_vipm_ef/services/renewal_plan.py: WPS202",
+  "mpt_adobe_vipm_ef/settings.py: WPS202"
 ]
 
 [tool.ruff]

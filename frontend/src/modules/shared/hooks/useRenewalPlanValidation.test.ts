@@ -2,7 +2,8 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 
-import { useRenewalPlanValidation, type RenewalPlanBody } from './useRenewalPlanValidation';
+import type { RenewalPlanBody } from '../model';
+import { useRenewalPlanValidation } from './useRenewalPlanValidation';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -32,7 +33,7 @@ describe('useRenewalPlanValidation', () => {
     expect(result.current.error).toBe('');
   });
 
-  it('checks the 3YC floor with the whole plan, then previews the existing items only', async () => {
+  it('checks the 3YC floor with the whole plan and does not preview against Adobe', async () => {
     mockPost.mockResolvedValue({ data: { data: {} } });
 
     const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
@@ -43,41 +44,12 @@ describe('useRenewalPlanValidation', () => {
     });
 
     expect(isValid).toBe(true);
-    expect(mockPost).toHaveBeenNthCalledWith(
-      1,
-      '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
-      PLAN,
-    );
-    expect(mockPost).toHaveBeenNthCalledWith(
-      2,
-      '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
-      { subscriptions: PLAN.subscriptions },
-    );
-    await waitFor(() => expect(result.current.status).toBe('success'));
-  });
-
-  it('skips the preview when nothing renews', async () => {
-    mockPost.mockResolvedValue({ data: { data: {} } });
-
-    const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
-
-    const plan: RenewalPlanBody = {
-      subscriptions: [
-        { id: 'SUB-1', offerId: '65322587CA01A12', renew: false, renewalQuantity: 0 },
-      ],
-      netNewItems: [],
-    };
-    let isValid: boolean | undefined;
-    await act(async () => {
-      isValid = await result.current.validatePlan(plan);
-    });
-
-    expect(isValid).toBe(true);
     expect(mockPost).toHaveBeenCalledTimes(1);
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
-      plan,
+      PLAN,
     );
+    await waitFor(() => expect(result.current.status).toBe('success'));
   });
 
   it('passes an empty plan without calling the backend', async () => {
@@ -93,7 +65,7 @@ describe('useRenewalPlanValidation', () => {
     expect(result.current.status).toBe('idle');
   });
 
-  it('surfaces the backend detail when the 3YC check fails and never previews', async () => {
+  it('surfaces the backend detail when the 3YC check fails', async () => {
     mockPost.mockRejectedValue({
       response: {
         data: { detail: 'The renewal plan would place the account below the minimum quantities.' },
@@ -113,22 +85,6 @@ describe('useRenewalPlanValidation', () => {
     expect(result.current.error).toBe(
       'The renewal plan would place the account below the minimum quantities.',
     );
-  });
-
-  it('surfaces the preview rejection', async () => {
-    mockPost
-      .mockResolvedValueOnce({ data: { data: {} } })
-      .mockRejectedValueOnce({ response: { data: { detail: 'Adobe rejected the preview.' } } });
-
-    const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
-
-    let isValid: boolean | undefined;
-    await act(async () => {
-      isValid = await result.current.validatePlan(PLAN);
-    });
-
-    expect(isValid).toBe(false);
-    await waitFor(() => expect(result.current.error).toBe('Adobe rejected the preview.'));
   });
 
   it('falls back to a generic message when the failure carries no detail', async () => {

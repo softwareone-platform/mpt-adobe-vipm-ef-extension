@@ -39,6 +39,23 @@ def load_product_segments() -> tuple[ProductSegment, ...]:
     )
 
 
+def is_feature_enabled(feature_id: str) -> bool:
+    """Report whether EXT_FEATURES enables the given feature.
+
+    Features are opt-out: anything the EXT_FEATURES environment variable does not
+    explicitly disable stays enabled, so an empty EXT_FEATURES changes nothing.
+    Only a boolean false or the string "false" disables a feature; anything
+    else, including a misspelt flag, falls back to enabled.
+    """
+    feature = _json_env("EXT_FEATURES").get(feature_id)
+    if not isinstance(feature, dict):
+        return True
+    enabled = feature.get("enabled", True)
+    if isinstance(enabled, str):
+        return enabled.strip().lower() != "false"
+    return enabled is not False
+
+
 def _load_adobe_json(env_key: str) -> Any:
     raw_path = os.getenv(env_key)
     if not raw_path:

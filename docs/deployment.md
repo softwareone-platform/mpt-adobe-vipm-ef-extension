@@ -15,6 +15,7 @@ Local setup instructions live in [docs/local-development.md](local-development.m
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `EXT_WEBHOOKS_SECRETS` | - | `{"PRD-1111-1111": "123qweasd3432234"}` | Webhook secret keyed by Marketplace product id |
+| `EXT_FEATURES` | `{}` | `{"request-renewal-action":{"enabled":false}}` | Feature flags keyed by plug id (JSON). Opt-out: a plug is served unless its entry sets `enabled` to `false` |
 | `MPT_API_BASE_URL` | `http://localhost:8000` | `https://api.platform.softwareone.com` | SoftwareOne Marketplace API URL |
 | `MPT_API_TOKEN` | - | `eyJhbGciOiJSUzI1N...` | SoftwareOne Marketplace API token |
 | `SDK_EXTENSION_API_KEY` | - | `<extension-api-key>` | Extension API key used by the SDK to authenticate |
@@ -22,7 +23,7 @@ Local setup instructions live in [docs/local-development.md](local-development.m
 | `SDK_EXTENSION_URL` | `http://devmock:8000` | `http://devmock:8000` | Extension service URL (devmock locally) |
 | `MPT_PRODUCTS_IDS` | `PRD-1111-1111` | `PRD-1234-1234,PRD-4321-4321` | Comma-separated list of Marketplace product ids |
 | `MPT_TOOL_STORAGE_TYPE` | `local` | `airtable` | Storage type for MPT tools |
-| `MPT_TOOL_STORAGE_AIRTABLE_API_KEY` | - | `patXXXXXXXXXXXXXX` | Airtable API key when Airtable storage is enabled |
+| `MPT_TOOL_STORAGE_AIRTABLE_API_KEY` | - | `patXXXXXXXXXXXXXX` | Airtable API key when Airtable storage is enabled; fed by the `MptToolStorageAirtableApiKey` Helm secret carrying the shared Airtable service-account token (provisioned and rotated by DevOps). This secret name differs from those used by other extensions. Swap and verify it before revoking personal tokens. |
 | `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID` | - | `appXXXXXXXXXXXXXX` | Airtable base id when Airtable storage is enabled |
 | `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` | - | `MigrationTracking` | Airtable table name when Airtable storage is enabled |
 

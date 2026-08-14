@@ -1,5 +1,6 @@
 {
   "Common": {
+    "Terms title": "Terms",
     "Retry": "Retry",
     "Close": "Close",
     "Yes": "Yes",
@@ -133,7 +134,9 @@
     "LinkedMembershipRequest": "Linked membership request failed.",
     "CommitmentNoData": "Commitment response did not include customer data.",
     "CommitmentRequest": "Commitment request failed.",
-    "RenewalPlanValidation": "The renewal plan could not be validated."
+    "LoadAutoRenewSupport": "Failed to load which products can renew at the anniversary date.",
+    "RenewalPlanValidation": "The renewal plan could not be validated.",
+    "RenewalDiscountValidation": "The selected discount codes could not be validated."
   },
   "Commitment": {
     "Title": "Request 3-year commitment",
@@ -175,7 +178,6 @@
     "Send invitation": "Send invitation",
     "Validation": {
       "AtLeastOne": "At least one quantity is required.",
-      "AboveMinimum": "{{label}} must be greater than the current minimum ({{minimum}}).",
       "AlreadyCommitted": "The customer is already committed. Select recommitment instead."
     }
   },
@@ -281,7 +283,61 @@
         "AtLeast": "Quantity must be at least {{quantity}}",
         "FixQuantities": "Enter a valid renewal quantity for every item before continuing."
       }
+    },
+    "Promotions": {
+      "Prompt": "Apply any discount codes as desired. Updated pricing, including applicable discount levels and promotions, will be shown on the Review order page.",
+      "Discount code": "Discount code",
+      "Select or type code": "Select or type code",
+      "No code": "No code",
+      "Redeemed code": "{{code}} (already redeemed)",
+      "Custom code": "Discount code",
+      "Add code": "Add code",
+      "Unknown code": "The code you have entered, {{code}}, is not known. You can ask your sales team to add it as a known code or submit the order anyway. Any invalid codes will cause the order to fail.",
+      "Empty": {
+        "Title": "No items to discount",
+        "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
+      },
+      "Validating": "Validating the selected discount codes…",
+      "Errors": {
+        "Discounts could not be loaded": "Your discount codes could not be loaded."
+      }
+    },
+    "Details": {
+      "Additional ID": "Additional ID",
+      "Additional ID placeholder": "Enter additional ID",
+      "Additional ID description": "Enter a value that will help you identify this order",
+      "Notes": "Notes",
+      "Notes placeholder": "Enter notes"
+    },
+    "Review": {
+      "Qty": "Qty",
+      "Order price": "Order price *",
+      "Items price": "Items price *",
+      "No parameters": "This order has no parameters.",
+      "Place order": "Place order",
+      "Placing order": "Placing the renewal order…",
+      "Tabs": {
+        "Items": "Items",
+        "Parameters": "Parameters",
+        "Details": "Details"
+      }
+    },
+    "Summary": {
+      "View order": "View order",
+      "Title": "Your renewal order is being processed",
+      "StatusBody": "Your renewal order is currently being processed. No action is required from you at this stage.",
+      "NextHeading": "What happens next",
+      "NextBody": "Your renewal takes effect on your anniversary date. If additional information is required, you'll be notified here.",
+      "NextUpdates": "Updates will be provided as your order progresses.",
+      "HelpHeading": "Need help?",
+      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
+      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
+      "HelpClosing": "We're here to help."
     }
+  },
+  "Discounts": {
+    "PercentageOff": "{{value}}% off",
+    "AmountOff": "{{amount}} off"
   },
   "Highlights": {
     "orderSuffix": "{{type}} order",
@@ -321,6 +377,7 @@
         "Description": "Billing for this order will be allocated to an individual buyer from the buyers configured for split billing within this agreement"
       },
       "AllocationInfo": "Billing for subscription changes will be allocated between buyers as follows",
+      "NoBuyers": "The buyers configured for split billing on this agreement could not be loaded.",
       "Allocation %": "Allocation %",
       "Validation": {
         "SelectOption": "Select a split billing option.",

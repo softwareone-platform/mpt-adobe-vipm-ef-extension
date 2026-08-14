@@ -1,9 +1,12 @@
+import json
+
 import pytest
 from mpt_extension_sdk.api.auth.context import Account, AccountType, AuthContext
 
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
 from mpt_adobe_vipm_ef.models.recommendation import RecommendationRequest
 from mpt_adobe_vipm_ef.routers.api import subscriptions
+from mpt_adobe_vipm_ef.settings import get_settings
 
 _FAKE_JWT = "fake-token"
 _MPT_API_BASE_URL = "https://api.dummy.test"
@@ -41,13 +44,14 @@ class FakeAdobeNamespace:
 
 
 class FakeAdobeClient:
-    """Fake Adobe client exposing customer, offer, order and recommendation namespaces."""
+    """Fake Adobe client exposing every resource namespace, routed to one stub."""
 
     def __init__(self, call):
         self.customer = FakeAdobeNamespace(call)
         self.offer = FakeAdobeNamespace(call)
         self.order = FakeAdobeNamespace(call)
         self.recommendation = FakeAdobeNamespace(call)
+        self.subscription = FakeAdobeNamespace(call)
 
 
 class FakeAgreements:
@@ -328,6 +332,17 @@ def sync_setup(fake_ctx, fake_subscriptions, patch_caller_client):
         return fake_ctx, client
 
     return factory
+
+
+@pytest.fixture
+def plug_env(monkeypatch):
+    """Provide the product configuration plug metadata is built from, with no feature flags."""
+    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
+    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
+    monkeypatch.delenv("EXT_FEATURES", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture

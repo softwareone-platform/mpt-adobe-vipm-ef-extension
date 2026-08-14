@@ -67,6 +67,7 @@ export default function App() {
   );
   const hasSplit = subscription?.splitStatus === 'Active';
   const split = subscription?.split ?? null;
+  const agreementSplit = subscription?.agreement?.split ?? null;
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
@@ -178,10 +179,10 @@ export default function App() {
 
   const addBuyerToOrder = useCallback(
     async (buyer: { id?: string }) => {
-      const selected = split?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
+      const selected = agreementSplit?.allocations?.find(a => a.buyer?.id === buyer.id)?.buyer;
       setOrder(prev => ({ ...prev, billTo: selected ?? null }));
     },
-    [split]
+    [agreementSplit]
   );
 
   useEffect(() => {
@@ -307,6 +308,7 @@ export default function App() {
               <SplitBillingStep
                 subscription={subscription}
                 split={split}
+                agreementSplit={agreementSplit}
                 order={order}
                 addBuyerToOrder={addBuyerToOrder}
                 selectedBuyer={selectedBuyer}
@@ -350,6 +352,7 @@ export default function App() {
           onActiveStepIndexChange={setActiveStepIndex}
           onClose={onClose}
           onSave={viewOrder}
+          isToDisableSideNavigation={Boolean(order.id)}
         >
           <Wizard.Header>{t('MidtermUpgrade:Header')}</Wizard.Header>
           <Wizard.Content>

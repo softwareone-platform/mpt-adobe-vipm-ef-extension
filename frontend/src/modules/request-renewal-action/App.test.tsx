@@ -67,11 +67,21 @@ jest.mock('@mpt-extension/sdk', () => ({
 const mockPost = jest.mocked(http.post);
 const mockGet = jest.mocked(http.get);
 
+const AUTO_RENEW_SUPPORT_URL = '/api/v2/agreements/AGR-1/renewal-order/auto-renew-support';
+const AUTO_RENEW_SUPPORTED = { '65322587CA': true, '65322588CA': true };
+
 function respondTo(url: string) {
   if (url === '/api/v2/settings') {
     return Promise.resolve({ data: { data: { products: [{ id: 'PRD-1', segment: 'COM' }] } } });
   }
   return Promise.resolve({ data: { data: SUBSCRIPTIONS } });
+}
+
+function respondToPost(url: string, support = AUTO_RENEW_SUPPORTED) {
+  if (url === AUTO_RENEW_SUPPORT_URL) {
+    return Promise.resolve({ data: { data: { skus: support } } });
+  }
+  return Promise.resolve({ data: { data: AGREEMENT } });
 }
 
 interface MockChildren {
@@ -80,11 +90,15 @@ interface MockChildren {
 interface MockWizardProps extends MockChildren {
   onClose?: () => void;
   stepsProps?: { title: string }[];
+  isToDisableSideNavigation?: boolean;
 }
 let wizardSteps: { title: string }[] = [];
+let wizardProps: MockWizardProps;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => {
-  const Wizard = ({ children, onClose, stepsProps }: MockWizardProps) => {
+  const Wizard = (props: MockWizardProps) => {
+    const { children, onClose, stepsProps } = props;
+    wizardProps = props;
     wizardSteps = stepsProps ?? [];
     return (
       <div>
@@ -110,6 +124,7 @@ interface TimingProps {
   renewalDate?: string;
   path: string;
   onPathChange: (path: string) => void;
+  lockedPath?: string | null;
 }
 let timingProps: TimingProps;
 
@@ -152,6 +167,60 @@ jest.mock('./ItemsStep', () => ({
   },
 }));
 
+interface PromotionsStepProps {
+  discountSelections: Record<string, string>;
+  onDiscountChange: (rowId: string, code: string) => void;
+}
+let promotionsProps: PromotionsStepProps;
+
+jest.mock('./PromotionsStep', () => ({
+  PromotionsStep: (props: PromotionsStepProps) => {
+    promotionsProps = props;
+    return <div>Promotions step</div>;
+  },
+}));
+
+interface DetailsStepProps {
+  details: { externalId: string; notes: string };
+  onDetailsChange: (details: { externalId: string; notes: string }) => void;
+}
+let detailsProps: DetailsStepProps;
+
+jest.mock('./DetailsStep', () => ({
+  DetailsStep: (props: DetailsStepProps) => {
+    detailsProps = props;
+    return <div>Details step</div>;
+  },
+}));
+
+interface ReviewOrderStepProps {
+  subscriptions: { id: string }[];
+  details: { externalId: string; notes: string };
+  onPlaceOrder: () => Promise<boolean>;
+  errorMessage?: string;
+  isSubmitting?: boolean;
+}
+let reviewProps: ReviewOrderStepProps;
+
+jest.mock('./ReviewOrderStep', () => ({
+  ReviewOrderStep: (props: ReviewOrderStepProps) => {
+    reviewProps = props;
+    return <div>Review step</div>;
+  },
+}));
+
+interface SummaryStepProps {
+  order: { id?: string | null } | null;
+}
+let summaryProps: SummaryStepProps;
+
+jest.mock('./SummaryStep', () => ({
+  SummaryStep: (props: SummaryStepProps) => {
+    summaryProps = props;
+    return <div>Summary step</div>;
+  },
+}));
+
 jest.mock('../shared/components/Loader/Loader', () => ({
   Loader: () => <div data-testid="loader" />,
 }));
@@ -182,7 +251,7 @@ describe('request-renewal-action App', () => {
     mockAccountType = 'Client';
     mockPost.mockReset();
     mockGet.mockReset();
-    mockPost.mockResolvedValue({ data: { data: AGREEMENT } });
+    mockPost.mockImplementation((url: string) => respondToPost(url));
     mockGet.mockImplementation((url: string) => respondTo(url));
   });
 
@@ -217,6 +286,55 @@ describe('request-renewal-action App', () => {
       '/api/v2/agreements/AGR-1/subscriptions',
       expect.objectContaining({ signal: expect.anything() }),
     );
+  });
+
+  it('asks which held SKUs can renew at the anniversary', async () => {
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        AUTO_RENEW_SUPPORT_URL,
+        { skus: ['65322587CA', '65322588CA'] },
+        expect.objectContaining({ signal: expect.anything() }),
+      ),
+    );
+  });
+
+  it('keeps a subscription whose SKU cannot auto-renew out of the plan', async () => {
+    mockActiveStepIndex = 1;
+    mockPost.mockImplementation((url: string) =>
+      respondToPost(url, { '65322587CA': true, '65322588CA': false }),
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Renewal step')).toBeTruthy();
+    await waitFor(() =>
+      expect(renewalProps.subscriptions.map((subscription) => subscription.id)).toEqual(['SUB-1']),
+    );
+  });
+
+  it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {
+    mockPost.mockImplementation((url: string) =>
+      respondToPost(url, { '65322587CA': false, '65322588CA': false }),
+    );
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    expect(timingProps.path).toBe('anniversary');
+    expect(timingProps.lockedPath).toBeUndefined();
+  });
+
+  it('surfaces a failed auto-renewal support lookup with a retry', async () => {
+    mockPost.mockImplementation((url: string) =>
+      url === AUTO_RENEW_SUPPORT_URL
+        ? Promise.reject(new Error('Airtable unavailable'))
+        : respondToPost(url),
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Airtable unavailable')).toBeTruthy();
+    expect(screen.queryByText('Timing step')).toBeNull();
   });
 
   it('hands the renewal date and the selected path to the timing step', async () => {
@@ -285,6 +403,138 @@ describe('request-renewal-action App', () => {
     act(() => itemsProps.onNetNewItemsChange([{ itemId: 'ITM-9' }]));
 
     await waitFor(() => expect(itemsProps.netNewItems).toEqual([{ itemId: 'ITM-9' }]));
+  });
+
+  it('stores the applied discount codes in the wizard state', async () => {
+    mockActiveStepIndex = 3;
+    render(<App />);
+
+    await screen.findByText('Promotions step');
+    expect(promotionsProps.discountSelections).toEqual({});
+
+    act(() => promotionsProps.onDiscountChange('SUB-1', 'CODE-ONE'));
+
+    await waitFor(() =>
+      expect(promotionsProps.discountSelections).toEqual({ 'SUB-1': 'CODE-ONE' }),
+    );
+  });
+
+  it('stores the order details in the wizard state', async () => {
+    mockActiveStepIndex = 4;
+    render(<App />);
+
+    await screen.findByText('Details step');
+    expect(detailsProps.details).toEqual({ externalId: '', notes: '' });
+
+    act(() => detailsProps.onDetailsChange({ externalId: 'PO-1', notes: 'Renew everything' }));
+
+    await waitFor(() =>
+      expect(detailsProps.details).toEqual({ externalId: 'PO-1', notes: 'Renew everything' }),
+    );
+  });
+
+  it('hands the plan and the applied codes to the review step', async () => {
+    mockActiveStepIndex = 5;
+    render(<App />);
+
+    expect(await screen.findByText('Review step')).toBeTruthy();
+    expect(reviewProps.subscriptions).toEqual(SUBSCRIPTIONS);
+    expect(reviewProps.details).toEqual({ externalId: '', notes: '' });
+    expect(reviewProps.isSubmitting).toBe(false);
+  });
+
+  it('places the renewal order with the plan, the codes and the tracker id', async () => {
+    mockActiveStepIndex = 5;
+    mockPost.mockImplementation((url: string) => {
+      if (url === '/api/v2/agreements/AGR-1/recommendations') {
+        return Promise.resolve({
+          data: {
+            data: {
+              productRecommendations: { upsells: [], crossSells: [], addOns: [] },
+              xRecommendationTrackerId: 'TRACKER-1',
+            },
+          },
+        });
+      }
+      if (url === '/api/v2/agreements/AGR-1/renewal-order') {
+        return Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } });
+      }
+      return respondToPost(url);
+    });
+    render(<App />);
+
+    await screen.findByText('Review step');
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        '/api/v2/agreements/AGR-1/recommendations',
+        expect.anything(),
+      ),
+    );
+    await act(async () => {});
+
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewProps.onPlaceOrder();
+    });
+
+    expect(placed).toBe(true);
+    expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1/renewal-order', {
+      subscriptions: [
+        { id: 'SUB-1', offerId: '65322587CA', renew: true, renewalQuantity: 37 },
+        { id: 'SUB-2', offerId: '65322588CA', renew: false, renewalQuantity: 0 },
+      ],
+      netNewItems: [],
+      flexDiscountCodes: [],
+      recommendationTrackerId: 'TRACKER-1',
+      notes: '',
+      externalIds: { client: '' },
+    });
+  });
+
+  it('locks the side navigation once the order is placed', async () => {
+    mockActiveStepIndex = 5;
+    mockPost.mockImplementation((url: string) =>
+      url === '/api/v2/agreements/AGR-1/renewal-order'
+        ? Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } })
+        : respondToPost(url),
+    );
+    render(<App />);
+
+    await screen.findByText('Review step');
+    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+
+    await act(async () => {
+      await reviewProps.onPlaceOrder();
+    });
+
+    await waitFor(() => expect(wizardProps.isToDisableSideNavigation).toBe(true));
+  });
+
+  it('surfaces a rejected renewal order on the review step', async () => {
+    mockActiveStepIndex = 5;
+    mockPost.mockImplementation((url: string) =>
+      url === '/api/v2/agreements/AGR-1/renewal-order'
+        ? Promise.reject({ response: { data: { detail: 'Adobe rejected the plan.' } } })
+        : respondToPost(url),
+    );
+    render(<App />);
+
+    await screen.findByText('Review step');
+    let placed: boolean | undefined;
+    await act(async () => {
+      placed = await reviewProps.onPlaceOrder();
+    });
+
+    expect(placed).toBe(false);
+    await waitFor(() => expect(reviewProps.errorMessage).toBe('Adobe rejected the plan.'));
+  });
+
+  it('hands no order to the summary step before placement', async () => {
+    mockActiveStepIndex = 6;
+    render(<App />);
+
+    expect(await screen.findByText('Summary step')).toBeTruthy();
+    expect(summaryProps.order).toBeNull();
   });
 
   it('requests Adobe recommendations for the whole subscription estate', async () => {
