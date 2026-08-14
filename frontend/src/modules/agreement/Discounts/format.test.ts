@@ -1,6 +1,7 @@
-import { EM_DASH, formatDate, formatOrderTypes, formatSource, formatValue } from './format';
+import { formatDate, formatOrderTypes, formatSource, formatValue } from './format';
 
 import type { Discount } from '../../shared/model';
+import { EM_DASH } from '../../utils/date';
 
 describe('formatDate', () => {
   it('truncates an ISO timestamp to its date part', () => {

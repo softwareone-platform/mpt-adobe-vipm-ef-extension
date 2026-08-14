@@ -1,5 +1,5 @@
-import { ProductSegments } from '../shared/model';
 import type { ProductSegment } from '../shared/hooks/useSettings';
+import { ProductSegments } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { getProduct } from './settings';
 
@@ -73,10 +73,6 @@ export function canRequestGlobalCustomer(
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
 
-export function canManageDiscountCodes(accountType: AccountType | undefined): boolean {
-  return accountType === 'Operations' || accountType === 'Vendor';
-}
-
 export function canEditDiscountCode(
   accountType: AccountType | undefined,
   source: string | null | undefined,
@@ -90,4 +86,17 @@ export function canEditDiscountCode(
   }
 
   return false;
+}
+
+/**
+ * Mirrors the backend gate in `routers/api/discount_scope.py::require_editor_account`,
+ * which rejects client accounts with 403. Authoring closed discount codes is
+ * offered only to the accounts that would actually be allowed to save them.
+ */
+export function canManageDiscountCodes(
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  return canRequestAdobeAction(accountType, products, agreementProductId);
 }
