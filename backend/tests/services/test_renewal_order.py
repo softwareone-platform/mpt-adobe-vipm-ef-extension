@@ -167,6 +167,27 @@ def test_build_configuration_order_subscriptions_is_empty_without_an_autorenew_c
     assert result == []
 
 
+def test_build_configuration_order_subscriptions_drops_unchanged_early_renewal_subscriptions():
+    """The platform rejects a subscription whose AutoRenew value does not change.
+
+    An early renewal is no exception: only the changed decisions enter the
+    order, and the full plan reaches fulfilment on the renewalPayload snapshot.
+    """
+    request = _request(
+        subscriptions=[
+            _selection(renew=False, quantity=_CURRENT_QUANTITY),
+            _selection(renew=True, quantity=_CURRENT_QUANTITY, subscription_id="SUB-9999-0001"),
+        ],
+        renewalPath="now",
+    )
+    plan = _plan(request, auto_renew=True, current_quantity=_CURRENT_QUANTITY)
+
+    result = build_configuration_order_subscriptions(plan)
+
+    assert [entry["id"] for entry in result] == [_SUBSCRIPTION_ID]
+    assert result[0]["AutoRenew"] is False
+
+
 @pytest.fixture
 def orders_service(mocker):
     created = mocker.Mock()
@@ -237,6 +258,29 @@ async def test_create_renewal_configuration_order_creates_in_processing_status(
         "subscriptions": subscriptions,
     })
     orders_service.process.assert_not_awaited()
+
+
+async def test_create_renewal_configuration_order_carries_the_early_renewal_payload(
+    mocker, orders_service
+):
+    client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
+    request = _request(subscriptions=[_selection(renew=False)], renewalPath="now")
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+    subscriptions = [{"id": _SUBSCRIPTION_ID, "AutoRenew": False, "lines": []}]
+
+    await create_renewal_configuration_order(
+        client, _AGREEMENT_ID, subscriptions, request, renewal_payload
+    )
+
+    orders_service.create.assert_awaited_once_with({
+        "status": "Processing",
+        "type": "Configuration",
+        "agreement": {"id": _AGREEMENT_ID},
+        "subscriptions": subscriptions,
+        "parameters": {
+            "ordering": [{"externalId": "renewalPayload", "value": renewal_payload.to_dict()}],
+        },
+    })
 
 
 async def test_create_renewal_configuration_order_carries_the_customer_details(

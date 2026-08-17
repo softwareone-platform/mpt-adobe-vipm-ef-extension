@@ -3,13 +3,15 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any, cast
 
-from mpt_extension_sdk.api import ErrorDetail, ValidationError
+from mpt_extension_sdk.api import ErrorDetail, UpstreamServiceError, ValidationError
 from mpt_extension_sdk.api.context import APIContext
 from mpt_extension_sdk.models import Agreement, Subscription
 
+from mpt_adobe_vipm_ef.constants import EARLY_RENEWAL_NO_CHANGE_ITEM
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
     RenewalOrderRequest,
+    RenewalPath,
     RenewalPayload,
     RenewalPlanRequest,
     RenewalSubscriptionSelection,
@@ -22,6 +24,7 @@ logger = logging.getLogger(__name__)
 Line = dict[str, Any]
 
 _FIRST_LINE_NUMBER = 1
+_NO_CHANGE_ITEM_QUANTITY = 1
 
 
 @dataclass(frozen=True)
@@ -59,17 +62,29 @@ def require_renewal_selections(request: RenewalPlanRequest) -> None:
 
 
 def require_renewal_changes(
-    plan_subscriptions: list[PlanSubscription], net_new_lines: list[NetNewLine]
+    request: RenewalPlanRequest,
+    plan_subscriptions: list[PlanSubscription],
+    net_new_lines: list[NetNewLine],
 ) -> None:
-    """Reject a plan that would create neither a Change nor a Configuration order.
+    """Reject an at-anniversary plan that would create neither order type.
 
-    The platform accepts a Change order only when at least one line's quantity
+    At the anniversary the order *is* the plan, so it has to carry something:
+    the platform accepts a Change order only when at least one line's quantity
     actually moves (a renewing subscription's renewal quantity differs from
     its current quantity) or a net-new product is added, and a Configuration
     order only when at least one subscription's renew decision differs from
     its standing AutoRenew preference. A plan with none of these is a pure
     no-op the wizard should never have let through.
+
+    An early renewal ("Renew now") is never a no-op: renewing before the
+    anniversary is itself the change the customer asked for, and fulfilment
+    executes it from the ``renewalPayload`` snapshot the order carries — so a
+    plan that repeats the current quantities and AutoRenew decisions is
+    accepted and submitted as a Change order carrying the platform's
+    placeholder item (see ``resolve_no_change_line``).
     """
+    if request.renewal_path is RenewalPath.NOW:
+        return
     has_quantity_change = any(
         plan.selection.renew and plan.selection.renewal_quantity != plan.current_quantity
         for plan in plan_subscriptions
@@ -81,6 +96,35 @@ def require_renewal_changes(
         raise ValidationError(
             detail="The renewal plan has no changes to submit.",
         )
+
+
+async def resolve_no_change_line(ctx: APIContext, agreement: Agreement) -> Line:
+    """Resolve the platform's early-renewal placeholder item into the order's only line.
+
+    An early renewal ("Renew now") that repeats the current quantities and
+    AutoRenew decisions produces neither order type on its own: the platform
+    rejects a Change order whose lines carry no quantity delta and a
+    Configuration order whose subscriptions keep their AutoRenew value. The
+    plan still has to become an order — renewing before the anniversary is
+    itself the change — so it is submitted as a Change order whose single line
+    is the ``adobe-early-renewal-no-change`` catalog item; the line only
+    exists to satisfy the platform, and fulfilment executes the plan from the
+    ``renewalPayload`` snapshot the order carries.
+    """
+    product_items = await resolve_items_by_sku(
+        ctx, agreement.product.id, [EARLY_RENEWAL_NO_CHANGE_ITEM]
+    )
+    product_item = product_items.get(EARLY_RENEWAL_NO_CHANGE_ITEM)
+    if product_item is None or not product_item.get("id"):
+        logger.warning(
+            "Early-renewal placeholder item %s not found on product %s",
+            EARLY_RENEWAL_NO_CHANGE_ITEM,
+            agreement.product.id,
+        )
+        raise UpstreamServiceError(
+            detail="The early-renewal placeholder item is not available in the product catalog.",
+        )
+    return {"item": {"id": product_item["id"]}, "quantity": _NO_CHANGE_ITEM_QUANTITY}
 
 
 async def resolve_net_new_lines(
@@ -120,30 +164,66 @@ async def resolve_net_new_offer_ids(
 
 
 def build_preview_renewal_line_items(
-    plan_subscriptions: list[PlanSubscription], flex_discount_codes: list[str]
+    plan_subscriptions: list[PlanSubscription],
+    flex_discount_codes: list[str],
+    net_new_lines: list[NetNewLine] | None = None,
 ) -> list[Line]:
-    """Build the Adobe PREVIEW_RENEWAL line items for the renewing subscriptions.
+    """Build the Adobe PREVIEW_RENEWAL line items for the plan.
 
-    Only renewing subscriptions can be previewed: a lapsing one has nothing to
-    price and a net-new product has no Adobe subscription until fulfilment
-    creates it. The selected flexible discount codes ride on every line so
-    Adobe validates their eligibility per subscription. ``plan.offer_id``
-    must already carry the full Adobe offer id (resolved from the customer's
-    live subscriptions) or Adobe rejects the line.
+    A lapsing subscription has nothing to price, so only renewing ones carry a
+    line. The selected flexible discount codes ride on every line so Adobe
+    validates their eligibility per line. ``plan.offer_id`` must already carry
+    the full Adobe offer id (resolved from the customer's live subscriptions)
+    or Adobe rejects the line.
+
+    ``net_new_lines`` are the early-renewal additions, which ride the RENEWAL
+    order itself as an offer id with no subscription id — Adobe only sees (and
+    only rejects) the forbidden renew-and-add basket when the preview carries
+    them. They are left out at the anniversary, where a net-new product has no
+    Adobe subscription until fulfilment creates it.
     """
-    line_items = []
     renewing = (plan for plan in plan_subscriptions if plan.selection.renew)
-    for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER):
-        line_item: Line = {
+    line_items = [
+        _preview_subscription_line(plan, line_number, flex_discount_codes)
+        for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER)
+    ]
+    return line_items + _preview_net_new_lines(
+        net_new_lines or [], len(line_items) + _FIRST_LINE_NUMBER, flex_discount_codes
+    )
+
+
+def _preview_subscription_line(
+    plan: PlanSubscription, line_number: int, flex_discount_codes: list[str]
+) -> Line:
+    line_item: Line = {
+        "extLineItemNumber": line_number,
+        "offerId": plan.offer_id,
+        "subscriptionId": plan.adobe_subscription_id,
+        "quantity": plan.selection.renewal_quantity,
+    }
+    if flex_discount_codes:
+        line_item["flexDiscountCodes"] = list(flex_discount_codes)
+    return line_item
+
+
+def _preview_net_new_lines(
+    net_new_lines: list[NetNewLine], first_line_number: int, flex_discount_codes: list[str]
+) -> list[Line]:
+    """Build the lines for the products the customer does not hold yet.
+
+    Adobe identifies each by offer id alone: there is no subscription to renew,
+    so ``subscriptionId`` is omitted (optional for a new offer). They number
+    after the renewing lines of the same preview.
+    """
+    return [
+        {
             "extLineItemNumber": line_number,
-            "offerId": plan.offer_id,
-            "subscriptionId": plan.adobe_subscription_id,
-            "quantity": plan.selection.renewal_quantity,
+            "offerId": net_new.offer_id,
+            "quantity": net_new.selection.quantity,
+            **({"flexDiscountCodes": list(flex_discount_codes)} if flex_discount_codes else {}),
         }
-        if flex_discount_codes:
-            line_item["flexDiscountCodes"] = list(flex_discount_codes)
-        line_items.append(line_item)
-    return line_items
+        for line_number, net_new in enumerate(net_new_lines, start=first_line_number)
+    ]
 
 
 def build_renewal_payload(
@@ -154,14 +234,19 @@ def build_renewal_payload(
 ) -> RenewalPayload:
     """Build the ``renewalPayload`` DataObject snapshot from the customer's plan.
 
-    Every selected subscription is recorded with its Adobe id, offer id, renew
-    decision and renewal quantity; the selected flexible discount codes ride on
-    each renewing entry, matching Adobe's auto-renewal preference object. The
-    net-new products carry their full offer ids (resolved from the Airtable
-    SKU mapping, see ``resolve_net_new_offer_ids``) so fulfilment can create
-    the scheduled subscriptions without re-resolving them.
+    The renewal path the customer picked on the wizard's first step is recorded
+    first: it is what tells fulfilment which flow to execute — apply the plan
+    as auto-renewal preferences at the coterm date, or place the early RENEWAL
+    order now — since the resulting Marketplace order looks the same either
+    way. Every selected subscription is recorded with its Adobe id, offer id,
+    renew decision and renewal quantity; the selected flexible discount codes
+    ride on each renewing entry, matching Adobe's auto-renewal preference
+    object. The net-new products carry their full offer ids (resolved from the
+    Airtable SKU mapping, see ``resolve_net_new_offer_ids``) so fulfilment can
+    create the scheduled subscriptions without re-resolving them.
     """
     return RenewalPayload.from_payload({
+        "renewalPath": request.renewal_path.value,
         "recommendationTrackerId": request.recommendation_tracker_id,
         "currencyCode": currency_code,
         "subscriptions": [
