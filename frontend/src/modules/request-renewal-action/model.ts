@@ -109,11 +109,13 @@ export function normalizeDiscountCode(code: string): string {
 /**
  * Whether the customer can still apply the discount.
  *
- * A code can be redeemed only once per customer, so a redemption recorded
- * against this customer takes the code out of play.
+ * A single-use code can be redeemed once per customer, so a redemption
+ * recorded against this customer takes it out of play. A reusable code stays
+ * selectable after its redemption — its discount lock is what limits how long
+ * it can be applied, and the listing already drops it once the lock runs out.
  */
 export function isDiscountAvailable(discount: Discount): boolean {
-  return !discount.redeemedAt;
+  return Boolean(discount.reusable) || !discount.redeemedAt;
 }
 
 /** Whether the discount applies to a renewal; an unrestricted code applies to any order. */

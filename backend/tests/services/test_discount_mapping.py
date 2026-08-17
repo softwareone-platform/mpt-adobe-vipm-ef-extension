@@ -2,7 +2,7 @@ import datetime as dt
 
 import pytest
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest
+from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountOrderType
 from mpt_adobe_vipm_ef.services import discount_mapping
 
 _NOW = dt.datetime.fromisoformat("2026-07-21T12:00:00+00:00")
@@ -24,27 +24,6 @@ def create_body():
         "targetOfferIds": [_TARGET_OFFER_ID],
         "applicableOrderTypes": ["RENEWAL"],
     })
-
-
-def _code_record(**field_overrides):
-    fields = {
-        "Code": "SUMMER25",
-        "name": "Summer 2025",
-        "description": "20% off for renewals",
-        "source": "Ops/Vendor",
-        "category": "STANDARD",
-        "status": "ACTIVE",
-        "discount_type": "PERCENTAGE",
-        "market_segment": "COM",
-        "start_date": "2026-06-01T00:00:00Z",
-        "end_date": "2026-08-31T23:59:59Z",
-        "target_offer_ids": "65322651CA02A12, 11083117CA01A12",
-        "applicable_order_types": ["RENEWAL"],
-        "supports_annual": True,
-        "target_customer_id": "CUST-001",
-    }
-    fields.update(field_overrides)
-    return {"id": "rec123", "fields": fields}
 
 
 def test_build_closed_code_fields_stamps_authoring_metadata(create_body):
@@ -94,8 +73,8 @@ def test_build_update_fields_serializes_wizard_fields(create_body):
     assert "Code" not in result
 
 
-def test_to_api_payload_maps_tdr_representation():
-    record = _code_record()
+def test_to_api_payload_maps_tdr_representation(code_record_factory):
+    record = code_record_factory()
 
     result = discount_mapping.to_api_payload(
         record,
@@ -125,50 +104,149 @@ def test_to_api_payload_maps_tdr_representation():
     }
 
 
-def test_to_api_payload_labels_open_source():
-    record = _code_record(source="API")
+def test_to_api_payload_labels_open_source(code_record_factory):
+    record = code_record_factory(source="API")
 
     result = discount_mapping.to_api_payload(record, [], None)
 
     assert result["source"] == "Open"
 
 
-def test_to_api_payload_ignores_computed_description_artifacts():
-    record = _code_record(description={"state": "error", "value": None})
+def test_to_api_payload_ignores_computed_description_artifacts(code_record_factory):
+    record = code_record_factory(description={"state": "error", "value": None})
 
     result = discount_mapping.to_api_payload(record, [], None)
 
     assert result["description"] is None
 
 
-def test_to_api_payload_unwraps_generated_description_artifacts():
-    record = _code_record(description={"state": "generated", "value": "20% off", "isStale": False})
+def test_to_api_payload_unwraps_generated_description_artifacts(code_record_factory):
+    record = code_record_factory(
+        description={"state": "generated", "value": "20% off", "isStale": False}
+    )
 
     result = discount_mapping.to_api_payload(record, [], None)
 
     assert result["description"] == "20% off"
 
 
-def test_is_visible_hides_retired_rows():
-    record = _code_record(retired_at="2026-07-01T00:00:00Z")
+def test_is_visible_hides_retired_rows(code_record_factory):
+    record = code_record_factory(retired_at="2026-07-01T00:00:00Z")
 
     result = discount_mapping.is_visible(record, "COM", "CUST-001")
 
     assert result is False
 
 
-def test_is_visible_hides_closed_codes_of_other_customers():
-    record = _code_record(target_customer_id="CUST-999")
+def test_is_visible_hides_closed_codes_of_other_customers(code_record_factory):
+    record = code_record_factory(target_customer_id="CUST-999")
 
     result = discount_mapping.is_visible(record, "COM", "CUST-001")
 
     assert result is False
 
 
-def test_is_visible_shows_open_codes_of_the_segment():
-    record = _code_record(source="API", target_customer_id=None)
+def test_is_visible_shows_open_codes_of_the_segment(code_record_factory):
+    record = code_record_factory(source="API", target_customer_id=None)
 
     result = discount_mapping.is_visible(record, "COM", "CUST-001")
+
+    assert result is True
+
+
+def test_is_offerable_accepts_a_code_inside_its_validity_window(code_record_factory):
+    record = code_record_factory()
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    "field_overrides",
+    [
+        pytest.param({"start_date": "2026-07-21T12:00:00Z"}, id="starts-now"),
+        pytest.param({"end_date": "2026-07-21T12:00:00Z"}, id="ends-now"),
+    ],
+)
+def test_is_offerable_accepts_the_bounds_of_the_validity_window(
+    field_overrides, code_record_factory
+):
+    record = code_record_factory(**field_overrides)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    "field_overrides",
+    [
+        pytest.param({"applicable_order_types": ["NEW", "SWITCH"]}, id="other-order-types"),
+        pytest.param({"applicable_order_types": []}, id="no-order-types"),
+        pytest.param({"applicable_order_types": None}, id="missing-order-types"),
+        pytest.param({"start_date": "2026-08-01T00:00:00Z"}, id="not-started"),
+        pytest.param({"end_date": "2026-07-01T00:00:00Z"}, id="expired"),
+        pytest.param({"retired_at": "2026-07-01T00:00:00Z"}, id="retired"),
+    ],
+)
+def test_is_offerable_rejects_codes_out_of_play(field_overrides, code_record_factory):
+    record = code_record_factory(**field_overrides)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is False
+
+
+def test_is_offerable_extends_a_reusable_code_to_its_discount_lock(code_record_factory):
+    record = code_record_factory(
+        end_date="2026-07-01T00:00:00Z",
+        reusable=True,
+        discount_lock_end_date="2026-12-31T23:59:59Z",
+    )
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is True
+
+
+def test_is_offerable_rejects_a_reusable_code_past_its_discount_lock(code_record_factory):
+    record = code_record_factory(
+        end_date="2026-06-01T00:00:00Z",
+        reusable=True,
+        discount_lock_end_date="2026-07-01T00:00:00Z",
+    )
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is False
+
+
+def test_is_offerable_falls_back_to_the_end_date_when_a_reusable_code_has_no_lock(
+    code_record_factory,
+):
+    record = code_record_factory(end_date="2026-07-01T00:00:00Z", reusable=True)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is False
+
+
+@pytest.mark.parametrize(
+    "field_overrides",
+    [
+        pytest.param({"end_date": None}, id="missing-end-date"),
+        pytest.param({"end_date": "not-a-date"}, id="unreadable-end-date"),
+        pytest.param({"start_date": "2026-06-01", "end_date": "2026-08-31"}, id="date-only-cells"),
+        pytest.param({"end_date": "2026-08-31T23:59:59"}, id="naive-end-date"),
+    ],
+)
+def test_is_offerable_leaves_the_window_open_on_unusable_bounds(
+    field_overrides, code_record_factory
+):
+    record = code_record_factory(**field_overrides)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
 
     assert result is True
 
