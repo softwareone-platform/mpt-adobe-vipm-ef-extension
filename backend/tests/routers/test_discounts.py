@@ -1,6 +1,7 @@
 import http
 
 import pytest
+from freezegun import freeze_time
 from mpt_extension_sdk.api.auth.context import Account, AccountType, AuthContext
 from mpt_extension_sdk.api.errors import (
     ForbiddenError,
@@ -53,25 +54,6 @@ def _agreement_payload():
         "authorization": {"id": "AUT-123", "name": "Dummy Authorization", "currency": "USD"},
         "parameters": {"fulfillment": [{"externalId": CUSTOMER_ID_PARAM, "value": _CUSTOMER_ID}]},
     }
-
-
-def _code_record(**field_overrides):
-    fields = {
-        "Code": "SUMMER25",
-        "name": "Summer 2025",
-        "source": "Ops/Vendor",
-        "category": "STANDARD",
-        "status": "ACTIVE",
-        "discount_type": "PERCENTAGE",
-        "market_segment": "COM",
-        "start_date": "2026-06-01T00:00:00Z",
-        "end_date": "2026-08-31T23:59:59Z",
-        "target_offer_ids": _TARGET_OFFER_ID,
-        "applicable_order_types": ["RENEWAL"],
-        "target_customer_id": _CUSTOMER_ID,
-    }
-    fields.update(field_overrides)
-    return {"id": _RECORD_ID, "fields": fields}
 
 
 def _body_payload(**overrides):
@@ -159,13 +141,13 @@ def agreement():
 
 
 @pytest.fixture
-def fake_store(mocker):
+def fake_store(mocker, code_record_factory):
     store = mocker.Mock()
-    store.list_codes.return_value = [_code_record()]
-    store.get_code.return_value = _code_record()
+    store.list_codes.return_value = [code_record_factory()]
+    store.get_code.return_value = code_record_factory()
     store.find_code.return_value = None
-    store.create_code.return_value = _code_record()
-    store.update_code.return_value = _code_record()
+    store.create_code.return_value = code_record_factory()
+    store.update_code.return_value = code_record_factory()
     store.replace_value.return_value = None
     store.list_values.return_value = [
         {
@@ -192,6 +174,45 @@ async def test_list_returns_paginated_codes_with_values(agreement, fake_store):
     assert result.payload[0]["code"] == "SUMMER25"
     assert result.payload[0]["values"] == expected_values
     fake_store.list_codes.assert_called_once_with("COM", _CUSTOMER_ID)
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_only_the_codes_the_order_type_can_apply(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(),
+        code_record_factory(applicable_order_types=["NEW"]),
+        code_record_factory(end_date="2026-07-01T00:00:00Z"),
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert len(result.payload) == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_without_order_type_keeps_every_code(agreement, fake_store, code_record_factory):
+    fake_store.list_codes.return_value = [
+        code_record_factory(applicable_order_types=["NEW"]),
+        code_record_factory(end_date="2026-07-01T00:00:00Z"),
+    ]
+    ctx = FakeDiscountContext(agreement)
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 2
+
+
+async def test_list_rejects_an_unsupported_order_type(agreement, fake_store):
+    ctx = FakeDiscountContext(agreement, query={"orderType": "TRANSFER"})
+
+    with pytest.raises(ValidationError):
+        await list_discount_codes(ctx=ctx)
+
+    fake_store.list_codes.assert_not_called()
 
 
 async def test_list_requires_agreement_query_parameter(agreement, fake_store):
@@ -227,9 +248,9 @@ async def test_get_hides_missing_record_as_not_found(agreement, fake_store):
         await get_discount_code(discount_id=_RECORD_ID, ctx=ctx)
 
 
-async def test_get_hides_retired_record_as_not_found(agreement, fake_store):
+async def test_get_hides_retired_record_as_not_found(agreement, fake_store, code_record_factory):
     ctx = FakeDiscountContext(agreement)
-    fake_store.get_code.return_value = _code_record(retired_at="2026-07-01T00:00:00Z")
+    fake_store.get_code.return_value = code_record_factory(retired_at="2026-07-01T00:00:00Z")
 
     with pytest.raises(NotFoundError):
         await get_discount_code(discount_id=_RECORD_ID, ctx=ctx)
@@ -242,9 +263,9 @@ async def test_create_rejects_client_accounts(agreement, fake_store):
         await create_discount_code(ctx=ctx, body=_create_body())
 
 
-async def test_create_rejects_duplicate_codes(agreement, fake_store):
+async def test_create_rejects_duplicate_codes(agreement, fake_store, code_record_factory):
     ctx = FakeDiscountContext(agreement)
-    fake_store.find_code.return_value = _code_record()
+    fake_store.find_code.return_value = code_record_factory()
 
     with pytest.raises(ValidationError):
         await create_discount_code(ctx=ctx, body=_create_body())
@@ -280,9 +301,9 @@ async def test_create_stores_code_and_value_row(agreement, fake_store):
     fake_store.replace_value.assert_called_once_with("SUMMER25", "COM", expected_value_fields)
 
 
-async def test_update_rejects_open_codes(agreement, fake_store):
+async def test_update_rejects_open_codes(agreement, fake_store, code_record_factory):
     ctx = FakeDiscountContext(agreement)
-    fake_store.get_code.return_value = _code_record(source="API")
+    fake_store.get_code.return_value = code_record_factory(source="API")
 
     with pytest.raises(ValidationError):
         await update_discount_code(discount_id=_RECORD_ID, ctx=ctx, body=_update_body())

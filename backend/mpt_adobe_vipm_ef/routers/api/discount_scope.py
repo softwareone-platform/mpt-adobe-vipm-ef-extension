@@ -16,13 +16,16 @@ from mpt_extension_sdk.api import (
 )
 from mpt_extension_sdk.models import Agreement
 
-from mpt_adobe_vipm_ef.models.discount import DiscountScope
+from mpt_adobe_vipm_ef.models.discount import DiscountOrderType, DiscountScope
 from mpt_adobe_vipm_ef.routers.api.customer import load_agreement, require_customer_id
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
 
 logger = logging.getLogger(__name__)
 
 AGREEMENT_QUERY_PARAM = "agreement"
+ORDER_TYPE_QUERY_PARAM = "orderType"
+
+_SUPPORTED_ORDER_TYPES = ", ".join(order_type.value for order_type in DiscountOrderType)
 
 
 def require_editor_account(ctx: APIContext) -> None:
@@ -50,6 +53,24 @@ async def load_discount_scope(ctx: APIContext) -> DiscountScope:
         market_segment=resolve_market_segment(ctx, agreement),
         customer_id=customer_id,
     )
+
+
+def read_order_type_filter(ctx: APIContext) -> DiscountOrderType | None:
+    """Read the optional ``orderType`` filter of the listing endpoint.
+
+    The renewal wizard passes ``RENEWAL`` to be offered only the codes a
+    renewal can still apply; the discounts tab omits it and lists every code.
+    """
+    raw_order_type = ctx.request.query.get(ORDER_TYPE_QUERY_PARAM)
+    if not raw_order_type:
+        return None
+    try:
+        return DiscountOrderType(raw_order_type.strip().upper())
+    except ValueError:
+        raise ValidationError(
+            detail=f"The 'orderType' query parameter must be one of {_SUPPORTED_ORDER_TYPES}.",
+            errors=[ErrorDetail(pointer="#/orderType", detail="Unsupported order type.")],
+        )
 
 
 def _assert_product_allowed(ctx: APIContext, agreement: Agreement) -> None:

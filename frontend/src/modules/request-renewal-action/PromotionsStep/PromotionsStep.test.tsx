@@ -234,13 +234,15 @@ describe('PromotionsStep', () => {
     expect(getByText(/Apply any discount codes as desired/)).toBeTruthy();
   });
 
-  it('reads the discounts available to the customer', async () => {
+  it('reads the discounts a renewal can still apply', async () => {
     const { getByTestId } = renderStep();
 
     await waitFor(() => expect(getByTestId('grid')).toBeTruthy());
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
-      expect.objectContaining({ params: expect.objectContaining({ agreement: 'AGR-1' }) }),
+      expect.objectContaining({
+        params: expect.objectContaining({ agreement: 'AGR-1', orderType: 'RENEWAL' }),
+      }),
     );
   });
 
@@ -278,6 +280,19 @@ describe('PromotionsStep', () => {
     expect(options.map((option) => option.value)).toEqual(['CODE-ONE', 'CODE-TWO']);
     expect(options[1].hasAttribute('disabled')).toBe(true);
     expect(select.getAttribute('data-placeholder')).toBe('Select or type code');
+  });
+
+  it('keeps a redeemed reusable code selectable', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [{ ...DISCOUNTS[1], reusable: true }] },
+    });
+
+    const { findByTestId } = renderStep();
+
+    const select = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    const options = Array.from(select.querySelectorAll('option')).filter((option) => option.value);
+    expect(options.map((option) => option.value)).toEqual(['CODE-TWO']);
+    expect(options[0].hasAttribute('disabled')).toBe(false);
   });
 
   it('stores the code picked for a line', async () => {
