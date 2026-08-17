@@ -19,8 +19,16 @@ def test_request_commitment_modal_plug_metadata(plug_env):
     assert plug.href == "/static/request-commitment-action/index.js"
 
 
-def test_request_midterm_upgrade_plug_metadata(plug_env):
+def test_request_discount_plug_metadata(plug_env):
     plug = agreement_plugs()[4]  # act
+
+    assert plug.id == "request-discount-action"
+    assert plug.socket == "portal.commerce.agreements.agreement.modal"
+    assert plug.href == "/static/request-discount-action/index.js"
+
+
+def test_request_midterm_upgrade_plug_metadata(plug_env):
+    plug = agreement_plugs()[5]  # act
 
     assert plug.id == "request-midterm-upgrade-action"
     assert plug.name == "Upgrade"
@@ -33,7 +41,7 @@ def test_subscription_plug_condition_lists_products(plug_env, monkeypatch):
         "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})
     )
 
-    plug = agreement_plugs()[4]  # act
+    plug = agreement_plugs()[5]  # act
 
     assert plug.condition == (
         "and("
@@ -65,7 +73,7 @@ def test_plugs_omit_disabled_feature(plug_env, monkeypatch):
 def test_plugs_kept_without_features(plug_env):
     result = agreement_plugs()
 
-    assert len(result) == 6
+    assert len(result) == 7
 
 
 def test_plug_condition_empty(plug_env, monkeypatch):
