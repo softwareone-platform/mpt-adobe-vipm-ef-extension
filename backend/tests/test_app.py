@@ -46,7 +46,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
     result = ext_app.to_meta_config()
 
     assert result.plugs is not None
-    assert len(result.plugs) == 6
+    assert len(result.plugs) == 7
     assert result.plugs[0].model_dump() == {
         "id": "agreement-adobe",
         "name": "Adobe",
@@ -84,6 +84,15 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         "href": "/static/request-global-customer-action/index.js",
     }
     assert result.plugs[4].model_dump() == {
+        "id": "request-discount-action",
+        "name": "Discount",
+        "description": "Create a closed discount code for the agreement's customer.",
+        "icon": None,
+        "socket": "portal.commerce.agreements.agreement.modal",
+        "condition": "in(agreement.product.id,(PRD-1111-1111,PRD-2222-2222))",
+        "href": "/static/request-discount-action/index.js",
+    }
+    assert result.plugs[5].model_dump() == {
         "id": "request-midterm-upgrade-action",
         "name": "Upgrade",
         "description": "Request a mid-term upgrade for the subscription.",
@@ -95,7 +104,7 @@ def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
         ")",
         "href": "/static/request-midterm-upgrade-action/index.js",
     }
-    assert result.plugs[5].model_dump() == {
+    assert result.plugs[6].model_dump() == {
         "id": "request-renewal-action",
         "name": "Renew",
         "description": "Request a renewal for the agreement.",

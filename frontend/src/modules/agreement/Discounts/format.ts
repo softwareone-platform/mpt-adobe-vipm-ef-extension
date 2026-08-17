@@ -1,20 +1,11 @@
 import { i18n } from '../../../i18n/translations';
 
 import type { Discount, DiscountOrderType } from '../../shared/model';
-
-export const EM_DASH = '—';
+import { EM_DASH } from '../../utils/date';
+import { formatCurrency } from '../../utils/price';
 
 export function formatDate(value?: string | null): string {
   return value ? value.slice(0, 10) : EM_DASH;
-}
-
-function formatCurrency(value: number, currency?: string): string {
-  if (!currency) return String(value);
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(value);
-  } catch {
-    return `${value} ${currency}`;
-  }
 }
 
 export function formatValue(discount: Discount): string {

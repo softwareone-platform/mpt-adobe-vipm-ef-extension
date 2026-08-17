@@ -1,0 +1,62 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.order-types {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  &__label {
+    display: block;
+    margin-bottom: $var-spacing-1;
+    font-weight: 500;
+  }
+
+  &__control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $var-spacing-1;
+    width: 100%;
+    padding: 10px $var-spacing-2;
+    border: 1px solid $var-gray-3;
+    border-radius: 4px;
+    background: $var-brand-white;
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+      border-color: $var-gray-4;
+    }
+  }
+
+  &__value {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    &--placeholder {
+      color: $var-gray-4;
+    }
+  }
+
+  &__option {
+    display: flex;
+    align-items: center;
+    padding: $var-spacing-1 $var-spacing-2;
+    cursor: pointer;
+
+    &:hover {
+      background-color: $var-gray-2;
+    }
+
+    // The checkbox is purely visual; the <li> owns the click
+    [class*="checkbox"] {
+      pointer-events: none;
+    }
+  }
+
+  &__divider {
+    padding: 0 $var-spacing-2;
+    pointer-events: none;
+  }
+}
