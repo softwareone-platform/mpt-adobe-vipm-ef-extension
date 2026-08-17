@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Self
 
 from mpt_extension_sdk.api.models.base import APIBaseModel
@@ -8,6 +9,21 @@ from mpt_adobe_vipm_ef.constants import MAX_LENGTH, MIN_LENGTH, NOTES_MAX_LENGTH
 from mpt_adobe_vipm_ef.models.switch import OrderExternalIds
 
 _MIN_RENEWAL_QUANTITY = 1
+
+
+class RenewalPath(StrEnum):
+    """The renewal path the customer picked on the wizard's first step.
+
+    ``ANNIVERSARY`` renews at the coterm date through the standing
+    ``autoRenewal`` preference, so nothing reaches Adobe until then.
+    ``NOW`` (early renewal, "Renew now") places an explicit RENEWAL order
+    before the anniversary, which makes Adobe the authority on the basket:
+    every plan the wizard assembles on that path is quoted through a
+    ``PREVIEW_RENEWAL`` before the wizard advances.
+    """
+
+    ANNIVERSARY = "anniversary"
+    NOW = "now"
 
 
 class RenewalSubscriptionSelection(BaseSchema):
@@ -45,11 +61,15 @@ class RenewalPlanRequest(BaseSchema):
 
     Body schema for the 3YC floor pre-check endpoint and the base of the
     preview and submission request schemas, so the wizard sends the same plan
-    shape at every step.
+    shape at every step. ``renewalPath`` carries the choice made on the
+    wizard's first step: it decides how the plan is validated (early renewal is
+    settled by Adobe's preview) and is snapshotted on the order so fulfilment
+    knows which flow to execute. A body without it is an at-anniversary plan.
     """
 
     subscriptions: list[RenewalSubscriptionSelection] = Field(default_factory=list)
     net_new_items: list[NetNewItemSelection] = Field(default_factory=list, alias="netNewItems")
+    renewal_path: RenewalPath = Field(default=RenewalPath.ANNIVERSARY, alias="renewalPath")
 
     @field_validator("subscriptions")
     @classmethod
@@ -124,13 +144,17 @@ class RenewalPayloadNetNewItem(APIBaseModel):
 class RenewalPayload(APIBaseModel):
     """The renewal plan snapshot stored in the hidden order DataObject.
 
-    Locks in what the customer agreed to in the wizard: the per-subscription
-    renew decisions with their quantities and discount codes, the net-new
-    products to schedule (with their full offer ids), and the recommendation
-    tracker id — everything the fulfillment extension needs to apply the plan
-    to Adobe at the anniversary.
+    Locks in what the customer agreed to in the wizard: the renewal path they
+    picked, the per-subscription renew decisions with their quantities and
+    discount codes, the net-new products to schedule (with their full offer
+    ids), and the recommendation tracker id — everything the fulfillment
+    extension needs to apply the plan to Adobe. ``renewalPath`` is the
+    discriminator fulfilment routes on: ``anniversary`` applies the plan as
+    auto-renewal preferences at the coterm date, ``now`` places the early
+    RENEWAL order (plus any RETURN orders) immediately.
     """
 
+    renewal_path: str = Field(alias="renewalPath")
     recommendation_tracker_id: str = Field(default="", alias="recommendationTrackerId")
     currency_code: str = Field(alias="currencyCode")
     subscriptions: list[RenewalPayloadSubscription]

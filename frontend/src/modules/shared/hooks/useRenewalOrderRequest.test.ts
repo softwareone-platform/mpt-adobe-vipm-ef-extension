@@ -13,6 +13,7 @@ jest.mock('@mpt-extension/sdk', () => ({
 const mockPost = jest.mocked(http.post);
 
 const ORDER_INPUT = {
+  renewalPath: 'now' as const,
   subscriptions: [{ id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 5 }],
   netNewItems: [{ offerId: 'OFFER-2', quantity: 3 }],
   flexDiscountCodes: ['CODE-ONE'],

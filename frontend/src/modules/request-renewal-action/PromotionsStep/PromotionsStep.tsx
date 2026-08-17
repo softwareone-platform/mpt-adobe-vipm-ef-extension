@@ -29,19 +29,24 @@ import {
   WIZARD_GRID_PAGE_SIZE,
 } from '../../shared/constants';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
+import { useRenewalDiscountValidation } from '../../shared/hooks/useRenewalDiscountValidation';
 import type { Agreement, Discount, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import { getDiscountedUnitPrice } from '../../utils/discount';
 import {
   appliesToRenewal,
+  buildRenewalPlanRequest,
   findDiscountByCode,
   getRenewalQuantity,
+  getRenewalRowIds,
+  getSelectedDiscountCodes,
   isDiscountAvailable,
   isRenewing,
   normalizeDiscountCode,
   type DiscountSelections,
   type NetNewItem,
+  type RenewalPath,
   type RenewalQuantities,
   type RenewalSelections,
 } from '../model';
@@ -55,6 +60,8 @@ export interface PromotionsStepProps {
   quantities: RenewalQuantities;
   netNewItems: NetNewItem[];
   discountSelections: DiscountSelections;
+  /** The path picked on the first step; the early one gates Next on Adobe's preview. */
+  path: RenewalPath;
   onDiscountChange: (rowId: string, code: string) => void;
 }
 
@@ -347,11 +354,18 @@ export function PromotionsStep({
   quantities,
   netNewItems,
   discountSelections,
+  path,
   onDiscountChange,
 }: PromotionsStepProps) {
   const { t } = useTranslation();
   const discounts = useAllDiscounts(agreement.id, 'RENEWAL');
   const { registerOnNextCallback } = useStepActions();
+  const {
+    error: discountValidationError,
+    status: discountValidationStatus,
+    validateDiscounts,
+    reset: resetDiscountValidation,
+  } = useRenewalDiscountValidation(agreement.id);
 
   // A code that cannot apply to a renewal is never offered on this step.
   const renewalDiscounts = useMemo(() => discounts.data.filter(appliesToRenewal), [discounts.data]);
@@ -387,9 +401,36 @@ export function PromotionsStep({
     [renewalDiscounts, options, onDiscountChange],
   );
 
+  // Any discount edit invalidates the previous validation outcome.
+  useEffect(() => {
+    resetDiscountValidation();
+  }, [discountSelections, resetDiscountValidation]);
+
   const onNext = useCallback(
-    async ({ targetStepIndex }: StepNavigationProperties) => targetStepIndex,
-    [],
+    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      const plan = buildRenewalPlanRequest(
+        subscriptions,
+        selections,
+        quantities,
+        netNewItems,
+        path,
+      );
+      const flexDiscountCodes = getSelectedDiscountCodes(
+        discountSelections,
+        getRenewalRowIds(subscriptions, selections, netNewItems),
+      );
+      const isValid = await validateDiscounts(plan, flexDiscountCodes);
+      return isValid ? targetStepIndex : currentStepIndex;
+    },
+    [
+      subscriptions,
+      selections,
+      quantities,
+      netNewItems,
+      path,
+      discountSelections,
+      validateDiscounts,
+    ],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
@@ -430,6 +471,21 @@ export function PromotionsStep({
               {discounts.error || t('Renewal:Promotions:Errors:Discounts could not be loaded')}
             </InlineNotification>
           </div>
+        )}
+        {discountValidationError && (
+          <div
+            className="promotions-step__validation"
+            data-testid="promotions-step-validation-error"
+          >
+            <InlineNotification status="error" isStandalone>
+              {discountValidationError}
+            </InlineNotification>
+          </div>
+        )}
+        {discountValidationStatus === 'loading' && (
+          <RegularText as="p" size={2} color="grey-4" className="promotions-step__validating">
+            {t('Renewal:Promotions:Validating')}
+          </RegularText>
         )}
         {rows.length === 0 ? (
           <NoDataCard

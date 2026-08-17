@@ -3,6 +3,7 @@ from mpt_extension_sdk.api import UpstreamServiceError, ValidationError
 from mpt_extension_sdk.models import Subscription
 from requests import ConnectionError as RequestsConnectionError
 
+from mpt_adobe_vipm_ef.constants import EARLY_RENEWAL_NO_CHANGE_ITEM
 from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
 from mpt_adobe_vipm_ef.services.renewal_plan import (
     NetNewLine,
@@ -12,6 +13,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (
     require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_offer_ids,
+    resolve_no_change_line,
 )
 
 _SUBSCRIPTION_ID = "SUB-1234-5678"
@@ -120,6 +122,61 @@ def test_build_preview_renewal_line_items_skips_lapsing_subscriptions():
     assert result == []
 
 
+def test_build_preview_renewal_line_items_carries_the_early_renewal_additions():
+    """Only a preview carrying the additions can reject a renew-and-add basket.
+
+    A net-new line has no Adobe subscription to renew, so it is identified by
+    its offer id alone, and it numbers after the renewing lines.
+    """
+    request = _request(
+        subscriptions=[_selection()],
+        net_new_items=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
+        codes=["ABCD-XV54-HG34-78YT"],
+        renewalPath="now",
+    )
+    net_new_lines = [
+        NetNewLine(
+            selection=request.net_new_items[0],
+            item_id="ITM-NET-NEW",
+            offer_id=_NET_NEW_OFFER_ID,
+        ),
+    ]
+
+    result = build_preview_renewal_line_items(
+        _plan(request), request.flex_discount_codes, net_new_lines
+    )
+
+    assert result[1] == {
+        "extLineItemNumber": 2,
+        "offerId": _NET_NEW_OFFER_ID,
+        "quantity": 5,
+        "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
+    }
+
+
+def test_build_preview_renewal_line_items_numbers_an_add_only_basket_from_one():
+    request = _request(
+        subscriptions=[_selection(renew=False, quantity=0)],
+        net_new_items=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
+        renewalPath="now",
+    )
+    net_new_lines = [
+        NetNewLine(
+            selection=request.net_new_items[0],
+            item_id="ITM-NET-NEW",
+            offer_id=_NET_NEW_OFFER_ID,
+        ),
+    ]
+
+    result = build_preview_renewal_line_items(
+        _plan(request), request.flex_discount_codes, net_new_lines
+    )
+
+    assert result == [
+        {"extLineItemNumber": 1, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
+    ]
+
+
 def test_build_renewal_payload_snapshots_the_whole_plan():
     request = _request(
         subscriptions=[
@@ -141,6 +198,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
     result = build_renewal_payload(_plan(request), net_new_lines, request, "USD")
 
     assert result.to_dict() == {
+        "renewalPath": "anniversary",
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [
@@ -184,16 +242,25 @@ def test_build_renewal_payload_defaults_the_optional_fields():
     assert payload["netNewItems"] == []
 
 
+def test_build_renewal_payload_snapshots_the_early_renewal_path():
+    """The path is the discriminator fulfilment routes the snapshot on."""
+    request = _request(subscriptions=[_selection()], renewalPath="now")
+
+    result = build_renewal_payload(_plan(request), [], request, "USD")
+
+    assert result.to_dict()["renewalPath"] == "now"
+
+
 def test_require_renewal_changes_accepts_a_quantity_change():
     request = _request(subscriptions=[_selection(quantity=37)])  # noqa: WPS432
 
-    require_renewal_changes(_plan(request), [])  # act
+    require_renewal_changes(request, _plan(request), [])  # act
 
 
 def test_require_renewal_changes_accepts_an_autorenew_change():
     request = _request(subscriptions=[_selection(renew=False, quantity=_CURRENT_QUANTITY)])
 
-    require_renewal_changes(_plan(request, auto_renew=True), [])  # act
+    require_renewal_changes(request, _plan(request, auto_renew=True), [])  # act
 
 
 def test_require_renewal_changes_accepts_a_net_new_only_plan():
@@ -206,21 +273,31 @@ def test_require_renewal_changes_accepts_a_net_new_only_plan():
         ),
     ]
 
-    require_renewal_changes([], net_new_lines)  # act
+    require_renewal_changes(net_new_request, [], net_new_lines)  # act
 
 
 def test_require_renewal_changes_rejects_a_pure_no_op_plan():
     request = _request(subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY)])
 
     with pytest.raises(ValidationError, match="no changes to submit"):
-        require_renewal_changes(_plan(request, auto_renew=True), [])
+        require_renewal_changes(request, _plan(request, auto_renew=True), [])
+
+
+def test_require_renewal_changes_accepts_an_unchanged_early_renewal():
+    """Renewing before the anniversary is the change, so nothing else has to move."""
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY)],
+        renewalPath="now",
+    )
+
+    require_renewal_changes(request, _plan(request, auto_renew=True), [])  # act
 
 
 def test_require_renewal_changes_rejects_an_unchanged_lapse():
     request = _request(subscriptions=[_selection(renew=False, quantity=0)])
 
     with pytest.raises(ValidationError, match="no changes to submit"):
-        require_renewal_changes(_plan(request, auto_renew=False), [])
+        require_renewal_changes(request, _plan(request, auto_renew=False), [])
 
 
 @pytest.fixture
@@ -285,3 +362,45 @@ async def test_resolve_net_new_offer_ids_maps_store_failures_to_upstream_errors(
 
     with pytest.raises(UpstreamServiceError):
         await resolve_net_new_offer_ids(ctx, [_net_new_line()], lambda: _MARKET_SEGMENT)
+
+
+_NO_CHANGE_ITEM_ID = "ITM-NO-CHANGE"
+_PRODUCT_ID = "PRD-1111-1111"
+
+
+@pytest.fixture
+def agreement(mocker):
+    fake_agreement = mocker.Mock()
+    fake_agreement.product.id = _PRODUCT_ID
+    return fake_agreement
+
+
+@pytest.fixture
+def no_change_item(mocker):
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.services.renewal_plan.resolve_items_by_sku",
+        return_value={
+            EARLY_RENEWAL_NO_CHANGE_ITEM: {
+                "id": _NO_CHANGE_ITEM_ID,
+                "name": "Early renewal (no changes)",
+                "externalId": EARLY_RENEWAL_NO_CHANGE_ITEM,
+            },
+        },
+    )
+
+
+async def test_resolve_no_change_line_builds_the_placeholder_line(ctx, agreement, no_change_item):
+    result = await resolve_no_change_line(ctx, agreement)
+
+    assert result == {"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}
+    no_change_item.assert_awaited_once_with(ctx, _PRODUCT_ID, [EARLY_RENEWAL_NO_CHANGE_ITEM])
+
+
+async def test_resolve_no_change_line_fails_when_the_item_is_missing(
+    ctx, agreement, no_change_item
+):
+    """A catalog without the placeholder item cannot carry the unchanged plan."""
+    no_change_item.return_value = {}
+
+    with pytest.raises(UpstreamServiceError, match="placeholder item"):
+        await resolve_no_change_line(ctx, agreement)
