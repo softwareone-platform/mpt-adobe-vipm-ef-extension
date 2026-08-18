@@ -67,6 +67,10 @@ env:
   LogLevel:
     name: LOG_LEVEL
     defaultValue: INFO
+  AirtableDiscountsBaseId:
+    name: EXT_AIRTABLE_DISCOUNTS_ID
+  AirTableSkuMappingBase:
+    name: EXT_AIRTABLE_SKU_MAPPING_ID
 secrets:
   SdkExtensionApiKey:
     name: SDK_EXTENSION_API_KEY
@@ -80,6 +84,8 @@ secrets:
     name: EXT_ADOBE_CREDENTIALS_JSON
   AuthorizationsJson:
     name: EXT_ADOBE_AUTHORIZATIONS_JSON
+  AirtableApiToken:
+    name: EXT_AIRTABLE_API_TOKEN
 secretFiles:
   - name: files
     mountPath: /extension/config
