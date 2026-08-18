@@ -377,6 +377,27 @@ export interface RenewalPlanNetNewItemSelection {
  */
 export type RenewalPath = 'anniversary' | 'now';
 
+/** How much of a subscription's existing quantity is already early-renewed. */
+export type RenewalStateValue = 'notRenewed' | 'partiallyRenewed' | 'fullyRenewed';
+
+/**
+ * One subscription's early-renewal state, as the renewal-state endpoint reports it.
+ *
+ * ``remainingQuantity`` is how much of the existing seats a further RENEWAL
+ * order can still early-renew, the figure the remainder control surfaces.
+ * ``earlyRenewable`` is false for a SKU Adobe will not early-renew at all, and
+ * ``increaseAllowed`` is true only once every existing seat is renewed, since an
+ * increase rides a later add-mode order.
+ */
+export interface RenewalStateEntry {
+  currentQuantity: number;
+  renewedQuantity: number;
+  state: RenewalStateValue;
+  remainingQuantity: number;
+  earlyRenewable: boolean;
+  increaseAllowed: boolean;
+}
+
 /** The renewal plan body shared by the 3YC check, preview and submission endpoints. */
 export interface RenewalPlanBody {
   subscriptions: RenewalPlanSubscriptionSelection[];

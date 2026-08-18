@@ -174,7 +174,9 @@ async def check_renewal_order_three_yc(  # noqa: WPS217
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
     customer = await _load_adobe_customer(ctx, agreement_id)
     summary = await _check_three_yc_floor(
         ctx, agreement, customer, plan_subscriptions, net_new_lines
@@ -217,7 +219,9 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     require_active_agreement(agreement)
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
     plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     net_new_lines = await _resolve_preview_net_new_lines(ctx, agreement, body)
     line_items = build_preview_renewal_line_items(
@@ -256,7 +260,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     the changed lines plus the plan snapshot — the renewal path the customer
     picked, renew decisions, quantities, discount codes and the recommendation
     tracker id — on the hidden ``renewalPayload`` order parameter, which is
-    what tells fulfilment whether to renew at the anniversary or now.
+    what tells fulfillment whether to renew at the anniversary or now.
     Otherwise it is submitted as a Configuration order carrying only the
     AutoRenew-changed subscriptions (the platform rejects a subscription whose
     AutoRenew value does not change) — plus, on the early-renewal path alone,
@@ -267,7 +271,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     is always a change, so a plan that repeats the current quantities and
     AutoRenew decisions still becomes a Change order carrying the platform's
     ``adobe-early-renewal-no-change`` placeholder item as its single line,
-    with fulfilment executing the plan from the snapshot alone.
+    with fulfillment executing the plan from the snapshot alone.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -277,7 +281,9 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
     require_renewal_changes(body, plan_subscriptions, net_new_lines)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
 
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
@@ -325,8 +331,18 @@ async def _check_auto_renew_support(
     agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     net_new_items: list[NetNewItemSelection],
+    renewal_path: RenewalPath,
 ) -> None:
-    return await check_renewal_plan_auto_renew_support(
+    """Gate the plan on per-SKU auto-renewal support, which only the anniversary path needs.
+
+    The at-anniversary path renews through Adobe's auto-renewal preferences, so
+    a SKU that cannot auto-renew cannot take it. An early renewal places an
+    explicit RENEWAL order instead and never touches those preferences, so the
+    same SKU is orderable and the gate does not apply.
+    """
+    if renewal_path is RenewalPath.NOW:
+        return
+    await check_renewal_plan_auto_renew_support(
         ctx,
         lambda: resolve_market_segment(ctx, agreement),
         plan_subscriptions,

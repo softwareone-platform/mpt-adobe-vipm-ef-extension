@@ -140,8 +140,8 @@ function buildColumns(
   return [
     {
       name: 'select',
-      initialWidth: 40,
-      minWidth: 40,
+      initialWidth: 56,
+      minWidth: 56,
       isScalable: false,
       cell: (row) => (
         <GridCellSimple>

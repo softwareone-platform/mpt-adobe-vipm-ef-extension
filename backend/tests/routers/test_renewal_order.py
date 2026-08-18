@@ -118,13 +118,14 @@ def _body(  # noqa: WPS211
     })
 
 
-def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None):
+def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None, path="anniversary"):
     default_subscriptions = [
         {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": renew, "renewalQuantity": quantity},
     ]
     return RenewalPlanRequest.model_validate({
         "subscriptions": default_subscriptions if subscriptions is None else subscriptions,
         "netNewItems": net_new or [],
+        "renewalPath": path,
     })
 
 
@@ -1185,6 +1186,17 @@ async def test_check_renewal_order_blocks_a_sku_without_auto_renewal_support(
         await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body())
 
     auto_renew_support_store.list_auto_renew_supported.assert_called_once_with([_SKU], "COM")
+
+
+async def test_check_renewal_order_skips_the_gate_on_the_early_path(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_customer, auto_renew_support_store
+):
+    """An early renewal orders explicitly, so auto-renewal support does not apply."""
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: False}
+
+    await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body(path="now"))  # act
+
+    auto_renew_support_store.list_auto_renew_supported.assert_not_called()
 
 
 async def test_preview_renewal_plan_blocks_a_sku_without_auto_renewal_support(

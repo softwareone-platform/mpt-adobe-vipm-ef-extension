@@ -24,6 +24,17 @@
     width: 100%;
   }
 
+  &__conflict {
+    p {
+      margin: 0;
+    }
+
+    ul {
+      margin: $var-spacing-1 0;
+      padding-left: $var-spacing-4;
+    }
+  }
+
   &__validating {
     margin: 0;
   }
