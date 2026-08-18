@@ -14,7 +14,11 @@ from mpt_extension_sdk.routing import APIRouter
 
 from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountCodeUpdateRequest
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
-from mpt_adobe_vipm_ef.routers.api.discount_scope import load_discount_scope, require_editor_account
+from mpt_adobe_vipm_ef.routers.api.discount_scope import (
+    load_discount_scope,
+    read_order_type_filter,
+    require_editor_account,
+)
 from mpt_adobe_vipm_ef.services import discount_mapping
 from mpt_adobe_vipm_ef.services.discount_codes import (
     build_store,
@@ -34,9 +38,11 @@ discounts_router = APIRouter(prefix="/discount-codes")
 @log_inputs
 async def list_discount_codes(ctx: APIContext) -> APIResponse:  # noqa: WPS210
     """List the discounts in scope for the agreement's customer (open + closed)."""
+    order_type = read_order_type_filter(ctx)
     scope = await load_discount_scope(ctx)
     store = build_store(ctx)
-    records = await store_call(store.list_codes, scope.market_segment, scope.customer_id)
+    stored = await store_call(store.list_codes, scope.market_segment, scope.customer_id)
+    records = discount_mapping.filter_offerable(stored, order_type)
     pagination = ctx.request.pagination
     page = records[pagination.offset : pagination.offset + pagination.limit]
     payloads = await serialize_page(store, scope, page)

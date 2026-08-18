@@ -21,6 +21,7 @@ SUBSCRIPTION_AUDIT_SELECT = ("audit",)
 CUSTOMER_ID_PARAM = "customerId"
 SWITCH_PAYLOAD_PARAM = "switchPayload"
 RENEWAL_PAYLOAD_PARAM = "renewalPayload"
+EARLY_RENEWAL_NO_CHANGE_ITEM = "adobe-early-renewal-no-change"
 MIN_LENGTH = 1
 MAX_LENGTH = 255
 NOTES_MAX_LENGTH = 4000

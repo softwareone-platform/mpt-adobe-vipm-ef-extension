@@ -368,10 +368,39 @@ export interface RenewalPlanNetNewItemSelection {
   quantity: number;
 }
 
+/**
+ * The renewal path the customer picks on the wizard's first step.
+ *
+ * ``anniversary`` renews at the coterm date, so nothing reaches Adobe until
+ * then; ``now`` (early renewal) places the RENEWAL order immediately, which is
+ * why that path is validated against Adobe as the customer assembles it.
+ */
+export type RenewalPath = 'anniversary' | 'now';
+
 /** The renewal plan body shared by the 3YC check, preview and submission endpoints. */
 export interface RenewalPlanBody {
   subscriptions: RenewalPlanSubscriptionSelection[];
   netNewItems: RenewalPlanNetNewItemSelection[];
+  renewalPath: RenewalPath;
+}
+
+/**
+ * Whether the plan has to be quoted through Adobe before the wizard advances.
+ *
+ * Early renewal places the RENEWAL order now, so Adobe is the authority on
+ * whether the basket is valid — the renewing lines, their quantities and the
+ * additions that would ride the same order — and the wizard gates every step
+ * that changes it on a ``PREVIEW_RENEWAL``. An at-anniversary plan orders
+ * nothing today and is only checked against the 3YC floors, and a plan with
+ * neither a renewing subscription nor an addition has no line Adobe could
+ * price.
+ */
+export function isRenewalPreviewRequired(plan: RenewalPlanBody): boolean {
+  return (
+    plan.renewalPath === 'now' &&
+    (plan.subscriptions.some((subscription) => subscription.renew) ||
+      plan.netNewItems.length > 0)
+  );
 }
 
 /** The renewal order body: the plan plus everything only the submission carries. */

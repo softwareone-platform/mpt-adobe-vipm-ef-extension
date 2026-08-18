@@ -34,8 +34,11 @@ frontend/                    TypeScript plug UI (esbuild)
     the wizard grids can show the item info card without a second call
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
-  - `api/renewal.py` — at-anniversary renewal routes; restricted to client
-    accounts. `auto-renew-support` reports which SKUs can renew at the
+  - `api/renewal.py` — renewal routes; restricted to client accounts. Every
+    plan body carries the `renewalPath` the customer picked on the wizard's
+    first step (`anniversary`, the default, or `now` for an early renewal),
+    which decides how strictly the plan is validated.
+    `auto-renew-support` reports which SKUs can renew at the
     anniversary at all (the hand-curated `auto_renew_supported` column of the
     Airtable SKU mapping), which the wizard uses to route: a subscription whose
     SKU has no support is left out of the renewal plan. `3yc-check`
@@ -43,11 +46,26 @@ frontend/                    TypeScript plug UI (esbuild)
     commitment floors (splitting licenses and consumables through the same SKU
     mapping), `preview` re-checks the routing and quotes the plan through an
     Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
-    codes and returning the renewal pricing), and the submit route repeats every
-    gate and creates the
-    change order carrying the plan snapshot (renew decisions, quantities,
-    discount codes and the recommendation tracker id) on the hidden
-    `renewalPayload` order parameter
+    codes and returning the renewal pricing); on the `now` path the quote also
+    carries the net-new additions, which ride the RENEWAL order itself, so
+    Adobe rejects the renew-and-add basket it forbids in one order. The submit
+    route repeats every gate and creates the
+    change order carrying the plan snapshot (the renewal path, renew decisions,
+    quantities, discount codes and the recommendation tracker id) on the hidden
+    `renewalPayload` order parameter, the discriminator fulfilment reads to pick
+    the execution flow. A plan that moves no quantity and adds no net-new
+    product cannot be a change order, so it is submitted as a configuration
+    order carrying only the AutoRenew-changed subscriptions (the platform
+    rejects a subscription whose AutoRenew value does not change, on either
+    path); on the `now` path that order also carries the same snapshot on the
+    Configuration context's own `renewalPayload` parameter, because an early
+    renewal is executed against Adobe whether or not a quantity moved. At the
+    anniversary a plan that
+    changes nothing at all is rejected upfront (the order would have no
+    content); renewing now is itself the change, so the same plan is accepted
+    there and becomes a change order whose single line is the catalog's
+    `adobe-early-renewal-no-change` placeholder item, with fulfilment executing
+    the plan from the snapshot alone
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend, serving
     only the plugs the `EXT_FEATURES` flags leave enabled (see

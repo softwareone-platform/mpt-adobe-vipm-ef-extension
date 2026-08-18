@@ -13,7 +13,7 @@ from mpt_extension_sdk.api.errors import (
 from mpt_extension_sdk.models import Agreement, Subscription
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
-from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
+from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM, EARLY_RENEWAL_NO_CHANGE_ITEM
 from mpt_adobe_vipm_ef.models.product import ProductSegment
 from mpt_adobe_vipm_ef.models.renewal import (
     RenewalOrderRequest,
@@ -38,6 +38,7 @@ _OFFER_ID = "65304470CA01A12"
 _NET_NEW_OFFER_ID = "65304481CA01A12"
 _NET_NEW_SKU = "65304481CA"
 _NET_NEW_ITEM_ID = "ITM-NET-NEW"
+_NO_CHANGE_ITEM_ID = "ITM-NO-CHANGE"
 _ADOBE_SUBSCRIPTION_ID = "adobe-sub-1"
 _CURRENT_QUANTITY = 10
 _TODAY = "2026-08-04"
@@ -100,6 +101,7 @@ def _body(  # noqa: WPS211
     tracker_id="TRACKER-1",
     notes="",
     client_external_id="",
+    path="anniversary",
 ):
     default_subscriptions = [
         {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": renew, "renewalQuantity": quantity},
@@ -111,6 +113,7 @@ def _body(  # noqa: WPS211
         "recommendationTrackerId": tracker_id,
         "notes": notes,
         "externalIds": {"client": client_external_id},
+        "renewalPath": path,
     })
 
 
@@ -124,7 +127,7 @@ def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None):
     })
 
 
-def _preview_body(*, renew=True, quantity=7, codes=None, net_new=None):
+def _preview_body(*, renew=True, quantity=7, codes=None, net_new=None, path="anniversary"):
     return RenewalPreviewRequest.model_validate({
         "subscriptions": [
             {
@@ -136,6 +139,7 @@ def _preview_body(*, renew=True, quantity=7, codes=None, net_new=None):
         ],
         "netNewItems": net_new or [],
         "flexDiscountCodes": codes or [],
+        "renewalPath": path,
     })
 
 
@@ -322,16 +326,110 @@ async def test_create_renewal_order_creates_a_configuration_order_for_an_autoren
     assert len(adobe_call.calls) == 1
 
 
+async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_configuration_order(
+    fake_ctx, submit_deps, fake_subscriptions, create_configuration_order_mock
+):
+    """Renewing now with the quantities untouched still has to reach fulfilment.
+
+    The order carries no line-quantity delta, so it is a Configuration order —
+    but the early renewal is executed against Adobe as soon as it processes,
+    so the plan snapshot rides on it too, unlike at the anniversary.
+    """
+    fake_subscriptions.subscription = Subscription.from_payload(
+        _subscription_payload(auto_renew=False)
+    )
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"], path="now")
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_configuration_order_mock.await_args
+    assert call_args[4].to_dict() == {
+        "renewalPath": "now",
+        "recommendationTrackerId": "TRACKER-1",
+        "currencyCode": "USD",
+        "subscriptions": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": _CURRENT_QUANTITY,
+                "flexDiscountCodes": ["CODE-1"],
+            },
+        ],
+        "netNewItems": [],
+    }
+
+
+async def test_create_renewal_order_leaves_an_anniversary_configuration_order_without_a_payload(
+    fake_ctx, submit_deps, create_configuration_order_mock
+):
+    """At the anniversary the AutoRenew decisions the order carries are the whole plan."""
+    body = _body(renew=False, quantity=0)  # renewing_subscription defaults autoRenew=True
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_configuration_order_mock.await_args
+    assert call_args[4] is None
+
+
 async def test_create_renewal_order_rejects_a_plan_with_no_changes(
     fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock, adobe_call
 ):
-    """A plan that neither moves a quantity nor flips AutoRenew is a pure no-op."""
+    """At the anniversary a plan that neither moves a quantity nor flips AutoRenew is a no-op."""
     body = _body(renew=True, quantity=_CURRENT_QUANTITY)  # matches autoRenew=True and current qty
 
     with pytest.raises(ValidationError, match="no changes to submit"):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
     assert not adobe_call.calls
+    create_order_mock.assert_not_awaited()
+    create_configuration_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_change_order(
+    fake_ctx,
+    submit_deps,
+    resolve_net_new_item,
+    create_order_mock,
+    create_configuration_order_mock,
+):
+    """Renewing now with everything left as it stands is the wizard's normal case.
+
+    Nothing moves a quantity and no AutoRenew decision changes, so neither
+    order type stands on its own (the platform rejects a Change order without
+    a quantity delta and a Configuration order without an AutoRenew flip). The
+    plan is submitted as a Change order whose single line is the platform's
+    ``adobe-early-renewal-no-change`` placeholder item, and fulfilment
+    executes it from the ``renewalPayload`` snapshot.
+    """
+    resolve_net_new_item.return_value = {
+        EARLY_RENEWAL_NO_CHANGE_ITEM: {
+            "id": _NO_CHANGE_ITEM_ID,
+            "name": "Early renewal (no changes)",
+            "externalId": EARLY_RENEWAL_NO_CHANGE_ITEM,
+        },
+    }
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, path="now")
+
+    result = await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload == {"id": "ORD-0001", "status": "Processing"}
+    create_configuration_order_mock.assert_not_awaited()
+    call_args, _ = create_order_mock.await_args
+    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
+    assert call_args[3].to_dict()["renewalPath"] == "now"
+
+
+async def test_create_renewal_order_fails_an_unchanged_early_renewal_without_the_item(
+    fake_ctx, submit_deps, resolve_net_new_item, create_order_mock, create_configuration_order_mock
+):
+    """A catalog missing the placeholder item cannot submit the unchanged plan."""
+    resolve_net_new_item.return_value = {}
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, path="now")
+
+    with pytest.raises(UpstreamServiceError, match="placeholder item"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
     create_order_mock.assert_not_awaited()
     create_configuration_order_mock.assert_not_awaited()
 
@@ -343,6 +441,7 @@ async def test_create_renewal_order_passes_the_renewal_payload(
 
     call_args, _ = create_order_mock.await_args
     assert call_args[3].to_dict() == {
+        "renewalPath": "anniversary",
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [
@@ -356,6 +455,16 @@ async def test_create_renewal_order_passes_the_renewal_payload(
         ],
         "netNewItems": [],
     }
+
+
+async def test_create_renewal_order_snapshots_the_early_renewal_path(
+    fake_ctx, submit_deps, create_order_mock
+):
+    """Fulfilment reads the path back to pick which flow to execute."""
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(path="now"))  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[3].to_dict()["renewalPath"] == "now"
 
 
 @freeze_time(_TODAY)
@@ -846,6 +955,75 @@ async def test_preview_renewal_plan_falls_back_to_the_selected_offer_id(
 
     call_args, _ = adobe_call.calls[1]
     assert call_args[3][0]["offerId"] == _OFFER_ID
+
+
+async def test_preview_renewal_plan_carries_the_early_renewal_additions(  # noqa: WPS211
+    fake_ctx,
+    renewal_agreement,
+    renewing_subscription,
+    resolve_net_new_item,
+    net_new_sku_mapping,
+    adobe_call,
+):
+    """Early renewal rides its additions on the RENEWAL order itself.
+
+    Only a preview that carries them lets Adobe reject the renew-and-add basket
+    it forbids in a single order.
+    """
+    adobe_call.returns = {"items": []}
+    body = _preview_body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}], path="now")
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert call_args[3] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": _OFFER_ID,
+            "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+            "quantity": 7,
+        },
+        {"extLineItemNumber": 2, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
+    ]
+    net_new_sku_mapping.list_full_skus.assert_called_once_with([_NET_NEW_SKU], "COM")
+
+
+async def test_preview_renewal_plan_leaves_the_anniversary_additions_out(
+    fake_ctx, renewal_agreement, renewing_subscription, resolve_net_new_item, adobe_call
+):
+    """At the anniversary a net-new product has no Adobe subscription to price yet."""
+    adobe_call.returns = {"items": []}
+    body = _preview_body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}])
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert [line["offerId"] for line in call_args[3]] == [_OFFER_ID]
+
+
+async def test_preview_renewal_plan_previews_an_early_add_only_basket(  # noqa: WPS211
+    fake_ctx,
+    renewal_agreement,
+    renewing_subscription,
+    resolve_net_new_item,
+    net_new_sku_mapping,
+    adobe_call,
+):
+    adobe_call.returns = {"lineItems": []}
+    body = _preview_body(
+        renew=False,
+        quantity=0,
+        net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
+        path="now",
+    )
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    # Nothing renews, so no offer-id resolution runs: the quote is the only call.
+    call_args, _ = adobe_call.calls[0]
+    assert call_args[3] == [
+        {"extLineItemNumber": 1, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
+    ]
 
 
 async def test_preview_renewal_plan_requires_a_renewing_subscription(

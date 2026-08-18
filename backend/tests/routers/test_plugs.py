@@ -20,11 +20,7 @@ def test_request_commitment_modal_plug_metadata(plug_env):
     assert plug.href == "/static/request-commitment-action/index.js"
 
 
-def test_request_discount_plug_metadata(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
-    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
-    get_settings.cache_clear()
-
+def test_request_discount_plug_metadata(plug_env):
     plug = agreement_plugs()[4]  # act
 
     assert plug.id == "request-discount-action"
@@ -32,11 +28,7 @@ def test_request_discount_plug_metadata(monkeypatch):
     assert plug.href == "/static/request-discount-action/index.js"
 
 
-def test_request_midterm_upgrade_plug_metadata(monkeypatch):
-    monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
-    monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
-    get_settings.cache_clear()
-
+def test_request_midterm_upgrade_plug_metadata(plug_env):
     plug = agreement_plugs()[5]  # act
 
     assert plug.id == "request-midterm-upgrade-action"

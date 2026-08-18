@@ -6,7 +6,7 @@ import { http } from '@mpt-extension/sdk';
 
 import { PromotionsStep } from './PromotionsStep';
 import type { Agreement, Discount, Subscription } from '../../shared/model';
-import type { DiscountSelections, NetNewItem } from '../model';
+import type { DiscountSelections, NetNewItem, RenewalPath } from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -204,6 +204,7 @@ const renderStep = ({
   quantities = {},
   netNewItems = [] as NetNewItem[],
   discountSelections = {} as DiscountSelections,
+  path = 'anniversary' as RenewalPath,
   onDiscountChange = jest.fn(),
 } = {}) =>
   render(
@@ -214,6 +215,7 @@ const renderStep = ({
       quantities={quantities}
       netNewItems={netNewItems}
       discountSelections={discountSelections}
+      path={path}
       onDiscountChange={onDiscountChange}
     />,
   );
@@ -234,13 +236,15 @@ describe('PromotionsStep', () => {
     expect(getByText(/Apply any discount codes as desired/)).toBeTruthy();
   });
 
-  it('reads the discounts available to the customer', async () => {
+  it('reads the discounts a renewal can still apply', async () => {
     const { getByTestId } = renderStep();
 
     await waitFor(() => expect(getByTestId('grid')).toBeTruthy());
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
-      expect.objectContaining({ params: expect.objectContaining({ agreement: 'AGR-1' }) }),
+      expect.objectContaining({
+        params: expect.objectContaining({ agreement: 'AGR-1', orderType: 'RENEWAL' }),
+      }),
     );
   });
 
@@ -278,6 +282,19 @@ describe('PromotionsStep', () => {
     expect(options.map((option) => option.value)).toEqual(['CODE-ONE', 'CODE-TWO']);
     expect(options[1].hasAttribute('disabled')).toBe(true);
     expect(select.getAttribute('data-placeholder')).toBe('Select or type code');
+  });
+
+  it('keeps a redeemed reusable code selectable', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [{ ...DISCOUNTS[1], reusable: true }] },
+    });
+
+    const { findByTestId } = renderStep();
+
+    const select = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    const options = Array.from(select.querySelectorAll('option')).filter((option) => option.value);
+    expect(options.map((option) => option.value)).toEqual(['CODE-TWO']);
+    expect(options[0].hasAttribute('disabled')).toBe(false);
   });
 
   it('stores the code picked for a line', async () => {
@@ -346,7 +363,7 @@ describe('PromotionsStep', () => {
       expect(registeredOnNext).toBeDefined();
     });
 
-    it('advances without validating the discount codes against Adobe', async () => {
+    it('advances without validating the discount codes against Adobe at the anniversary', async () => {
       const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'code-one' } });
       await findByTestId('grid');
 
@@ -357,6 +374,56 @@ describe('PromotionsStep', () => {
 
       expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
       expect(mockPost).not.toHaveBeenCalled();
+    });
+
+    it('previews the early-renewal basket with the selected codes, then advances', async () => {
+      mockPost.mockResolvedValue({ data: { data: {} } });
+      const { findByTestId } = renderStep({
+        path: 'now',
+        netNewItems: [NET_NEW_ITEM],
+        discountSelections: { 'SUB-1': 'code-one' },
+      });
+      await findByTestId('grid');
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
+      expect(mockPost).toHaveBeenCalledWith(
+        '/api/v2/agreements/AGR-1/renewal-order/preview',
+        {
+          renewalPath: 'now',
+          subscriptions: [
+            { id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 10 },
+            { id: 'SUB-2', offerId: 'OFFER-2', renew: false, renewalQuantity: 0 },
+          ],
+          netNewItems: [{ offerId: 'OFFER-3', quantity: 2 }],
+          flexDiscountCodes: ['CODE-ONE'],
+        },
+      );
+    });
+
+    it('stays on the step and shows the message when Adobe rejects a code', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: '3132 - Ineligible product for orderType' } },
+      });
+      const { findByTestId } = renderStep({
+        path: 'now',
+        discountSelections: { 'SUB-1': 'code-one' },
+      });
+      await findByTestId('grid');
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect((await findByTestId('promotions-step-validation-error')).textContent).toContain(
+        '3132 - Ineligible product for orderType',
+      );
     });
   });
 });

@@ -36,6 +36,7 @@ import {
   getRenewalQuantity,
   isRenewing,
   type NetNewItem,
+  type RenewalPath,
   type RenewalQuantities,
   type RenewalSelections,
 } from '../model';
@@ -53,6 +54,8 @@ export interface ItemsStepProps {
   quantities: RenewalQuantities;
   netNewItems: NetNewItem[];
   recommendedSkus: Set<string>;
+  /** The path picked on the first step; the early one gates Next on Adobe's preview. */
+  path: RenewalPath;
   onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
   onNetNewItemsChange: (items: NetNewItem[]) => void;
 }
@@ -299,6 +302,7 @@ export function ItemsStep({
   quantities,
   netNewItems,
   recommendedSkus,
+  path,
   onQuantityChange,
   onNetNewItemsChange,
 }: ItemsStepProps) {
@@ -332,11 +336,17 @@ export function ItemsStep({
         return currentStepIndex;
       }
       setQuantityError('');
-      const plan = buildRenewalPlanRequest(subscriptions, selections, quantities, netNewItems);
+      const plan = buildRenewalPlanRequest(
+        subscriptions,
+        selections,
+        quantities,
+        netNewItems,
+        path,
+      );
       const isValid = await validatePlan(plan);
       return isValid ? targetStepIndex : currentStepIndex;
     },
-    [rows, subscriptions, selections, quantities, netNewItems, validatePlan, t],
+    [rows, subscriptions, selections, quantities, netNewItems, path, validatePlan, t],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);

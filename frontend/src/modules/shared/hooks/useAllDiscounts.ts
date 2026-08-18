@@ -5,7 +5,7 @@ import { http } from '@mpt-extension/sdk';
 import { i18n } from '../../../i18n/translations';
 import { DISCOUNTS_FETCH_SIZE } from '../constants';
 
-import type { Discount, DiscountsPage } from '../model';
+import type { Discount, DiscountOrderType, DiscountsPage } from '../model';
 
 const INITIAL_STATE: DiscountsPage = {
   status: 'idle',
@@ -23,9 +23,15 @@ interface DiscountsResponse {
  * Read every discount in scope for the agreement, page by page.
  *
  * The renewal wizard offers the codes in a per-line dropdown, so it needs the
- * whole list rather than the page the customer happens to be looking at.
+ * whole list rather than the page the customer happens to be looking at. With
+ * an `orderType` the backend returns only the codes an order of that type can
+ * still apply: the right order type, and a validity window (or discount lock,
+ * for a reusable code) that has not run out.
  */
-export function useAllDiscounts(agreementId: string): DiscountsPage {
+export function useAllDiscounts(
+  agreementId: string,
+  orderType?: DiscountOrderType,
+): DiscountsPage {
   const [state, setState] = useState<DiscountsPage>(INITIAL_STATE);
 
   useEffect(() => {
@@ -44,7 +50,12 @@ export function useAllDiscounts(agreementId: string): DiscountsPage {
       let total: number;
       do {
         const response = await http.get('/api/v2/discount-codes', {
-          params: { agreement: agreementId, limit: DISCOUNTS_FETCH_SIZE, offset: collected.length },
+          params: {
+            agreement: agreementId,
+            limit: DISCOUNTS_FETCH_SIZE,
+            offset: collected.length,
+            ...(orderType ? { orderType } : {}),
+          },
           signal: controller.signal,
         });
         const body = response.data as DiscountsResponse;
@@ -68,7 +79,7 @@ export function useAllDiscounts(agreementId: string): DiscountsPage {
       });
 
     return () => controller.abort();
-  }, [agreementId]);
+  }, [agreementId, orderType]);
 
   return state;
 }

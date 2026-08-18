@@ -14,12 +14,15 @@ jest.mock('@mpt-extension/sdk', () => ({
 const mockPost = jest.mocked(http.post);
 
 const PLAN: RenewalPlanBody = {
+  renewalPath: 'anniversary',
   subscriptions: [
     { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 53 },
     { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
   ],
   netNewItems: [{ offerId: '65304578CA01A12', quantity: 5 }],
 };
+
+const EARLY_PLAN: RenewalPlanBody = { ...PLAN, renewalPath: 'now' };
 
 describe('useRenewalPlanValidation', () => {
   beforeEach(() => {
@@ -52,12 +55,76 @@ describe('useRenewalPlanValidation', () => {
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
 
+  it('previews the early-renewal plan against Adobe after the 3YC check', async () => {
+    mockPost.mockResolvedValue({ data: { data: {} } });
+
+    const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
+
+    let isValid: boolean | undefined;
+    await act(async () => {
+      isValid = await result.current.validatePlan(EARLY_PLAN);
+    });
+
+    expect(isValid).toBe(true);
+    expect(mockPost.mock.calls).toEqual([
+      ['/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check', EARLY_PLAN],
+      [
+        '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
+        { ...EARLY_PLAN, flexDiscountCodes: [] },
+      ],
+    ]);
+    await waitFor(() => expect(result.current.status).toBe('success'));
+  });
+
+  it('surfaces the Adobe rejection when the early-renewal preview fails', async () => {
+    mockPost.mockResolvedValueOnce({ data: { data: {} } }).mockRejectedValueOnce({
+      response: { data: { detail: 'Place the renewal first, then add in a new order.' } },
+    });
+
+    const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
+
+    let isValid: boolean | undefined;
+    await act(async () => {
+      isValid = await result.current.validatePlan(EARLY_PLAN);
+    });
+
+    expect(isValid).toBe(false);
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toBe('Place the renewal first, then add in a new order.');
+  });
+
+  it('skips the early-renewal preview when the plan renews and adds nothing', async () => {
+    mockPost.mockResolvedValue({ data: { data: {} } });
+
+    const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
+
+    await act(async () => {
+      await result.current.validatePlan({
+        renewalPath: 'now',
+        subscriptions: [
+          { id: 'SUB-1', offerId: '65322587CA01A12', renew: false, renewalQuantity: 0 },
+        ],
+        netNewItems: [],
+      });
+    });
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
+      expect.anything(),
+    );
+  });
+
   it('passes an empty plan without calling the backend', async () => {
     const { result } = renderHook(() => useRenewalPlanValidation('AGR-1234-5678'));
 
     let isValid: boolean | undefined;
     await act(async () => {
-      isValid = await result.current.validatePlan({ subscriptions: [], netNewItems: [] });
+      isValid = await result.current.validatePlan({
+        renewalPath: 'anniversary',
+        subscriptions: [],
+        netNewItems: [],
+      });
     });
 
     expect(isValid).toBe(true);

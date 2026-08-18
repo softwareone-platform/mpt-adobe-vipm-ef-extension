@@ -48,6 +48,11 @@
     &:hover {
       background-color: $var-gray-2;
     }
+
+    // The checkbox is purely visual; the <li> owns the click
+    [class*="checkbox"] {
+      pointer-events: none;
+    }
   }
 
   &__divider {

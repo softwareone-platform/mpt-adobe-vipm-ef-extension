@@ -150,7 +150,6 @@ export function Discounts() {
   const { t } = useTranslation();
   const { open } = useMPTModal();
   const settings = useSettings();
-  
   const context = useMPTContext<{
     auth?: { account?: { type?: AccountType } };
     data?: { agreement?: { product?: { id?: string } } };

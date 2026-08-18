@@ -1,6 +1,9 @@
 import { Wizard } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 
-import { relativeScreenHeight } from "../../../../utils/window";
+import {
+  relativeScreenHeight,
+  relativeScreenWidth,
+} from "../../../../utils/window";
 
 import type { StepProps } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ReactNode } from "react";
@@ -8,15 +11,13 @@ import type { ReactNode } from "react";
 import "./DiscountWizard.scss";
 
 /**
- * Share of the available height the wizard occupies.
+ * Use the full available screen (up to the Figma design size of 756×1200).
  *
- * "Available" here means the screen work area, not the browser viewport: the
- * portal sizes the plug's iframe to our content, so a viewport-relative height
- * feeds back into that measurement — `100vh` grew without bound and `height:
- * 100%` collapsed the modal. The screen is the only stable reference reachable
- * from inside a cross-origin iframe.
+ * Previous factors (0.8 / 0.75) left unused space on large screens and clipped
+ * content on small ones. Using the default factors from `window.ts`
+ * (`MAX_MODAL_HEIGHT / 1000` and `MAX_MODAL_WIDTH / 1600`) already caps at the
+ * Figma maximums while scaling proportionally on smaller screens.
  */
-const WIZARD_AVAILABLE_HEIGHT_FACTOR = 0.78;
 
 /** A wizard step: the SDK's own props plus the body to render for it. */
 export interface DiscountWizardStep extends StepProps {
@@ -60,7 +61,12 @@ export function DiscountWizard({
   return (
     <div
       className="discount-wizard"
-      style={{ height: relativeScreenHeight(WIZARD_AVAILABLE_HEIGHT_FACTOR) }}
+      style={{
+        height: relativeScreenHeight(),
+        width: relativeScreenWidth(),
+        maxHeight: '100vh',
+        maxWidth: '100vw',
+      }}
     >
       <Wizard
         stepsProps={steps.map((step) => ({

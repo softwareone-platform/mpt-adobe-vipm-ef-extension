@@ -3,7 +3,7 @@ import { Divider } from "@softwareone-platform/sdk-react-ui-v0/divider";
 import { Dropdown } from "@softwareone-platform/sdk-react-ui-v0/dropdown";
 import { Icon } from "@softwareone-platform/sdk-react-ui-v0/icon";
 import { RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ANY_ORDER_TYPE } from "../../discountDraft";
@@ -37,14 +37,9 @@ export interface OrderTypesDropdownProps {
 export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  // The SDK closes the list after every pick, which fights a checkbox list.
-  // `onItemSelected` runs immediately before that close, so a flag set there
-  // lets the next close be ignored while still honouring outside clicks.
-  const keepOpenRef = useRef(false);
 
-  const onItemSelected = useCallback(
+  const toggle = useCallback(
     (selected: OrderTypeSelection) => {
-      keepOpenRef.current = true;
       if (selected === ANY_ORDER_TYPE) {
         onChange(value.includes(ANY_ORDER_TYPE) ? [] : [ANY_ORDER_TYPE]);
         return;
@@ -59,16 +54,8 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
     [onChange, value],
   );
 
-  const onOpenChange = useCallback((open: boolean) => {
-    if (!open && keepOpenRef.current) {
-      keepOpenRef.current = false;
-      return;
-    }
-    setIsOpen(open);
-  }, []);
-
   const renderOption = useCallback(
-    ({ option, selectedValue, onSelect }: DropdownListOptionProps<OrderTypeSelection>) => {
+    ({ option, selectedValue }: DropdownListOptionProps<OrderTypeSelection>) => {
       if ("type" in option) {
         return (
           <li className="order-types__divider">
@@ -77,19 +64,25 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
         );
       }
       return (
-        <li className="order-types__option" onClick={() => onSelect(option)}>
+        <li
+          className="order-types__option"
+          onMouseDown={(e) => {
+            // Prevent the SDK from closing the dropdown on this click
+            e.preventDefault();
+            e.stopPropagation();
+            toggle(option.value);
+          }}
+        >
           <Checkbox
             isChecked={selectedValue.includes(option.value)}
             label={t(`Agreement:Discounts:Wizard:OrderTypes:${option.value}`)}
-            // The row owns the click so the whole option is a hit target;
-            // the box itself must not fire a second toggle.
             onChange={() => undefined}
             testId={`order-type-${option.value}`}
           />
         </li>
       );
     },
-    [t],
+    [t, toggle],
   );
 
   const selectedLabels = value
@@ -103,9 +96,9 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
       </RegularText>
       <Dropdown<OrderTypeSelection>
         isOpen={isOpen}
-        isOpenChange={onOpenChange}
+        isOpenChange={setIsOpen}
         itemElementRenderer={renderOption}
-        onItemSelected={onItemSelected}
+        onItemSelected={() => undefined}
         options={OPTIONS}
         testId="order-types-dropdown"
         value={value}

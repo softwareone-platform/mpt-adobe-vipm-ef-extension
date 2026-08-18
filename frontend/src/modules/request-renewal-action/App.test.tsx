@@ -155,6 +155,7 @@ interface ItemsStepProps {
   quantities: Record<string, number | null>;
   netNewItems: { itemId: string }[];
   recommendedSkus: Set<string>;
+  path: string;
   onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
   onNetNewItemsChange: (items: { itemId: string }[]) => void;
 }
@@ -169,6 +170,7 @@ jest.mock('./ItemsStep', () => ({
 
 interface PromotionsStepProps {
   discountSelections: Record<string, string>;
+  path: string;
   onDiscountChange: (rowId: string, code: string) => void;
 }
 let promotionsProps: PromotionsStepProps;
@@ -346,6 +348,41 @@ describe('request-renewal-action App', () => {
     expect(typeof timingProps.onPathChange).toBe('function');
   });
 
+  it('carries the picked early-renewal path into the later steps and onto the order', async () => {
+    mockPost.mockImplementation((url: string) =>
+      url === '/api/v2/agreements/AGR-1/renewal-order'
+        ? Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } })
+        : respondToPost(url),
+    );
+    const { rerender } = render(<App />);
+
+    await screen.findByText('Timing step');
+    act(() => timingProps.onPathChange('now'));
+    await waitFor(() => expect(timingProps.path).toBe('now'));
+
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await screen.findByText('Items step');
+    expect(itemsProps.path).toBe('now');
+
+    mockActiveStepIndex = 3;
+    rerender(<App />);
+    await screen.findByText('Promotions step');
+    expect(promotionsProps.path).toBe('now');
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    await screen.findByText('Review step');
+    await act(async () => {
+      await reviewProps.onPlaceOrder();
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/renewal-order',
+      expect.objectContaining({ renewalPath: 'now' }),
+    );
+  });
+
   it('hands the subscriptions and the seeded renew preferences to the renewal step', async () => {
     mockActiveStepIndex = 1;
     render(<App />);
@@ -479,6 +516,7 @@ describe('request-renewal-action App', () => {
 
     expect(placed).toBe(true);
     expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1/renewal-order', {
+      renewalPath: 'anniversary',
       subscriptions: [
         { id: 'SUB-1', offerId: '65322587CA', renew: true, renewalQuantity: 37 },
         { id: 'SUB-2', offerId: '65322588CA', renew: false, renewalQuantity: 0 },
