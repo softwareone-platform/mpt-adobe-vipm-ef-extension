@@ -67,7 +67,10 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
         <li
           className="order-types__option"
           onMouseDown={(e) => {
-            // Prevent the SDK from closing the dropdown on this click
+            // The row owns the pointer: the stylesheet sets pointer-events:none
+            // on the checkbox, so its own onChange can never fire from a click.
+            // preventDefault also keeps focus off the row, which would otherwise
+            // blur the control and close the list.
             e.preventDefault();
             e.stopPropagation();
             toggle(option.value);
@@ -98,7 +101,7 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
         isOpen={isOpen}
         isOpenChange={setIsOpen}
         itemElementRenderer={renderOption}
-        onItemSelected={() => undefined}
+        onItemSelected={toggle}
         options={OPTIONS}
         testId="order-types-dropdown"
         value={value}

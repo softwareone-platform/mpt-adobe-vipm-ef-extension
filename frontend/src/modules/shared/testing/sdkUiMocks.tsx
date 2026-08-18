@@ -107,7 +107,7 @@ export function createCheckboxMock() {
 function GridActionsMock({ children }: { children?: ReactNode }) {
   return <>{children}</>;
 }
-GridActionsMock.DisplayName = 'Grid.Actions';
+GridActionsMock.displayName = 'Grid.Actions';
 
 type MockWizardStep = { title: string };
 
