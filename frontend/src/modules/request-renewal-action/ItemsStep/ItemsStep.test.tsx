@@ -6,7 +6,7 @@ import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
 import type { Agreement, Subscription } from '../../shared/model';
-import type { NetNewItem, RenewalQuantities, RenewalSelections } from '../model';
+import type { NetNewItem, RenewalPath, RenewalQuantities, RenewalSelections } from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -199,6 +199,7 @@ const renderStep = ({
   onNetNewItemsChange = jest.fn(),
   subscriptionList = subscriptions,
   agreementOverride = agreement,
+  path = 'anniversary',
 }: {
   selections?: RenewalSelections;
   quantities?: RenewalQuantities;
@@ -208,6 +209,7 @@ const renderStep = ({
   onNetNewItemsChange?: (items: NetNewItem[]) => void;
   subscriptionList?: Subscription[];
   agreementOverride?: Agreement;
+  path?: RenewalPath;
 } = {}) =>
   render(
     <ItemsStep
@@ -217,6 +219,7 @@ const renderStep = ({
       quantities={quantities}
       netNewItems={netNewItems}
       recommendedSkus={recommendedSkus}
+      path={path}
       onQuantityChange={onQuantityChange}
       onNetNewItemsChange={onNetNewItemsChange}
     />,
@@ -465,6 +468,11 @@ describe('ItemsStep', () => {
       );
     });
 
+    const PLAN_SUBSCRIPTIONS = [
+      { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 37 },
+      { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
+    ];
+
     it('checks the 3YC floor with the whole plan and does not preview against Adobe, then advances', async () => {
       mockPost.mockResolvedValue({ data: { data: {} } });
       renderStep({ netNewItems: [NET_NEW_ITEM] });
@@ -475,17 +483,55 @@ describe('ItemsStep', () => {
       });
 
       expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
-      const planSubscriptions = [
-        { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 37 },
-        { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
-      ];
       expect(mockPost).toHaveBeenCalledTimes(1);
       expect(mockPost).toHaveBeenCalledWith(
         '/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check',
         {
-          subscriptions: planSubscriptions,
+          renewalPath: 'anniversary',
+          subscriptions: PLAN_SUBSCRIPTIONS,
           netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
         },
+      );
+    });
+
+    it('previews the early-renewal items against Adobe after the 3YC floor check', async () => {
+      mockPost.mockResolvedValue({ data: { data: {} } });
+      renderStep({ netNewItems: [NET_NEW_ITEM], path: 'now' });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
+      const plan = {
+        renewalPath: 'now',
+        subscriptions: PLAN_SUBSCRIPTIONS,
+        netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
+      };
+      expect(mockPost.mock.calls).toEqual([
+        ['/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check', plan],
+        [
+          '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',
+          { ...plan, flexDiscountCodes: [] },
+        ],
+      ]);
+    });
+
+    it('stays on the step when Adobe rejects the early-renewal items', async () => {
+      mockPost.mockResolvedValueOnce({ data: { data: {} } }).mockRejectedValueOnce({
+        response: { data: { detail: 'Place the renewal first, then add in a new order.' } },
+      });
+      const { getByTestId } = renderStep({ netNewItems: [NET_NEW_ITEM], path: 'now' });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(getByTestId('items-step-error').textContent).toContain(
+        'Place the renewal first, then add in a new order.',
       );
     });
 
@@ -526,6 +572,7 @@ describe('ItemsStep', () => {
           quantities={{ 'SUB-1': 53 }}
           netNewItems={[]}
           recommendedSkus={new Set<string>()}
+          path="anniversary"
           onQuantityChange={onQuantityChange}
           onNetNewItemsChange={jest.fn()}
         />,

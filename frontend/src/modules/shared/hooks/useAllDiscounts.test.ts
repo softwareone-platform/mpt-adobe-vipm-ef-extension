@@ -38,6 +38,31 @@ describe('useAllDiscounts', () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
+  it('asks the backend for the codes of one order type only', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },
+    });
+
+    const { result } = renderHook(() => useAllDiscounts('AGR-1', 'RENEWAL'));
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v2/discount-codes',
+      expect.objectContaining({ params: expect.objectContaining({ orderType: 'RENEWAL' }) }),
+    );
+  });
+
+  it('omits the order type when none is asked for', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },
+    });
+
+    const { result } = renderHook(() => useAllDiscounts('AGR-1'));
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    expect(mockGet.mock.calls[0][1]?.params).not.toHaveProperty('orderType');
+  });
+
   it('keeps reading until every page is in', async () => {
     const firstPage = Array.from({ length: 100 }, (_unused, index) => discount(index));
     const secondPage = [discount(100), discount(101)];

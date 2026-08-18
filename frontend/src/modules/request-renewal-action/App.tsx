@@ -123,6 +123,7 @@ export default function App() {
       renewalSelections ?? {},
       renewalQuantities,
       netNewItems,
+      renewalPath,
     );
     const placed = await submitOrder({
       ...plan,
@@ -144,6 +145,7 @@ export default function App() {
     renewalSelections,
     renewalQuantities,
     netNewItems,
+    renewalPath,
     discountSelections,
     orderDetails,
     recommendations.data,
@@ -287,6 +289,7 @@ export default function App() {
           quantities={renewalQuantities}
           netNewItems={netNewItems}
           recommendedSkus={recommendedSkus}
+          path={renewalPath}
           onQuantityChange={onRenewalQuantityChange}
           onNetNewItemsChange={setNetNewItems}
         />
@@ -302,6 +305,7 @@ export default function App() {
           quantities={renewalQuantities}
           netNewItems={netNewItems}
           discountSelections={discountSelections}
+          path={renewalPath}
           onDiscountChange={onDiscountChange}
         />
       ),

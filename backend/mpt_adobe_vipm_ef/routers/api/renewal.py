@@ -20,6 +20,7 @@ from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
     RenewalOrderRequest,
+    RenewalPath,
     RenewalPayload,
     RenewalPlanRequest,
     RenewalPreviewRequest,
@@ -57,6 +58,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     require_renewal_selections,
     resolve_net_new_lines,
     resolve_net_new_offer_ids,
+    resolve_no_change_line,
 )
 from mpt_adobe_vipm_ef.services.renewal_three_yc import check_renewal_plan_three_yc_floor
 from mpt_adobe_vipm_ef.services.switch_order import (
@@ -144,17 +146,24 @@ async def check_renewal_order_three_yc(  # noqa: WPS217
 )
 @validate_agreement_access
 @log_inputs
-async def preview_renewal_plan(
+async def preview_renewal_plan(  # noqa: WPS210, WPS217
     agreement_id: str, ctx: APIContext, body: RenewalPreviewRequest
 ) -> APIResponse:
     """Quote the renewal plan through an Adobe ``PREVIEW_RENEWAL`` order.
 
-    The wizard calls this on the discount codes step: the selected flexible
-    discount codes ride on every renewing line, so Adobe validates their
-    eligibility and returns the renewal pricing the wizard shows as the
-    estimate. Net-new products have no Adobe subscription to preview yet and
-    are priced only at fulfilment. A SKU that cannot renew at the anniversary is
-    rejected here too, so no route quotes a plan the submit route would refuse.
+    The at-anniversary wizard calls this on the discount codes step: the
+    selected flexible discount codes ride on every renewing line, so Adobe
+    validates their eligibility and returns the renewal pricing the wizard
+    shows as the estimate. Net-new products have no Adobe subscription to
+    preview yet on that path and are priced only at fulfilment.
+
+    The early-renewal ("Renew now") wizard calls it on every step that changes
+    the basket — the items and the discount codes — because the RENEWAL order
+    is placed now, which makes Adobe the authority on whether the basket is
+    valid: the preview carries the additions too, so a mixed renew-and-add
+    basket (which Adobe forbids in one order) is rejected in the wizard instead
+    of at fulfilment. A SKU that cannot renew at the anniversary is rejected
+    here too, so no route quotes a plan the submit route would refuse.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -163,7 +172,10 @@ async def preview_renewal_plan(
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
     plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
-    line_items = build_preview_renewal_line_items(plan_subscriptions, body.flex_discount_codes)
+    net_new_lines = await _resolve_preview_net_new_lines(ctx, agreement, body)
+    line_items = build_preview_renewal_line_items(
+        plan_subscriptions, body.flex_discount_codes, net_new_lines
+    )
     if not line_items:
         raise ValidationError(
             detail="The renewal plan has no renewing subscriptions to preview.",
@@ -189,12 +201,21 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     then dispatches on what actually changed: any subscription whose renewal
     quantity differs from its current quantity, or any net-new product, is
     submitted as a Change order (directly in Processing status) carrying only
-    the changed lines plus the plan snapshot — renew decisions, quantities,
-    discount codes and the recommendation tracker id — on the hidden
-    ``renewalPayload`` order parameter. Otherwise, when only AutoRenew
-    decisions changed, it is submitted as a Configuration order carrying only
-    the AutoRenew-changed subscriptions. The platform accepts neither order
-    type for a plan with no real change, so that case is rejected upfront.
+    the changed lines plus the plan snapshot — the renewal path the customer
+    picked, renew decisions, quantities, discount codes and the recommendation
+    tracker id — on the hidden ``renewalPayload`` order parameter, which is
+    what tells fulfilment whether to renew at the anniversary or now.
+    Otherwise it is submitted as a Configuration order carrying only the
+    AutoRenew-changed subscriptions (the platform rejects a subscription whose
+    AutoRenew value does not change) — plus, on the early-renewal path alone,
+    the same plan snapshot on that context's own ``renewalPayload`` parameter,
+    since renewing now is executed against Adobe whether or not a quantity
+    moved. At the anniversary the platform accepts neither order type for a
+    plan with no real change, so that case is rejected upfront; renewing now
+    is always a change, so a plan that repeats the current quantities and
+    AutoRenew decisions still becomes a Change order carrying the platform's
+    ``adobe-early-renewal-no-change`` placeholder item as its single line,
+    with fulfilment executing the plan from the snapshot alone.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -203,7 +224,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
-    require_renewal_changes(plan_subscriptions, net_new_lines)
+    require_renewal_changes(body, plan_subscriptions, net_new_lines)
     await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
 
     customer = await _load_adobe_customer(ctx, agreement_id)
@@ -224,9 +245,19 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
         order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
     else:
         configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
-        order = await _create_configuration_order(
-            ctx, agreement_id, configuration_subscriptions, body
-        )
+        early_payload = await _early_renewal_payload(ctx, agreement, plan_subscriptions, body)
+        if configuration_subscriptions or early_payload is None:
+            order = await _create_configuration_order(
+                ctx, agreement_id, configuration_subscriptions, body, early_payload
+            )
+        else:
+            # An unchanged early renewal: neither order type stands on its own,
+            # so the Change order rides on the catalog's placeholder item and
+            # fulfilment executes the plan from the renewalPayload snapshot.
+            no_change_line = await resolve_no_change_line(ctx, agreement)
+            order = await _create_change_order(
+                ctx, agreement_id, [no_change_line], early_payload, body
+            )
     return APIResponse.created(payload=order)
 
 
@@ -264,6 +295,27 @@ async def _check_three_yc_floor(
         lambda: resolve_market_segment(ctx, agreement),
         plan_subscriptions,
         net_new_lines,
+    )
+
+
+async def _resolve_preview_net_new_lines(
+    ctx: APIContext, agreement: Agreement, body: RenewalPreviewRequest
+) -> list[NetNewLine]:
+    """Resolve the net-new products the early-renewal preview has to carry.
+
+    Early renewal rides its additions on the RENEWAL order itself (an offer id
+    with no subscription id), so they belong in the quote: only a preview that
+    carries them can reject the renew-and-add basket Adobe forbids in a single
+    order. The full Adobe offer id comes from the Airtable SKU mapping, the
+    only source for a product with no Adobe subscription to read it from. At
+    the anniversary the additions are scheduled subscriptions created at
+    fulfilment, so nothing about them is previewable.
+    """
+    if body.renewal_path is not RenewalPath.NOW or not body.net_new_items:
+        return []
+    net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
+    return await resolve_net_new_offer_ids(
+        ctx, net_new_lines, lambda: resolve_market_segment(ctx, agreement)
     )
 
 
@@ -485,11 +537,36 @@ async def _create_change_order(
         raise UpstreamServiceError(detail=mpt_order_error_detail(error))
 
 
+async def _early_renewal_payload(
+    ctx: APIContext,
+    agreement: Agreement,
+    plan_subscriptions: list[PlanSubscription],
+    body: RenewalOrderRequest,
+) -> RenewalPayload | None:
+    """Build the plan snapshot a quantity-less early renewal still has to carry.
+
+    An early renewal ("Renew now") is executed against Adobe as soon as the
+    order processes, so fulfilment needs the plan even when nothing moved a
+    quantity and the submission is a Configuration order: without it the order
+    would only carry the AutoRenew decisions and the ``now`` path would be
+    invisible. The renewing lines get their full Adobe offer ids here for the
+    same reason the Change path resolves them. At the anniversary the
+    configuration order is the whole plan already, so there is no snapshot to
+    attach.
+    """
+    if body.renewal_path is not RenewalPath.NOW:
+        return None
+    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement.id, plan_subscriptions)
+    currency_code = agreement.authorization.currency if agreement.authorization else ""
+    return build_renewal_payload(plan_subscriptions, [], body, currency_code or "")
+
+
 async def _create_configuration_order(
     ctx: APIContext,
     agreement_id: str,
     subscriptions: list[Line],
     body: RenewalOrderRequest,
+    renewal_payload: RenewalPayload | None,
 ) -> dict[str, object]:
     """Create the AutoRenew-only configuration order acting as the caller (client actor)."""
     client = build_caller_client(ctx)
@@ -497,7 +574,9 @@ async def _create_configuration_order(
         logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
         raise ForbiddenError(detail="Caller authentication is required to place the order.")
     try:
-        return await create_renewal_configuration_order(client, agreement_id, subscriptions, body)
+        return await create_renewal_configuration_order(
+            client, agreement_id, subscriptions, body, renewal_payload
+        )
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the renewal configuration order on agreement %s: "

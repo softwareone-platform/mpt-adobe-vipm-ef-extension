@@ -1,7 +1,15 @@
-import type { Discount, RenewalPlanBody, Subscription, Terms } from '../shared/model';
+import type {
+  Discount,
+  RenewalPath,
+  RenewalPlanBody,
+  Subscription,
+  Terms,
+} from '../shared/model';
 import { getPartialSku } from '../utils/sku';
 
-export type RenewalPath = 'anniversary' | 'now';
+// The wizard's steps read the path from here, next to the rest of the plan
+// state, while the endpoint bodies that carry it live in the shared model.
+export type { RenewalPath };
 
 /** The customer's per-subscription renewal decisions, keyed by subscription id. */
 export type RenewalSelections = Record<string, boolean>;
@@ -109,11 +117,13 @@ export function normalizeDiscountCode(code: string): string {
 /**
  * Whether the customer can still apply the discount.
  *
- * A code can be redeemed only once per customer, so a redemption recorded
- * against this customer takes the code out of play.
+ * A single-use code can be redeemed once per customer, so a redemption
+ * recorded against this customer takes it out of play. A reusable code stays
+ * selectable after its redemption — its discount lock is what limits how long
+ * it can be applied, and the listing already drops it once the lock runs out.
  */
 export function isDiscountAvailable(discount: Discount): boolean {
-  return !discount.redeemedAt;
+  return Boolean(discount.reusable) || !discount.redeemedAt;
 }
 
 /** Whether the discount applies to a renewal; an unrestricted code applies to any order. */
@@ -170,17 +180,21 @@ export function findDiscountByCode(code: string, discounts: Discount[]): Discoun
  * The wizard's renewal plan as the renewal endpoints expect it.
  *
  * Carries every subscription with its renew decision — the 3YC floor check
- * needs the lapsing ones too — plus the net-new additions. Quantities are
- * expected to have passed the Items step validation; a pending (``null``)
- * quantity is sent as 0, which the backend rejects.
+ * needs the lapsing ones too — plus the net-new additions and the renewal path
+ * chosen on the first step, which decides how the backend validates the plan
+ * and is snapshotted on the order for fulfilment. Quantities are expected to
+ * have passed the Items step validation; a pending (``null``) quantity is sent
+ * as 0, which the backend rejects.
  */
 export function buildRenewalPlanRequest(
   subscriptions: Subscription[],
   selections: RenewalSelections,
   quantities: RenewalQuantities,
   netNewItems: NetNewItem[],
+  renewalPath: RenewalPath,
 ): RenewalPlanBody {
   return {
+    renewalPath,
     subscriptions: subscriptions.flatMap((subscription) => {
       const offerId = subscription.lines?.[0]?.item.externalIds?.vendor;
       if (!offerId) return [];
