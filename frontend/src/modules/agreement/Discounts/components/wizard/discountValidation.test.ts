@@ -105,10 +105,33 @@ describe("validateValidity", () => {
   it.each([
     ["start date", { startDate: "" }],
     ["end date", { endDate: "" }],
+    ["null start date", { startDate: null as unknown as string }],
+    ["null end date", { endDate: null as unknown as string }],
   ])("rejects a missing %s", (_label, overrides) => {
     const result = validateValidity(periodWith(overrides));
 
     expect(result).not.toBeNull();
+  });
+
+  it.each([
+    ["an impossible day", "2026-02-30"],
+    ["a month overflow", "2026-13-01"],
+    ["a US-style date", "06/31/2026"],
+    ["a non-calendar date", "not-a-date"],
+  ])("rejects a non-exact calendar date for %s", (_label, value) => {
+    const result = validateValidity(periodWith({ startDate: value, endDate: "2026-08-31" }));
+
+    expect(result).toBe("The dates must be real calendar dates.");
+  });
+
+  it.each([
+    ["a precise ISO date", "2026-06-15"],
+    ["a same-day timestamp", "2026-06-15T00:00:00.000Z"],
+    ["a time-with-offset value", "2026-06-15T23:00:00-05:00"],
+  ])("accepts a valid calendar date for %s", (_label, value) => {
+    const result = validateValidity(periodWith({ startDate: value, endDate: "2026-08-31" }));
+
+    expect(result).toBeNull();
   });
 
   it.each([
@@ -118,6 +141,28 @@ describe("validateValidity", () => {
     const result = validateValidity(periodWith(overrides));
 
     expect(result).toBe("The start date must be before the end date.");
+  });
+
+  it.each([
+    ["an unparseable start date", { startDate: "not-a-date" }],
+    ["an unparseable end date", { endDate: "not-a-date" }],
+    ["a day the month does not have", { endDate: "2026-02-30" }],
+    ["a day the month does not have on a full timestamp", { endDate: "2026-06-31T23:59:59Z" }],
+    ["a US-style impossible day", { endDate: "06/31/2026" }],
+    ["a textual impossible day", { endDate: "Jun 31, 2026" }],
+    ["a day without its leading zero", { endDate: "2026-6-31" }],
+  ])("rejects %s", (_label, overrides) => {
+    const result = validateValidity(periodWith(overrides));
+
+    expect(result).toBe("The dates must be real calendar dates.");
+  });
+
+  it("rejects an impossible lock date", () => {
+    const result = validateValidity(
+      periodWith({ reusable: true, discountLockEndDate: "2026-11-31" }),
+    );
+
+    expect(result).toBe("The dates must be real calendar dates.");
   });
 
   it("requires a lock date once the code is reusable", () => {

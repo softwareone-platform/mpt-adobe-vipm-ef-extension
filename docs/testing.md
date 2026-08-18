@@ -40,6 +40,19 @@ Repository-specific test settings come from [`backend/pyproject.toml`](../backen
 - coverage is collected for `mpt_adobe_vipm_ef`
 - tests run with `--import-mode=importlib`
 
+## Jest Configuration
+
+Repository-specific test settings come from
+[`frontend/jest.config.cjs`](../frontend/jest.config.cjs):
+
+- stylesheet imports resolve to an empty module, because styles carry no
+  behavior the unit tests assert
+- the SDK's `Icon` resolves to [`frontend/test/iconMock.tsx`](../frontend/test/iconMock.tsx),
+  both for direct imports and for the SDK components that pull it in
+  internally. The real one fetches its sprite in a promise and sets state when
+  it lands, which React reports as an update outside `act(...)` once the test
+  has already asserted
+
 ## Writing Tests
 
 Repository-specific guidance:

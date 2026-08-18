@@ -6,6 +6,8 @@ module.exports = {
   testMatch: ['<rootDir>/src/**/*.test.{ts,tsx}'],
   moduleNameMapper: {
     '\\.(scss|css)$': '<rootDir>/test/styleMock.cjs',
+    '^@softwareone-platform/sdk-react-ui-v0/icon$': '<rootDir>/test/iconMock.tsx',
+    '(^|/)icon/lib/Icon(\\.(js|mjs))?$': '<rootDir>/test/iconMock.tsx',
   },
   transform: {
     // Transpile-only: type-checking is handled by `npm run check` (tsc) project-wide.
