@@ -19,7 +19,7 @@ const PAYLOAD = {
   discountType: 'PERCENTAGE',
   value: 5,
   startDate: '2026-01-01T00:00:00Z',
-  endDate: '2026-06-31T23:59:59Z',
+  endDate: '2026-06-30T23:59:59Z',
   reusable: false,
   targetOfferIds: ['ITEM-001', 'ITEM-002', 'ITEM-003'],
   qualifyingOfferIds: ['ITEM-001', 'ITEM-002', 'ITEM-003', 'ITEM-004'],
