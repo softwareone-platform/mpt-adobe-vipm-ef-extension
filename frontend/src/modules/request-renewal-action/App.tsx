@@ -16,6 +16,7 @@ import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscript
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
 import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations';
 import { useAutoRenewSupport } from '../shared/hooks/useAutoRenewSupport';
+import { useRenewalState } from '../shared/hooks/useRenewalState';
 import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
 import { useSettingsResult } from '../shared/hooks/useSettings';
 import { getRecommendedOfferIds, readParameter } from '../shared/model';
@@ -39,6 +40,7 @@ import {
   getHeldSkus,
   getRenewalRowIds,
   getSelectedDiscountCodes,
+  isEarlyRenewable,
   type DiscountSelections,
   type NetNewItem,
   type OrderDetails,
@@ -89,12 +91,25 @@ export default function App() {
   const recommendations = useAdobeRecommendations(agreementId, recommendationOffers);
   const heldSkus = useMemo(() => getHeldSkus(subscriptions.data), [subscriptions.data]);
   const autoRenewSupport = useAutoRenewSupport(agreementId, heldSkus);
+  const renewalState = useRenewalState(agreementId);
   const anniversarySubscriptions = useMemo(
     () =>
       subscriptions.data.filter((subscription) =>
         canRenewAtAnniversary(subscription, autoRenewSupport.data),
       ),
     [subscriptions.data, autoRenewSupport.data],
+  );
+  // The two paths route on different inputs: at the anniversary a SKU has to
+  // support auto-renewal, while an early renewal orders explicitly and only
+  // drops what Adobe will not early-renew at all.
+  const pathSubscriptions = useMemo(
+    () =>
+      renewalPath === 'now'
+        ? subscriptions.data.filter((subscription) =>
+            isEarlyRenewable(subscription, renewalState.data),
+          )
+        : anniversarySubscriptions,
+    [renewalPath, subscriptions.data, renewalState.data, anniversarySubscriptions],
   );
   const recommendedSkus = useMemo(
     () => new Set(Array.from(getRecommendedOfferIds(recommendations.data), getPartialSku)),
@@ -119,7 +134,7 @@ export default function App() {
 
   const placeOrder = useCallback(async (): Promise<boolean> => {
     const plan = buildRenewalPlanRequest(
-      anniversarySubscriptions,
+      pathSubscriptions,
       renewalSelections ?? {},
       renewalQuantities,
       netNewItems,
@@ -129,7 +144,7 @@ export default function App() {
       ...plan,
       flexDiscountCodes: getSelectedDiscountCodes(
         discountSelections,
-        getRenewalRowIds(anniversarySubscriptions, renewalSelections ?? {}, netNewItems),
+        getRenewalRowIds(pathSubscriptions, renewalSelections ?? {}, netNewItems),
       ),
       recommendationTrackerId: recommendations.data?.xRecommendationTrackerId ?? '',
       notes: orderDetails.notes,
@@ -141,7 +156,7 @@ export default function App() {
     setOrder(placed);
     return true;
   }, [
-    anniversarySubscriptions,
+    pathSubscriptions,
     renewalSelections,
     renewalQuantities,
     netNewItems,
@@ -233,7 +248,9 @@ export default function App() {
     );
   }
 
-  if (autoRenewSupport.status === 'error') {
+  const isEarlyPath = renewalPath === 'now';
+
+  if (!isEarlyPath && autoRenewSupport.status === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <InlineNotification status="error" isStandalone>
@@ -246,9 +263,26 @@ export default function App() {
     );
   }
 
-  const isAutoRenewSupportPending = heldSkus.size > 0 && autoRenewSupport.status !== 'success';
+  if (isEarlyPath && renewalState.status === 'error') {
+    return (
+      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <InlineNotification status="error" isStandalone>
+          {renewalState.error || t('Errors:LoadRenewalState')}
+        </InlineNotification>
+        <Button onClick={renewalState.refresh}>
+          {t('Common:Retry')}
+        </Button>
+      </div>
+    );
+  }
 
-  if (subscriptions.status !== 'success' || isAutoRenewSupportPending) {
+  // Each path waits only on the lookup it routes with: auto-renewal support at
+  // the anniversary, the early-renewal state on the now path.
+  const isRoutingPending = isEarlyPath
+    ? renewalState.status !== 'success'
+    : heldSkus.size > 0 && autoRenewSupport.status !== 'success';
+
+  if (subscriptions.status !== 'success' || isRoutingPending) {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Loader />
@@ -273,7 +307,7 @@ export default function App() {
       render: () => (
         <RenewalStep
           agreement={agreement}
-          subscriptions={anniversarySubscriptions}
+          subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
           onRenewChange={onRenewChange}
         />
@@ -284,12 +318,13 @@ export default function App() {
       render: () => (
         <ItemsStep
           agreement={agreement}
-          subscriptions={anniversarySubscriptions}
+          subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}
           recommendedSkus={recommendedSkus}
           path={renewalPath}
+          renewalStates={renewalState.data}
           onQuantityChange={onRenewalQuantityChange}
           onNetNewItemsChange={setNetNewItems}
         />
@@ -300,7 +335,7 @@ export default function App() {
       render: () => (
         <PromotionsStep
           agreement={agreement}
-          subscriptions={anniversarySubscriptions}
+          subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}
@@ -329,7 +364,7 @@ export default function App() {
       render: () => (
         <ReviewOrderStep
           agreement={agreement}
-          subscriptions={anniversarySubscriptions}
+          subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}

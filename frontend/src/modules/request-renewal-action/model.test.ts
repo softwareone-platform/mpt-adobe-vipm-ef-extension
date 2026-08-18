@@ -4,12 +4,17 @@ import {
   buildRenewalPlanRequest,
   canRenewAtAnniversary,
   findDiscountByCode,
+  findRenewAndAddConflict,
   getDefaultRenewalQuantity,
   getHeldSkus,
+  getRemainingQuantity,
   getRenewalQuantity,
   getRenewalRowIds,
+  getRenewalState,
   getSelectedDiscountCodes,
   isDiscountAvailable,
+  isEarlyRenewable,
+  isIncreaseAllowed,
   isRenewedByDefault,
   isRenewing,
   normalizeDiscountCode,
@@ -153,6 +158,95 @@ describe('buildRenewalPlanRequest', () => {
     const plan = buildRenewalPlanRequest([{ id: 'SUB-3' }], {}, {}, [], 'anniversary');
 
     expect(plan.subscriptions).toEqual([]);
+  });
+});
+
+describe('renewal state helpers', () => {
+  const ADOBE_ID = 'a1b2c3d4e5NA';
+  const subscription: Subscription = {
+    id: 'SUB-1',
+    externalIds: { vendor: ADOBE_ID },
+    lines: [{ id: 'ALI-1', quantity: 10, item: { id: 'ITM-1', name: 'Item' } }],
+  };
+  const partial = {
+    currentQuantity: 10,
+    renewedQuantity: 4,
+    state: 'partiallyRenewed' as const,
+    remainingQuantity: 6,
+    earlyRenewable: true,
+    increaseAllowed: false,
+  };
+  const states = { [ADOBE_ID]: partial };
+
+  it('finds the state by the Adobe subscription id', () => {
+    expect(getRenewalState(subscription, states)).toEqual(partial);
+    expect(getRenewalState({ id: 'SUB-2' }, states)).toBeUndefined();
+  });
+
+  it('reports the seats a further renewal can still carry', () => {
+    expect(getRemainingQuantity(subscription, states)).toBe(6);
+  });
+
+  it('falls back to the whole line without a state', () => {
+    expect(getRemainingQuantity(subscription, {})).toBe(10);
+  });
+
+  it('keeps a line the customer holds unless Adobe retired the SKU', () => {
+    expect(isEarlyRenewable(subscription, {})).toBe(true);
+    expect(isEarlyRenewable(subscription, states)).toBe(true);
+    expect(
+      isEarlyRenewable(subscription, { [ADOBE_ID]: { ...partial, earlyRenewable: false } }),
+    ).toBe(false);
+  });
+
+  it('offers an increase only on a fully renewed line of the early path', () => {
+    const renewed = { [ADOBE_ID]: { ...partial, increaseAllowed: true } };
+    expect(isIncreaseAllowed(subscription, renewed, 'now')).toBe(true);
+    expect(isIncreaseAllowed(subscription, renewed, 'anniversary')).toBe(false);
+    expect(isIncreaseAllowed(subscription, states, 'now')).toBe(false);
+    expect(isIncreaseAllowed(subscription, {}, 'now')).toBe(false);
+  });
+});
+
+describe('findRenewAndAddConflict', () => {
+  const renewalLine = { lineNumber: 1, itemId: 'ITM-1', isNetNew: false };
+  const increase = { ...renewalLine, currentQuantity: 37, renewalQuantity: 53 };
+  const decrease = { ...renewalLine, lineNumber: 2, itemId: 'ITM-2', currentQuantity: 10, renewalQuantity: 6 };
+  const netNew = {
+    lineNumber: 3,
+    itemId: 'ITM-3',
+    isNetNew: true,
+    currentQuantity: null,
+    renewalQuantity: 22,
+  };
+
+  it('reports both sides when an increase meets a renewal change', () => {
+    expect(findRenewAndAddConflict([increase, decrease], 'now')).toEqual({
+      renewals: [decrease],
+      additions: [increase],
+    });
+  });
+
+  it('counts a net-new product as an addition', () => {
+    expect(findRenewAndAddConflict([decrease, netNew], 'now')).toEqual({
+      renewals: [decrease],
+      additions: [netNew],
+    });
+  });
+
+  it('accepts a basket that only renews or only adds', () => {
+    expect(findRenewAndAddConflict([decrease], 'now')).toBeNull();
+    expect(findRenewAndAddConflict([increase, netNew], 'now')).toBeNull();
+  });
+
+  it('ignores an unchanged line, the state the guidance asks the customer to return to', () => {
+    const unchanged = { ...renewalLine, currentQuantity: 37, renewalQuantity: 37 };
+
+    expect(findRenewAndAddConflict([unchanged, netNew], 'now')).toBeNull();
+  });
+
+  it('forbids nothing at the anniversary', () => {
+    expect(findRenewAndAddConflict([increase, decrease], 'anniversary')).toBeNull();
   });
 });
 

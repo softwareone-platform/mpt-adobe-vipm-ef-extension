@@ -40,8 +40,10 @@ frontend/                    TypeScript plug UI (esbuild)
     which decides how strictly the plan is validated.
     `auto-renew-support` reports which SKUs can renew at the
     anniversary at all (the hand-curated `auto_renew_supported` column of the
-    Airtable SKU mapping), which the wizard uses to route: a subscription whose
-    SKU has no support is left out of the renewal plan. `3yc-check`
+    Airtable SKU mapping), which the wizard uses to route: on the `anniversary`
+    path a subscription whose SKU has no support is left out of the renewal
+    plan. The `now` path carries that same SKU, since an early renewal places an
+    explicit RENEWAL order and never uses those preferences. `3yc-check`
     re-checks that routing and pre-checks the plan against the customer's 3YC
     commitment floors (splitting licenses and consumables through the same SKU
     mapping), `preview` re-checks the routing and quotes the plan through an
