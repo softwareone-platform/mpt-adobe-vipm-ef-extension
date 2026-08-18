@@ -14,9 +14,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    white-space: normal;
 
     &--yes {
       color: $var-brand-success;

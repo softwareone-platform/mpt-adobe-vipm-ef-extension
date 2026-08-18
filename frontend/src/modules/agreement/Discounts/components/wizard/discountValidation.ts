@@ -84,12 +84,47 @@ export function validateDefinition(draft: DiscountDraft): string | null {
   );
 }
 
+const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/u;
+
+/**
+ * Whether the value is a date the comparisons below can trust.
+ *
+ * `new Date` yields an invalid date for unparseable text, which compares false
+ * both ways, and rolls an impossible day over into the next month, so only the
+ * picker's shape is accepted and the day is checked against a UTC date built
+ * from its parts. Nothing else is trusted: "02/30/2026" parses as March too,
+ * and a local-time value would shift a day under `toISOString`.
+ */
+function isValidDate(value: string): boolean {
+  const parts = CALENDAR_DAY.exec(value);
+  const parsed = new Date(value);
+
+  if (!parts || Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+
+  const asUtc = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    asUtc.getUTCFullYear() === year &&
+    asUtc.getUTCMonth() === month - 1 &&
+    asUtc.getUTCDate() === day
+  );
+}
+
 function validatePeriod(draft: DiscountDraft): string | null {
   if (!draft.startDate) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:StartDateRequired");
   }
   if (!draft.endDate) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:EndDateRequired");
+  }
+  if (!isValidDate(draft.startDate) || !isValidDate(draft.endDate)) {
+    return i18n.t("Agreement:Discounts:Wizard:Validation:DateInvalid");
   }
   if (new Date(draft.startDate) >= new Date(draft.endDate)) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:EndDateAfterStart");
@@ -105,6 +140,9 @@ function validateLockDate(draft: DiscountDraft): string | null {
   }
   if (!draft.discountLockEndDate) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:LockDateRequired");
+  }
+  if (!isValidDate(draft.discountLockEndDate)) {
+    return i18n.t("Agreement:Discounts:Wizard:Validation:DateInvalid");
   }
   if (new Date(draft.discountLockEndDate) <= new Date(draft.endDate)) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:LockDateAfterEnd");
@@ -176,10 +214,10 @@ export function validateScope(draft: DiscountDraft): string | null {
 export function isDefinitionComplete(draft: DiscountDraft): boolean {
   return Boolean(
     draft.code.trim() &&
-      draft.name.trim() &&
-      draft.category &&
-      draft.discountType &&
-      draft.value.trim(),
+    draft.name.trim() &&
+    draft.category &&
+    draft.discountType &&
+    draft.value.trim(),
   );
 }
 

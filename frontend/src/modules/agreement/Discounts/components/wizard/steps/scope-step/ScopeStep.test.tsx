@@ -73,7 +73,9 @@ function openOrderTypes() {
 }
 
 function pickOrderType(value: string) {
-  fireEvent.mouseDown(screen.getByTestId(`order-type-${value}`));
+  const row = screen.getByTestId(`order-type-${value}`).closest("li")!;
+  fireEvent.mouseDown(row);
+  fireEvent.click(row);
 }
 
 describe("ScopeStep", () => {
@@ -165,6 +167,15 @@ describe("ScopeStep", () => {
     pickOrderType("NEW");
 
     expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: ["NEW"] });
+  });
+
+  it("updates the draft once per pointer interaction", () => {
+    const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW"] });
+
+    openOrderTypes();
+    pickOrderType("RENEWAL");
+
+    expect(updateDraft).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the list open while several boxes are ticked", () => {

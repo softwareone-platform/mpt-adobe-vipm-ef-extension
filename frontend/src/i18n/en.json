@@ -142,7 +142,8 @@
         "OrderTypes": {
           "ANY": "Any",
           "NEW": "Add seats",
-          "RENEWAL": "Renewal"
+          "RENEWAL": "Renewal",
+          "SWITCH": "Switch"
         },
         "Categories": {
           "STANDARD": "Standard",
@@ -165,6 +166,7 @@
           "PercentageRange": "A percentage value must be between 1 and 100.",
           "StartDateRequired": "A start date is required.",
           "EndDateRequired": "An end date is required.",
+          "DateInvalid": "The dates must be real calendar dates.",
           "EndDateAfterStart": "The start date must be before the end date.",
           "LockDateRequired": "A discount lock end date is required for reusable discounts.",
           "LockDateAfterEnd": "The discount lock end date must be after the end date.",
