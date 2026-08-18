@@ -210,6 +210,15 @@ export function createGridMock(onUseGridAsync?: (config: MockGridConfig) => void
         onEvent: jest.fn(),
       };
     },
+    useGridInMemory: (data: object[], config: MockGridConfig) => {
+      onUseGridAsync?.({ ...config, data });
+      return {
+        id: config.id,
+        data,
+        configuration: { columns: config.columns, paging: config.paging },
+        onEvent: jest.fn(),
+      };
+    },
     // Mirrors the real Grid: a direct <Grid.Actions> child is lifted into the
     // toolbar row next to the built-in view/sort/filter/columns/refresh buttons.
     Grid: Object.assign(

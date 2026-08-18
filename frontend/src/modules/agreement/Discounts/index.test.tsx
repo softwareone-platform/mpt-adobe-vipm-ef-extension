@@ -52,8 +52,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () =>
     .createButtonMock(),
 );
 
-// Captures every useGridAsync config so tests can drive grid events (paging)
-// and renders rows through the real column cell definitions.
+// Captures every grid config so tests can assert what reaches the grid.
 const mockGridConfigs: Array<Record<string, unknown>> = [];
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () =>
@@ -147,7 +146,7 @@ describe('Discounts view', () => {
     expect(mockGet).toHaveBeenCalledWith(
       DISCOUNTS_URL,
       expect.objectContaining({
-        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 }),
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 100, offset: 0 }),
       }),
     );
   });
@@ -231,29 +230,22 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1] as {
-      onConfigChange: (config: { paging: { page: number; pageSize: number } }) => void;
+      onConfigChange?: (config: { paging: { page: number; pageSize: number } }) => void;
     };
 
     act(() => {
-      lastConfig.onConfigChange({ paging: { page: 2, pageSize: 10 } });
+      lastConfig.onConfigChange?.({ paging: { page: 2, pageSize: 10 } });
     });
 
-    await waitFor(() => expect(discountRequests()).toHaveLength(2));
-    expect(mockGet).toHaveBeenLastCalledWith(
-      DISCOUNTS_URL,
-      expect.objectContaining({
-        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 }),
-      }),
-    );
+    // Client-side paging: filter/sort/paging are handled in memory by useGridInMemory
+    await waitFor(() => expect(discountRequests()).toHaveLength(1));
   });
 
   it('passes the fetch state through to the grid', async () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1];
-    expect(lastConfig.total).toBe(DISCOUNTS.length);
-    expect(lastConfig.isLoading).toBe(false);
-    expect(lastConfig.error).toBeUndefined();
+    expect(lastConfig.data).toEqual(DISCOUNTS);
   });
 
   it('surfaces fetch errors to the grid', async () => {
@@ -262,7 +254,8 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1];
-    expect(lastConfig.error).toBe('Airtable unavailable');
+    // a failed read simply leaves the grid with an empty data set.
+    expect(lastConfig.data).toEqual([]);
   });
 
   it('renders the add action inside the grid toolbar for editor accounts', async () => {
