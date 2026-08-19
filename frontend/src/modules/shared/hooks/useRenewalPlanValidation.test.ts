@@ -76,6 +76,26 @@ describe('useRenewalPlanValidation', () => {
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
 
+  it('skips the Adobe quote when the caller owns no quantities', async () => {
+    mockPost.mockResolvedValue({ data: { data: {} } });
+
+    const { result } = renderHook(() =>
+      useRenewalPlanValidation('AGR-1234-5678', { quoteThroughAdobe: false }),
+    );
+
+    let isValid: boolean | undefined;
+    await act(async () => {
+      isValid = await result.current.validatePlan(EARLY_PLAN);
+    });
+
+    expect(isValid).toBe(true);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
+      EARLY_PLAN,
+    );
+  });
+
   it('surfaces the Adobe rejection when the early-renewal preview fails', async () => {
     mockPost.mockResolvedValueOnce({ data: { data: {} } }).mockRejectedValueOnce({
       response: { data: { detail: 'Place the renewal first, then add in a new order.' } },

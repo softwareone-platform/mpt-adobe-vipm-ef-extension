@@ -398,6 +398,38 @@ export interface RenewalStateEntry {
   increaseAllowed: boolean;
 }
 
+/**
+ * Whether a renewal can be planned today, and which path is already established.
+ *
+ * Adobe takes a renewal order and a scheduled net-new subscription only inside
+ * the window before the anniversary, and only for a customer holding an active
+ * subscription, so the wizard's first step reads this before it offers a path.
+ * ``lockedPath`` is set once an early renewal has rolled the anniversary
+ * forward, which fixes the path and makes the step read-only.
+ */
+export interface RenewalPathState {
+  anniversaryDate: string;
+  windowOpen: boolean;
+  windowOpensDays: number;
+  windowClosesDays: number;
+  hasActiveSubscriptions: boolean;
+  lockedPath: RenewalPath | null;
+}
+
+/**
+ * Whether the wizard can go past its first step.
+ *
+ * An established early path is answer enough: the anniversary has already
+ * rolled, so the customer returns to a confirmed path rather than to the window
+ * notice. Otherwise there has to be something to renew and a window Adobe still
+ * accepts an order in.
+ */
+export function canPlanRenewal(pathState: RenewalPathState | null): boolean {
+  if (!pathState) return false;
+  if (pathState.lockedPath) return true;
+  return pathState.windowOpen && pathState.hasActiveSubscriptions;
+}
+
 /** The renewal plan body shared by the 3YC check, preview and submission endpoints. */
 export interface RenewalPlanBody {
   subscriptions: RenewalPlanSubscriptionSelection[];

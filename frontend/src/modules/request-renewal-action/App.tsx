@@ -18,8 +18,9 @@ import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations
 import { useAutoRenewSupport } from '../shared/hooks/useAutoRenewSupport';
 import { useRenewalState } from '../shared/hooks/useRenewalState';
 import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
+import { useRenewalPathState } from '../shared/hooks/useRenewalPathState';
 import { useSettingsResult } from '../shared/hooks/useSettings';
-import { getRecommendedOfferIds, readParameter } from '../shared/model';
+import { canPlanRenewal, getRecommendedOfferIds, readParameter } from '../shared/model';
 import type { RenewalOrderResult } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
@@ -92,6 +93,7 @@ export default function App() {
   const heldSkus = useMemo(() => getHeldSkus(subscriptions.data), [subscriptions.data]);
   const autoRenewSupport = useAutoRenewSupport(agreementId, heldSkus);
   const renewalState = useRenewalState(agreementId);
+  const pathState = useRenewalPathState(agreementId);
   const anniversarySubscriptions = useMemo(
     () =>
       subscriptions.data.filter((subscription) =>
@@ -177,6 +179,16 @@ export default function App() {
   useEffect(() => {
     syncAgreement();
   }, [syncAgreement]);
+
+  // An early renewal has already rolled the anniversary, so the rest of the
+  // wizard runs on the established path rather than the default.
+  const lockedPath = pathState.data?.lockedPath ?? null;
+
+  useEffect(() => {
+    if (lockedPath) {
+      setRenewalPath(lockedPath);
+    }
+  }, [lockedPath]);
 
   // Seed each Renew toggle once from the subscription's standing autoRenewal
   // preference; from then on the customer's choices live in the wizard state.
@@ -276,13 +288,30 @@ export default function App() {
     );
   }
 
+  if (pathState.status === 'error') {
+    return (
+      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+        <InlineNotification status="error">
+          {pathState.error || t('Errors:LoadRenewalPathState')}
+        </InlineNotification>
+        <Button onClick={pathState.refresh}>
+          {t('Common:Retry')}
+        </Button>
+      </div>
+    );
+  }
+
   // Each path waits only on the lookup it routes with: auto-renewal support at
   // the anniversary, the early-renewal state on the now path.
   const isRoutingPending = isEarlyPath
     ? renewalState.status !== 'success'
     : heldSkus.size > 0 && autoRenewSupport.status !== 'success';
 
-  if (subscriptions.status !== 'success' || isRoutingPending) {
+  if (
+    subscriptions.status !== 'success' ||
+    isRoutingPending ||
+    pathState.status !== 'success'
+  ) {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
         <Loader />
@@ -293,12 +322,14 @@ export default function App() {
   const wizardSteps: (StepProps & { render: () => ReactNode })[] = [
     {
       title: t('Renewal:Steps:Timing'),
+      nextButton: { isDisabled: !canPlanRenewal(pathState.data) },
       render: () => (
         <TimingStep
           agreement={agreement}
           renewalDate={typeof renewalDate === 'string' ? renewalDate : undefined}
           path={renewalPath}
           onPathChange={setRenewalPath}
+          pathState={pathState.data}
         />
       ),
     },

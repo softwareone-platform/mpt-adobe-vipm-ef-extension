@@ -249,6 +249,7 @@
     "CommitmentRequest": "Commitment request failed.",
     "LoadAutoRenewSupport": "Failed to load which products can renew at the anniversary date.",
     "LoadRenewalState": "Failed to load how much of each subscription is already renewed.",
+    "LoadRenewalPathState": "Failed to load whether a renewal can be planned for this agreement.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated."
   },
@@ -350,6 +351,8 @@
       "Prompt_other": "Your renewal date is <b>{{date}}</b> ({{count}} days away). When would you like your renewal to occur?",
       "PromptWithoutDate": "When would you like your renewal to occur?",
       "Lock notice": "This choice applies to the whole renewal. Any further renewal orders will follow the same path, and it can't be changed once you've placed your first order.",
+      "Window closed": "You can only plan your renewal within {{opens}} to {{closes}} days before the renewal date. Please try again then. Meanwhile, you can still use Change, Configuration, and Termination orders to manage your subscriptions.",
+      "No subscriptions": "This agreement has no active subscriptions. You cannot plan a renewal for this agreement.",
       "Learn more": "Learn more",
       "Confirmed": "Confirmed",
       "Anniversary": {
