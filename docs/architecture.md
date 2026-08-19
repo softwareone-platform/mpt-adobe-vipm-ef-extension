@@ -46,10 +46,15 @@ frontend/                    TypeScript plug UI (esbuild)
     commitment floors (splitting licenses and consumables through the same SKU
     mapping), `preview` re-checks the routing and quotes the plan through an
     Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
-    codes and returning the renewal pricing); on the `now` path the quote also
-    carries the net-new additions, which ride the RENEWAL order itself, so
-    Adobe rejects the renew-and-add basket it forbids in one order. The submit
-    route repeats every gate and creates the
+    codes and returning the renewal pricing plus each line's now-path
+    eligibility); on the `now` path
+    the quote also carries the net-new additions, which ride the RENEWAL order
+    itself, so Adobe rejects the renew-and-add basket it forbids in one order.
+    `renewal-state` reports how much of each subscription is already
+    early-renewed, whether its SKU can be early-renewed at all, and whether the
+    Items step may offer an increase beyond the current quantity, which only a
+    fully-renewed line can carry. The
+    submit route repeats every gate and creates the
     change order carrying the plan snapshot (the renewal path, renew decisions,
     quantities, discount codes and the recommendation tracker id) on the hidden
     `renewalPayload` order parameter, the discriminator fulfilment reads to pick
