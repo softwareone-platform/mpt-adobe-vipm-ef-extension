@@ -25,6 +25,7 @@ from mpt_adobe_vipm_ef.routers.api.renewal import (
     check_renewal_order_three_yc,
     create_renewal_order,
     get_renewal_auto_renew_support,
+    get_renewal_path_state,
     get_renewal_state,
     preview_renewal_plan,
 )
@@ -333,9 +334,10 @@ async def test_create_renewal_order_creates_a_configuration_order_for_an_autoren
         },
     ]
     create_order_mock.assert_not_awaited()
-    # Only the Adobe customer load (for the 3YC pre-check) runs: nothing renews,
-    # so there is no offer-id resolution and no PREVIEW_RENEWAL quote.
-    assert len(adobe_call.calls) == 1
+    # Only the Adobe customer load (for the 3YC pre-check) and the path-lock
+    # subscriptions load run: nothing renews, so there is no offer-id
+    # resolution and no PREVIEW_RENEWAL quote.
+    assert len(adobe_call.calls) == 2
 
 
 async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_configuration_order(
@@ -396,6 +398,21 @@ async def test_create_renewal_order_rejects_a_plan_with_no_changes(
     assert not adobe_call.calls
     create_order_mock.assert_not_awaited()
     create_configuration_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_rejects_an_anniversary_plan_once_the_path_is_locked(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    """An early renewal has rolled the anniversary, so it can no longer be renewed at."""
+    adobe_call.returns = {
+        "cotermDate": "2027-08-20",
+        "items": [{"subscriptionId": _ADOBE_SUBSCRIPTION_ID, "renewalDate": _COTERM_IN_WINDOW}],
+    }
+
+    with pytest.raises(ValidationError, match="already moved the anniversary date forward"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
+
+    create_order_mock.assert_not_awaited()
 
 
 async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_change_order(
@@ -552,9 +569,9 @@ async def test_create_renewal_order_creates_change_order_for_a_net_new_only_plan
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    # No renewing subscription: only the Adobe customer load runs, no offer-id
-    # resolution and no PREVIEW_RENEWAL quote.
-    assert len(adobe_call.calls) == 1
+    # No renewing subscription: only the Adobe customer and the path-lock
+    # subscriptions load, no offer-id resolution and no PREVIEW_RENEWAL quote.
+    assert len(adobe_call.calls) == 2
     call_args, _ = create_order_mock.await_args
     assert call_args[2] == [{"item": {"id": _NET_NEW_ITEM_ID}, "quantity": 5}]
 
@@ -958,6 +975,95 @@ async def test_get_renewal_state_rejects_non_client_account(
 
     with pytest.raises(ForbiddenError):
         await get_renewal_state(_AGREEMENT_ID, fake_ctx)
+
+
+# --- GET /agreements/{id}/renewal-order/path-state ---
+
+
+def _path_state_payload(coterm_date, renewal_date=_COTERM_IN_WINDOW, status="1000"):
+    """One payload for both Adobe calls: the customer's coterm and its subscriptions."""
+    return {
+        "cotermDate": coterm_date,
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "status": status,
+                "renewalDate": renewal_date,
+            },
+        ],
+    }
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_reports_an_open_window(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload(_COTERM_IN_WINDOW)
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {
+        "anniversaryDate": _COTERM_IN_WINDOW,
+        "windowOpen": True,
+        "windowOpensDays": 30,
+        "windowClosesDays": 3,
+        "hasActiveSubscriptions": True,
+        "lockedPath": None,
+    }
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_reports_a_closed_window(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload(_COTERM_OUT_OF_WINDOW)
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["windowOpen"] is False
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_reports_no_active_subscriptions(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload(_COTERM_IN_WINDOW, status="1009")
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["hasActiveSubscriptions"] is False
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_locks_the_early_path_once_rolled(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    """A coterm past the subscription's renewal date means an early renewal rolled it."""
+    adobe_call.returns = _path_state_payload("2027-08-20")
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["lockedPath"] == "now"
+
+
+async def test_get_renewal_path_state_maps_an_adobe_failure_to_a_bad_gateway(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.error = _ADOBE_API_ERROR
+
+    with pytest.raises(UpstreamServiceError):
+        await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_get_renewal_path_state_rejects_non_client_account(
+    fake_ctx, renewal_agreement, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
 
 
 # --- POST /agreements/{id}/renewal-order/preview ---
