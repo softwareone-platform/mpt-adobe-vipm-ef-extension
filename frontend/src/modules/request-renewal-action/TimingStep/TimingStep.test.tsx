@@ -3,21 +3,30 @@ import { ChangeEvent, ReactNode } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 
 import { TimingStep } from './TimingStep';
-import type { Agreement } from '../../shared/model';
+import type { Agreement, RenewalPathState } from '../../shared/model';
 
 interface SelectionBoxProps {
   value?: string;
   selectedValue?: string;
+  isDisabled?: boolean;
   title?: ReactNode;
   children?: ReactNode;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 }
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/selection-box', () => ({
-  SelectionBox: ({ value, selectedValue, title, children, onChange }: SelectionBoxProps) => (
+  SelectionBox: ({
+    value,
+    selectedValue,
+    isDisabled,
+    title,
+    children,
+    onChange,
+  }: SelectionBoxProps) => (
     <button
       data-testid={`box-${value}`}
       data-selected={value === selectedValue}
+      data-disabled={isDisabled === true}
       onClick={() => onChange?.({ target: { value } } as ChangeEvent<HTMLInputElement>)}
     >
       <span>{title}</span>
@@ -40,6 +49,15 @@ function dateInDays(days: number): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+const pathState: RenewalPathState = {
+  anniversaryDate: dateInDays(7),
+  windowOpen: true,
+  windowOpensDays: 30,
+  windowClosesDays: 3,
+  hasActiveSubscriptions: true,
+  lockedPath: null,
+};
+
 const renderStep = (props: Partial<Parameters<typeof TimingStep>[0]> = {}) =>
   render(
     <TimingStep
@@ -47,6 +65,7 @@ const renderStep = (props: Partial<Parameters<typeof TimingStep>[0]> = {}) =>
       renewalDate={dateInDays(7)}
       path="anniversary"
       onPathChange={jest.fn()}
+      pathState={pathState}
       {...props}
     />,
   );
@@ -103,12 +122,42 @@ describe('TimingStep', () => {
     expect(onPathChange).toHaveBeenCalledWith('now');
   });
 
-  it('shows only the established path as confirmed once the path is locked', () => {
-    const { getByText, queryByTestId } = renderStep({ lockedPath: 'anniversary' });
+  it('marks the established path confirmed and locks both boxes', () => {
+    const { getByText, getByTestId } = renderStep({
+      pathState: { ...pathState, lockedPath: 'now' },
+    });
 
-    expect(getByText('Renew at your anniversary date (recommended)')).toBeTruthy();
     expect(getByText('Confirmed')).toBeTruthy();
+    expect(getByTestId('box-now').getAttribute('data-selected')).toBe('true');
+    expect(getByTestId('box-anniversary').getAttribute('data-disabled')).toBe('true');
+    expect(getByTestId('box-now').getAttribute('data-disabled')).toBe('true');
+  });
+
+  it('offers no path outside the renewal window', () => {
+    const { getByText, queryByTestId } = renderStep({
+      pathState: { ...pathState, windowOpen: false },
+    });
+
+    expect(getByText(/only plan your renewal within 30 to 3 days/)).toBeTruthy();
     expect(queryByTestId('box-anniversary')).toBeNull();
     expect(queryByTestId('box-now')).toBeNull();
+  });
+
+  it('offers no path without an active subscription', () => {
+    const { getByText, queryByTestId } = renderStep({
+      pathState: { ...pathState, hasActiveSubscriptions: false },
+    });
+
+    expect(getByText(/has no active subscriptions/)).toBeTruthy();
+    expect(queryByTestId('box-now')).toBeNull();
+  });
+
+  it('keeps the established path over the window notice', () => {
+    const { getByText, queryByText } = renderStep({
+      pathState: { ...pathState, windowOpen: false, lockedPath: 'now' },
+    });
+
+    expect(getByText('Confirmed')).toBeTruthy();
+    expect(queryByText(/only plan your renewal within/)).toBeNull();
   });
 });

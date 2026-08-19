@@ -17,6 +17,10 @@ from mpt_extension_sdk.models import Agreement, Subscription
 from mpt_extension_sdk.routing import APIRouter
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
+from mpt_adobe_vipm_ef.constants import (
+    SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
+    SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
+)
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.renewal import (
     NetNewItemSelection,
@@ -48,6 +52,12 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
     build_renewal_order_lines,
     create_renewal_change_order,
     create_renewal_configuration_order,
+)
+from mpt_adobe_vipm_ef.services.renewal_path import (
+    has_active_subscriptions,
+    is_renewal_window_open,
+    require_unlocked_anniversary_path,
+    resolve_locked_path,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     Line,
@@ -146,6 +156,39 @@ async def get_renewal_state(agreement_id: str, ctx: APIContext) -> APIResponse:
         subscriptions, lifecycle, is_three_yc=has_three_yc_in_force(customer)
     )
     return APIResponse.ok(payload={"subscriptions": states})
+
+
+@renewal_router.get(
+    path="/{agreement_id}/renewal-order/path-state",
+    name="agreements-renewal-order-path-state",
+)
+@validate_agreement_access
+@log_inputs
+async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIResponse:
+    """Report whether a renewal can be planned today and which path is established.
+
+    The wizard's first step reads this before it offers a path: outside the
+    window — or with no active subscription to renew — there is nothing to plan,
+    and the step says so instead of walking the customer into an Adobe
+    rejection. ``lockedPath`` is set once an early renewal has rolled the
+    anniversary forward, which fixes the path to ``now`` and makes the step
+    read-only.
+    """
+    _require_client_account(ctx)
+    customer = await _load_adobe_customer(ctx, agreement_id)
+    subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    coterm_date = str(customer.get("cotermDate") or "")
+    locked_path = resolve_locked_path(coterm_date, subscriptions)
+    return APIResponse.ok(
+        payload={
+            "anniversaryDate": coterm_date,
+            "windowOpen": is_renewal_window_open(coterm_date),
+            "windowOpensDays": SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
+            "windowClosesDays": SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
+            "hasActiveSubscriptions": has_active_subscriptions(subscriptions),
+            "lockedPath": locked_path.value if locked_path else None,
+        },
+    )
 
 
 @renewal_router.post(
@@ -287,8 +330,13 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
 
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
+    coterm_date = str(customer.get("cotermDate") or "")
     if net_new_lines:
-        require_scheduled_creation_window(str(customer.get("cotermDate") or ""))
+        require_scheduled_creation_window(coterm_date)
+    if body.renewal_path is RenewalPath.ANNIVERSARY:
+        require_unlocked_anniversary_path(
+            coterm_date, await _load_adobe_subscriptions(ctx, agreement_id)
+        )
 
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
     if lines:

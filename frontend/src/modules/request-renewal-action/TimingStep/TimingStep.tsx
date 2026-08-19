@@ -8,7 +8,7 @@ import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/t
 
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { RENEWAL_LEARN_MORE_URL } from '../../shared/constants';
-import { Agreement } from '../../shared/model';
+import { Agreement, canPlanRenewal, RenewalPathState } from '../../shared/model';
 import { daysUntil, formatDate } from '../../utils/date';
 import { RenewalPath } from '../model';
 
@@ -19,7 +19,7 @@ interface TimingStepProps {
   renewalDate?: string;
   path: RenewalPath;
   onPathChange: (path: RenewalPath) => void;
-  lockedPath?: RenewalPath | null;
+  pathState: RenewalPathState | null;
 }
 
 const PATH_KEYS: Record<RenewalPath, string> = {
@@ -32,12 +32,14 @@ export function TimingStep({
   renewalDate,
   path,
   onPathChange,
-  lockedPath,
+  pathState,
 }: TimingStepProps) {
   const { t } = useTranslation();
   const formattedRenewalDate = formatDate(renewalDate);
   const days = daysUntil(renewalDate);
+  const lockedPath = pathState?.lockedPath ?? null;
   const selectedPath = lockedPath ?? path;
+  const canPlan = canPlanRenewal(pathState);
 
   const learnMore = (
     <a href={RENEWAL_LEARN_MORE_URL} target="_blank" rel="noreferrer">
@@ -78,39 +80,47 @@ export function TimingStep({
           t('Renewal:Timing:PromptWithoutDate')
         )}
       </RegularText>
-      <InlineNotification status="warning">
-        {t('Renewal:Timing:Lock notice')} {learnMore}
-      </InlineNotification>
+      {canPlan ? (
+        <InlineNotification status="warning" isStandalone>
+          {t('Renewal:Timing:Lock notice')} {learnMore}
+        </InlineNotification>
+      ) : (
+        <InlineNotification status="error" isStandalone>
+          {pathState?.hasActiveSubscriptions === false
+            ? t('Renewal:Timing:No subscriptions')
+            : t('Renewal:Timing:Window closed', {
+                opens: pathState?.windowOpensDays,
+                closes: pathState?.windowClosesDays,
+              })}{' '}
+          {learnMore}
+        </InlineNotification>
+      )}
       <div className="timing-step__options">
-        {(Object.keys(PATH_KEYS) as RenewalPath[]).map((option) =>
-          lockedPath && lockedPath !== option ? null : (
-            <div className="timing-step__option" key={option}>
-              {lockedPath ? (
-                <div className="timing-step__option__locked">
-                  <div className="timing-step__option__locked__title">
-                    <MediumText as="h3" size={2}>
-                      {t(`Renewal:Timing:${PATH_KEYS[option]}:Title`)}
-                    </MediumText>
+        {(canPlan ? (Object.keys(PATH_KEYS) as RenewalPath[]) : []).map((option) => (
+          <div className="timing-step__option" key={option}>
+            <SelectionBox
+              name="renewal-path"
+              value={option}
+              selectedValue={selectedPath}
+              isDisabled={lockedPath != null}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                onPathChange(event.target.value as RenewalPath)
+              }
+              title={
+                <div className="timing-step__option__title">
+                  <MediumText as="span" size={2}>
+                    {t(`Renewal:Timing:${PATH_KEYS[option]}:Title`)}
+                  </MediumText>
+                  {lockedPath === option && (
                     <Chip label={t('Renewal:Timing:Confirmed')} color="success" />
-                  </div>
-                  {pathDescription(option)}
+                  )}
                 </div>
-              ) : (
-                <SelectionBox
-                  name="renewal-path"
-                  value={option}
-                  selectedValue={selectedPath}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    onPathChange(event.target.value as RenewalPath)
-                  }
-                  title={t(`Renewal:Timing:${PATH_KEYS[option]}:Title`)}
-                >
-                  {pathDescription(option)}
-                </SelectionBox>
-              )}
-            </div>
-          ),
-        )}
+              }
+            >
+              {pathDescription(option)}
+            </SelectionBox>
+          </div>
+        ))}
       </div>
     </div>
   );
