@@ -88,6 +88,24 @@ export default function App() {
       </div>
 
       <div className="request-linked-membership-modal__content">
+        {hasCommitment && (
+          <InlineNotification status="warning">
+            {t('LinkedMembership:HasCommitment')}
+          </InlineNotification>
+        )}
+
+        {(localError || (status === 'error' && error)) && (
+          <InlineNotification status="error">
+            {localError || error}
+          </InlineNotification>
+        )}
+
+        {status === 'success' && (
+          <InlineNotification status="success">
+            {t('LinkedMembership:Success')}
+          </InlineNotification>
+        )}
+
         <RadioButtonGroup
           name="linked-membership-type"
           label={t('LinkedMembership:Type')}
@@ -124,23 +142,6 @@ export default function App() {
           />
         </div>
 
-        {hasCommitment && (
-          <InlineNotification status="warning" isStandalone>
-            {t('LinkedMembership:HasCommitment')}
-          </InlineNotification>
-        )}
-
-        {(localError || (status === 'error' && error)) && (
-          <InlineNotification status="error" isStandalone>
-            {localError || error}
-          </InlineNotification>
-        )}
-
-        {status === 'success' && (
-          <InlineNotification status="success" isStandalone>
-            {t('LinkedMembership:Success')}
-          </InlineNotification>
-        )}
       </div>
 
       <div className="request-linked-membership-modal__actions">

@@ -66,6 +66,13 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
           {t('MidtermUpgrade:UpgradeTo:Instruction')}
         </RegularText>
       </div>
+      {validationError && (
+        <div className="upgrade-to-step__validation">
+          <InlineNotification status="error">
+            {validationError}
+          </InlineNotification>
+        </div>
+      )}
       <div className="upgrade-to-step__grid">
         <TargetSubscriptionGrid
           subscriptions={subscriptions}
@@ -83,13 +90,6 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
           </div>
         )}
       </div>
-      {validationError && (
-        <div className="upgrade-to-step__validation">
-          <InlineNotification status="error" isStandalone>
-            {validationError}
-          </InlineNotification>
-        </div>
-      )}
       <div className="upgrade-to-step__footer-text">
         <RegularText as="p" size={1}>
           {t('MidtermUpgrade:UpgradeTo:PriceDisclaimer')}

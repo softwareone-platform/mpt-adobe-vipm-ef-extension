@@ -326,7 +326,7 @@ export function ReviewOrderStep({
       </div>
       {errorMessage && (
         <div data-testid="review-order-step-error">
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {errorMessage}
           </InlineNotification>
         </div>
