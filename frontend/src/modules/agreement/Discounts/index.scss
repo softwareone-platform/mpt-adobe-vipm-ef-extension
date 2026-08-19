@@ -3,9 +3,22 @@
 .discounts {
   display: flex;
   flex-direction: column;
-  gap: $var-spacing-4;
+  gap: $var-spacing-1;
   width: 100%;
   min-width: 0;
+
+  .extension__content-description {
+    margin: $var-spacing-1 0 0 0;
+  }
+
+  & &__add-action {
+    color: #472aff;
+
+    &:hover {
+      background: $var-alerts-info-2;
+      background-color: $var-alerts-info-2;
+    }
+  }
 
   &__grid {
     min-width: 0;

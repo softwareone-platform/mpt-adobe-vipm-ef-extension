@@ -1,0 +1,28 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: $var-spacing-1;
+  min-width: 0;
+
+  &__label {
+    white-space: nowrap;
+  }
+
+  &__value {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+
+    &--yes {
+      color: $var-brand-success;
+    }
+
+    &--no {
+      color: $var-gray-4;
+    }
+  }
+}

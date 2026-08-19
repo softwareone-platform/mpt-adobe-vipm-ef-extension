@@ -74,6 +74,7 @@
     },
     "Discounts": {
       "Title": "Discounts",
+      "Description": "The details of this customer's discount codes are below.",
       "Code": "Code",
       "Source": "Source",
       "Type": "Type",
@@ -84,6 +85,7 @@
       "Discount lock until": "Discount lock until: {{date}}",
       "PercentageOff": "{{value}}% off",
       "AmountOff": "{{amount}} off",
+      "AddDiscount": "Add closed discount",
       "Status": {
         "ACTIVE": "Active",
         "EXPIRED": "Expired"
@@ -98,6 +100,115 @@
         "NEW": "Add seats",
         "RENEWAL": "Renewal",
         "SWITCH": "Switch"
+      },
+      "Wizard": {
+        "Fields": {
+          "Code": "Code",
+          "CodePlaceholder": "e.g. R8MX4KQ7DV92NLB3WJ6TPCYH",
+          "Name": "Name",
+          "NamePlaceholder": "e.g. Acrobat Studio Ent 20% 3YC Upsell Promotion (COM, Renewal)",
+          "Description": "Description",
+          "DescriptionPlaceholder": "Enter a description of this discount",
+          "Category": "Category",
+          "CategoryPlaceholder": "Select an option",
+          "DiscountType": "Discount type",
+          "Value": "Value",
+          "ValuePlaceholder": "e.g. 10",
+          "PercentageSuffix": "off",
+          "ValidityPeriod": "Validity period",
+          "StartDate": "Start date",
+          "EndDate": "End date",
+          "Reusable": "Reusable",
+          "ReusableYes": "Yes",
+          "DiscountLockEndDate": "Discount lock end date",
+          "DatePlaceholder": "DD MM YYYY",
+          "TargetItems": "Target items",
+          "TargetItemsPlaceholder": "e.g. 30001846CB, 30006354CB",
+          "TargetItemsDescription": "Items the customer can purchase with this discount.",
+          "PrerequisiteItems": "Prerequisite items",
+          "PrerequisiteItemsPlaceholder": "e.g. 30013112CB, 30007371CB, 30015486CB, 30002028CB, 30001853CB",
+          "PrerequisiteItemsDescription": "Items the customer must already own to use this discount.",
+          "SupportedTerms": "Supported terms",
+          "AnnualPlan": "Annual plan",
+          "ThreeYearCommitment": "3-year commitment",
+          "ApplicableOrderTypes": "Applicable order types",
+          "ApplicableOrderTypesPlaceholder": "Select an option",
+          "StartDateLabel": "Start date",
+          "EndDateLabel": "End date",
+          "OrderTypesLabel": "Order types",
+          "Yes": "Yes",
+          "No": "No"
+        },
+        "OrderTypes": {
+          "ANY": "Any",
+          "NEW": "Add seats",
+          "RENEWAL": "Renewal",
+          "SWITCH": "Switch"
+        },
+        "Categories": {
+          "STANDARD": "Standard",
+          "INTRO": "Intro"
+        },
+        "DiscountTypes": {
+          "PERCENTAGE": "Percentage discount",
+          "FIXED_DISCOUNT": "Fixed amount",
+          "FIXED_PRICE": "Fixed price"
+        },
+        "Validation": {
+          "CodeRequired": "A code is required.",
+          "CodeTooLong": "The code cannot be longer than {{max}} characters.",
+          "NameRequired": "A name is required.",
+          "NameTooLong": "The name cannot be longer than {{max}} characters.",
+          "CategoryRequired": "A category is required.",
+          "DiscountTypeRequired": "A discount type is required.",
+          "ValueRequired": "A value is required.",
+          "ValuePositive": "The value must be greater than zero.",
+          "PercentageRange": "A percentage value must be between 1 and 100.",
+          "StartDateRequired": "A start date is required.",
+          "EndDateRequired": "An end date is required.",
+          "DateInvalid": "The dates must be real calendar dates.",
+          "EndDateAfterStart": "The start date must be before the end date.",
+          "LockDateRequired": "A discount lock end date is required for reusable discounts.",
+          "LockDateAfterEnd": "The discount lock end date must be after the end date.",
+          "TargetItemsRequired": "At least one target item is required.",
+          "ItemFormat": "Items must be Adobe part numbers without spaces: {{items}}.",
+          "OrderTypesRequired": "At least one applicable order type is required.",
+          "OrderTypesAnyExclusive": "\"Any\" cannot be combined with specific order types.",
+          "IntroOrderTypes": "Intro discounts apply to Add seats orders only.",
+          "CurrencyRequired": "A customer currency is required for fixed amount and fixed price discounts."
+        },
+        "Create": {
+          "Header": "Add closed discount",
+          "Steps": {
+            "Definition": "Definition",
+            "Validity": "Validity",
+            "Scope": "Scope",
+            "Review": "Review",
+            "Summary": "Summary"
+          },
+          "Definition": {
+            "Title": "Definition",
+            "Description": "Enter the details of the customer's closed discount. This code will be saved for customer, {{customerId}}, and segment, {{segment}}."
+          },
+          "Validity": {
+            "Title": "Validity",
+            "Description": "Enter the details of the customer's closed discount. This code will be saved for customer, {{customerId}}, and segment, {{segment}}."
+          },
+          "Scope": {
+            "Title": "Scope",
+            "Description": "Enter the details of the customer's closed discount. This code will be saved for customer, {{customerId}}, and segment, {{segment}}."
+          },
+          "Review": {
+            "Title": "Review",
+            "Description": "Review the details of the customer's closed discount. This code will be saved for customer, {{customerId}}, and segment, {{segment}}.",
+            "Submit": "Add discount"
+          },
+          "Summary": {
+            "Title": "Summary",
+            "Description": "The customer's closed discount has been created and can be used in future orders.",
+            "Done": "View discounts"
+          }
+        }
       }
     },
     "Global": {
@@ -115,6 +226,8 @@
   "Errors": {
     "LoadAdobeCustomer": "Failed to load Adobe customer data.",
     "LoadDiscounts": "Failed to load discounts.",
+    "CreateDiscount": "Failed to create the discount code.",
+    "CreateDiscountNoData": "The discount code was not returned by the server.",
     "LoadAdobeOffer": "Failed to load Adobe offer switch paths.",
     "LoadAdobeRecommendations": "Failed to load Adobe recommendations.",
     "SubscriptionSync": "Subscription sync failed.",

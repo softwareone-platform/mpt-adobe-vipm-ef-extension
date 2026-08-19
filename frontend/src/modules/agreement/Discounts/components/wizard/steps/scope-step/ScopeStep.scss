@@ -1,0 +1,15 @@
+@use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
+
+.scope-step {
+  &__terms {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  &__terms-options {
+    display: flex;
+    gap: $var-spacing-3;
+  }
+}
