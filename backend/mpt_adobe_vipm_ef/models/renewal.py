@@ -26,6 +26,14 @@ class RenewalPath(StrEnum):
     NOW = "now"
 
 
+class RenewalState(StrEnum):
+    """How much of a subscription's existing quantity is already early-renewed."""
+
+    NOT_RENEWED = "notRenewed"
+    PARTIALLY_RENEWED = "partiallyRenewed"
+    FULLY_RENEWED = "fullyRenewed"
+
+
 class RenewalSubscriptionSelection(BaseSchema):
     """The customer's at-anniversary decision for one existing subscription.
 

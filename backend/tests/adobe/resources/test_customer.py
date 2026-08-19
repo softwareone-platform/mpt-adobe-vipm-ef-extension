@@ -106,7 +106,21 @@ def test_create_three_year_request_with_licenses_builds_payload_and_returns_resp
     assert result == expected
     assert {"offerType": "LICENSE", "quantity": 10} in quantities
     assert payload["companyProfile"] == customer_data["companyProfile"]
+    assert payload["globalSalesEnabled"] == customer_data["globalSalesEnabled"]
     assert "commitmentRequest" in payload["benefits"][0]
+
+
+def test_create_three_year_request_preserves_enabled_global_sales_flag(
+    mocker, adobe_client, customer_data
+):
+    global_customer = {**customer_data, "globalSalesEnabled": True}
+    mock_request = _mock_get_then_patch(mocker, adobe_client, global_customer, global_customer)
+
+    adobe_client.customer.create_three_year_request(
+        "AUT-1234-5678", "CUST-001", {"3YCLicenses": 10}
+    )  # act
+
+    assert _patch_payload(mock_request)["globalSalesEnabled"] is True
 
 
 def test_create_three_year_request_with_consumables_adds_consumable_quantity(
@@ -233,6 +247,20 @@ def test_create_linked_membership_request_default_type_builds_payload_and_return
     assert payload["linkedMembership"]["type"] == "STANDARD"
     assert payload["linkedMembership"]["name"] == "My Group"
     assert payload["companyProfile"] == customer_data["companyProfile"]
+    assert payload["globalSalesEnabled"] == customer_data["globalSalesEnabled"]
+
+
+def test_create_linked_membership_request_preserves_enabled_global_sales_flag(
+    mocker, adobe_client, customer_data
+):
+    global_customer = {**customer_data, "globalSalesEnabled": True}
+    mock_request = _mock_get_then_patch(mocker, adobe_client, global_customer, global_customer)
+
+    adobe_client.customer.create_linked_membership_request(
+        "AUT-1234-5678", "CUST-001", "My Group"
+    )  # act
+
+    assert _patch_payload(mock_request)["globalSalesEnabled"] is True
 
 
 def test_create_linked_membership_request_uses_consortium_membership_type(

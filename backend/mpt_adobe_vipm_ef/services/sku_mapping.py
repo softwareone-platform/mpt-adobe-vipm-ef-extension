@@ -103,6 +103,23 @@ class SkuMappingStore:
             if record.get("fields", {}).get("vendor_external_id")
         }
 
+    def list_lifecycle(
+        self, partial_skus: list[str], market_segment: str
+    ) -> dict[str, dict[str, bool]]:
+        """Return the ``end_of_sale`` and ``end_of_life`` flags of each SKU within the segment.
+
+        Keyed by partial SKU (the ``vendor_external_id`` column), with both
+        flags in one row so a single query serves the early-renewability rule.
+        An unticked checkbox is absent from the Airtable row, as is a SKU
+        without a mapping row, so both read as neither retired at the call site.
+        """
+        records = self._list_segment_rows(partial_skus, market_segment)
+        return {
+            record["fields"]["vendor_external_id"]: _lifecycle_flags(record)
+            for record in records
+            if record.get("fields", {}).get("vendor_external_id")
+        }
+
     def list_full_skus(self, partial_skus: list[str], market_segment: str) -> dict[str, str]:
         """Return the full Adobe SKU (``sku`` column) of each SKU within the segment.
 
@@ -140,6 +157,14 @@ async def load_full_skus(
     except RequestException as error:
         logger.warning("SKU mapping store request failed: %s", error)
         raise UpstreamServiceError(detail="SKU mapping data store request failed")
+
+
+def _lifecycle_flags(record: RecordDict) -> dict[str, bool]:
+    fields = record.get("fields", {})
+    return {
+        "endOfSale": bool(fields.get("end_of_sale")),
+        "endOfLife": bool(fields.get("end_of_life")),
+    }
 
 
 def _has_full_sku(record: RecordDict) -> bool:
