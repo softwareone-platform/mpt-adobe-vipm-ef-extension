@@ -158,15 +158,19 @@ describe('canRequestGlobalCustomer', () => {
 
 describe('canManageDiscountCodes', () => {
   it('returns true for operations accounts', () => {
-    expect(canManageDiscountCodes('Operations')).toBe(true);
+    expect(canManageDiscountCodes('Operations', products, 'PRD-1111-1111')).toBe(true);
   });
 
   it('returns true for vendor accounts', () => {
-    expect(canManageDiscountCodes('Vendor')).toBe(true);
+    expect(canManageDiscountCodes('Vendor', products, 'PRD-1111-1111')).toBe(true);
   });
 
   it('returns false for client accounts', () => {
-    expect(canManageDiscountCodes('Client')).toBe(false);
+    expect(canManageDiscountCodes('Client', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canManageDiscountCodes('Operations', products, 'PRD-9999-9999')).toBe(false);
   });
 });
 
