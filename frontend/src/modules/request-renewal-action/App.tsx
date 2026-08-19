@@ -193,7 +193,7 @@ export default function App() {
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {error || t('Renewal:Errors:Agreement could not be loaded')}
         </InlineNotification>
         <Button onClick={() => syncAgreement()}>
@@ -206,7 +206,7 @@ export default function App() {
   if (settingsStatus === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {t('Renewal:Errors:Settings could not be loaded')}
         </InlineNotification>
         <Button onClick={refetchSettings}>
@@ -238,7 +238,7 @@ export default function App() {
   if (subscriptions.status === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {subscriptions.error || t('Renewal:Errors:Subscriptions could not be loaded')}
         </InlineNotification>
         <Button onClick={subscriptions.refresh}>
@@ -253,7 +253,7 @@ export default function App() {
   if (!isEarlyPath && autoRenewSupport.status === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {autoRenewSupport.error || t('Errors:LoadAutoRenewSupport')}
         </InlineNotification>
         <Button onClick={autoRenewSupport.refresh}>

@@ -61,7 +61,7 @@ export function ScopeStep({ draft, updateDraft, customerId, segment }: ScopeStep
       </header>
 
       {error && (
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {error}
         </InlineNotification>
       )}

@@ -141,6 +141,18 @@ export default function App() {
       </div>
 
       <div className="request-commitment-modal__content">
+        {(localError || (status === 'error' && error)) && (
+          <InlineNotification status="error">
+            {localError || error}
+          </InlineNotification>
+        )}
+
+        {status === 'success' && (
+          <InlineNotification status="success">
+            {t('Commitment:Success')}
+          </InlineNotification>
+        )}
+
         <RegularText as="p" size={2} color="grey-5">
         {t('Commitment:Description')}
       </RegularText>
@@ -238,17 +250,6 @@ export default function App() {
         {t('Commitment:Custom tier hint')}
       </RegularText>
 
-      {(localError || (status === 'error' && error)) && (
-        <InlineNotification status="error" isStandalone>
-          {localError || error}
-        </InlineNotification>
-      )}
-
-        {status === 'success' && (
-          <InlineNotification status="success" isStandalone>
-            {t('Commitment:Success')}
-          </InlineNotification>
-        )}
       </div>
 
       <div className="request-commitment-modal__actions">

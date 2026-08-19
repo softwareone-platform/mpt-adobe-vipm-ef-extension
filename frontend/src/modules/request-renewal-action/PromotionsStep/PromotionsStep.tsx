@@ -462,12 +462,12 @@ export function PromotionsStep({
         <div className="promotions-step__highlights">
           <WizardHighlights agreement={agreement} />
         </div>
-        <InlineNotification status="info" isStandalone>
+        <InlineNotification status="info">
           {t('Renewal:Promotions:Prompt')}
         </InlineNotification>
         {discounts.status === 'error' && (
           <div data-testid="promotions-step-error">
-            <InlineNotification status="error" isStandalone>
+            <InlineNotification status="error">
               {discounts.error || t('Renewal:Promotions:Errors:Discounts could not be loaded')}
             </InlineNotification>
           </div>
@@ -477,7 +477,7 @@ export function PromotionsStep({
             className="promotions-step__validation"
             data-testid="promotions-step-validation-error"
           >
-            <InlineNotification status="error" isStandalone>
+            <InlineNotification status="error">
               {discountValidationError}
             </InlineNotification>
           </div>

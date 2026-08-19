@@ -78,7 +78,7 @@ export function TimingStep({
           t('Renewal:Timing:PromptWithoutDate')
         )}
       </RegularText>
-      <InlineNotification status="warning" isStandalone>
+      <InlineNotification status="warning">
         {t('Renewal:Timing:Lock notice')} {learnMore}
       </InlineNotification>
       <div className="timing-step__options">
