@@ -57,9 +57,8 @@ class CustomerClient:
             quantities.append(
                 {"offerType": "CONSUMABLES", "quantity": int(commitment_request["3YCConsumables"])},
             )
-        company_profile = self.get_customer(authorization_id, customer_id)["companyProfile"]
         payload = {
-            "companyProfile": company_profile,
+            **self._customer_base_payload(authorization_id, customer_id),
             "benefits": [
                 {
                     "type": "THREE_YEAR_COMMIT",
@@ -110,13 +109,12 @@ class CustomerClient:
         membership_type: LinkedMembershipType = LinkedMembershipType.STANDARD,
     ) -> dict[str, Any]:
         """Create a linked membership request for the given customer."""
-        company_profile = self.get_customer(authorization_id, customer_id)["companyProfile"]
         payload = {
             "linkedMembership": {
                 "type": membership_type,
                 "name": name,
             },
-            "companyProfile": company_profile,
+            **self._customer_base_payload(authorization_id, customer_id),
         }
         authorization = self._transport.settings.get_authorization(authorization_id)
         return self._transport.request(
@@ -125,3 +123,16 @@ class CustomerClient:
             f"/v3/customers/{customer_id}",
             json=payload,
         )
+
+    def _customer_base_payload(self, authorization_id: str, customer_id: str) -> dict[str, Any]:
+        """Return the customer fields every PATCH must preserve.
+
+        Adobe treats an omitted ``globalSalesEnabled`` as ``False``, which rejects
+        global customers with active deployments, so the existing value is always
+        echoed back.
+        """
+        customer = self.get_customer(authorization_id, customer_id)
+        return {
+            "companyProfile": customer["companyProfile"],
+            "globalSalesEnabled": customer.get("globalSalesEnabled", False),
+        }
