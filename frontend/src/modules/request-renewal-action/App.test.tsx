@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http } from '@mpt-extension/sdk';
 
 import App from './App';
+import type { RenewalPathState } from '../shared/model';
 
 const mockClose = jest.fn();
 let mockActiveStepIndex = 0;
@@ -69,10 +70,22 @@ const mockGet = jest.mocked(http.get);
 
 const AUTO_RENEW_SUPPORT_URL = '/api/v2/agreements/AGR-1/renewal-order/auto-renew-support';
 const AUTO_RENEW_SUPPORTED = { '65322587CA': true, '65322588CA': true };
+const PATH_STATE_URL = '/api/v2/agreements/AGR-1/renewal-order/path-state';
+const PATH_STATE: RenewalPathState = {
+  anniversaryDate: '2026-08-20',
+  windowOpen: true,
+  windowOpensDays: 30,
+  windowClosesDays: 3,
+  hasActiveSubscriptions: true,
+  lockedPath: null,
+};
 
-function respondTo(url: string) {
+function respondTo(url: string, pathState: RenewalPathState = PATH_STATE) {
   if (url === '/api/v2/settings') {
     return Promise.resolve({ data: { data: { products: [{ id: 'PRD-1', segment: 'COM' }] } } });
+  }
+  if (url === PATH_STATE_URL) {
+    return Promise.resolve({ data: { data: pathState } });
   }
   return Promise.resolve({ data: { data: SUBSCRIPTIONS } });
 }
@@ -87,12 +100,16 @@ function respondToPost(url: string, support = AUTO_RENEW_SUPPORTED) {
 interface MockChildren {
   children?: ReactNode | ((args: { activeStepIndex: number }) => ReactNode);
 }
+interface WizardStep {
+  title: string;
+  nextButton?: { isDisabled?: boolean };
+}
 interface MockWizardProps extends MockChildren {
   onClose?: () => void;
-  stepsProps?: { title: string }[];
+  stepsProps?: WizardStep[];
   isToDisableSideNavigation?: boolean;
 }
-let wizardSteps: { title: string }[] = [];
+let wizardSteps: WizardStep[] = [];
 let wizardProps: MockWizardProps;
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => {
@@ -124,7 +141,7 @@ interface TimingProps {
   renewalDate?: string;
   path: string;
   onPathChange: (path: string) => void;
-  lockedPath?: string | null;
+  pathState: RenewalPathState | null;
 }
 let timingProps: TimingProps;
 
@@ -347,7 +364,7 @@ describe('request-renewal-action App', () => {
 
     await screen.findByText('Timing step');
     expect(timingProps.path).toBe('anniversary');
-    expect(timingProps.lockedPath).toBeUndefined();
+    expect(timingProps.pathState?.lockedPath).toBeNull();
   });
 
   it('surfaces a failed auto-renewal support lookup with a retry', async () => {
@@ -684,6 +701,41 @@ describe('request-renewal-action App', () => {
 
     expect(await screen.findByText('Not available')).toBeTruthy();
     expect(screen.queryByText('Subscriptions unavailable')).toBeNull();
+  });
+
+  it('reports a path state failure and recovers on retry', async () => {
+    let failed = false;
+    mockGet.mockImplementation((url: string) => {
+      if (url === PATH_STATE_URL && !failed) {
+        failed = true;
+        return Promise.reject(new Error('Adobe unavailable'));
+      }
+      return respondTo(url);
+    });
+    render(<App />);
+
+    fireEvent.click(await screen.findByText('Retry'));
+
+    expect(await screen.findByText('Timing step')).toBeTruthy();
+  });
+
+  it('blocks the first step outside the renewal window', async () => {
+    mockGet.mockImplementation((url: string) =>
+      respondTo(url, { ...PATH_STATE, windowOpen: false }),
+    );
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    expect(wizardSteps[0].nextButton?.isDisabled).toBe(true);
+  });
+
+  it('runs the wizard on the established early path', async () => {
+    mockGet.mockImplementation((url: string) => respondTo(url, { ...PATH_STATE, lockedPath: 'now' }));
+    render(<App />);
+
+    await screen.findByText('Timing step');
+    await waitFor(() => expect(timingProps.path).toBe('now'));
+    expect(wizardSteps[0].nextButton?.isDisabled).toBe(false);
   });
 
   it('closes the modal from the wizard', async () => {

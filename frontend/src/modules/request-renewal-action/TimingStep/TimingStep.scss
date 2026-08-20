@@ -32,22 +32,10 @@
   }
 
   &__option {
-    &__locked {
-      padding: $var-spacing-3;
-      border: 1px solid $var-gray-2;
-
-      @extend %rad_m;
-
-      &__title {
-        display: flex;
-        align-items: center;
-        gap: $var-spacing-2;
-        margin-bottom: $var-spacing-2;
-
-        h3 {
-          margin: 0;
-        }
-      }
+    &__title {
+      display: flex;
+      align-items: center;
+      gap: $var-spacing-2;
     }
   }
 }
