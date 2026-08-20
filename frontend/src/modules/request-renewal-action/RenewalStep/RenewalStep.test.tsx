@@ -1,10 +1,36 @@
 import { ReactNode } from 'react';
 
-import { fireEvent, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
+
+import { http } from '@mpt-extension/sdk';
 
 import { RenewalStep } from './RenewalStep';
 import type { Agreement, Subscription } from '../../shared/model';
-import type { RenewalSelections } from '../model';
+import type { NetNewItem, RenewalPath, RenewalQuantities, RenewalSelections } from '../model';
+
+jest.mock('@mpt-extension/sdk', () => ({
+  http: {
+    post: jest.fn(),
+  },
+}), { virtual: true });
+
+const mockPost = jest.mocked(http.post);
+
+interface NavProps {
+  currentStepIndex: number;
+  targetStepIndex: number;
+}
+
+const NAVIGATION: NavProps = { currentStepIndex: 1, targetStepIndex: 2 };
+
+let registeredOnNext: ((props: NavProps) => Promise<number> | number) | undefined;
+const registerOnNextCallback = jest.fn((callback: (props: NavProps) => Promise<number> | number) => {
+  registeredOnNext = callback;
+});
+
+jest.mock('@softwareone-platform/sdk-react-ui-v0/wizard', () => ({
+  useStepActions: () => ({ registerOnNextCallback }),
+}));
 
 interface TestRow {
   id: string;
@@ -138,16 +164,25 @@ const renderStep = ({
   selections = {},
   onRenewChange = jest.fn(),
   subscriptionList = subscriptions,
+  quantities = {},
+  netNewItems = [],
+  path = 'anniversary',
 }: {
   selections?: RenewalSelections;
   onRenewChange?: (subscriptionId: string, renew: boolean) => void;
   subscriptionList?: Subscription[];
+  quantities?: RenewalQuantities;
+  netNewItems?: NetNewItem[];
+  path?: RenewalPath;
 } = {}) =>
   render(
     <RenewalStep
       agreement={agreement}
       subscriptions={subscriptionList}
       selections={selections}
+      quantities={quantities}
+      netNewItems={netNewItems}
+      path={path}
       onRenewChange={onRenewChange}
     />,
   );
@@ -233,6 +268,57 @@ describe('RenewalStep', () => {
     });
 
     expect(getByTestId('row-SUB-3').textContent).toContain('—');
+  });
+
+  describe('preview gate', () => {
+    beforeEach(() => {
+      mockPost.mockReset();
+      registeredOnNext = undefined;
+      mockPost.mockResolvedValue({ data: { data: {} } });
+    });
+
+    it('quotes the toggles through Adobe before advancing', async () => {
+      renderStep({ path: 'now', selections: { 'SUB-1': true } });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
+      expect(mockPost.mock.calls.map(([url]) => url)).toEqual([
+        '/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check',
+        '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',
+      ]);
+    });
+
+    it('keeps the customer on the step and shows what Adobe rejected', async () => {
+      mockPost.mockRejectedValue({
+        response: { data: { detail: '3121 - Subscription Not allowed for Renewal.' } },
+      });
+      const { findByTestId } = renderStep({ path: 'now', selections: { 'SUB-1': true } });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      const error = await findByTestId('renewal-step-error');
+      expect(error.textContent).toContain('Subscription Not allowed for Renewal');
+    });
+
+    it('leaves Adobe out of an at-anniversary plan', async () => {
+      renderStep({ selections: { 'SUB-1': true } });
+
+      await act(async () => {
+        await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(mockPost.mock.calls.map(([url]) => url)).toEqual([
+        '/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check',
+      ]);
+    });
   });
 
   it('pages the grid ten subscriptions at a time', () => {
