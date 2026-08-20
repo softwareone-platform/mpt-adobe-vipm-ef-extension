@@ -138,6 +138,9 @@ jest.mock('./TimingStep', () => ({
 interface RenewalStepProps {
   subscriptions: { id: string }[];
   selections: Record<string, boolean>;
+  quantities: Record<string, number | null>;
+  netNewItems: { itemId: string }[];
+  path: string;
   onRenewChange: (subscriptionId: string, renew: boolean) => void;
 }
 let renewalProps: RenewalStepProps;

@@ -202,10 +202,12 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     shows as the estimate. Net-new products have no Adobe subscription to
     preview yet on that path and are priced only at fulfilment.
 
-    The early-renewal ("Renew now") wizard calls it on every step that changes
-    the basket — the items and the discount codes — because the RENEWAL order
-    is placed now, which makes Adobe the authority on whether the basket is
-    valid: the preview carries the additions too, so a mixed renew-and-add
+    The early-renewal ("Renew now") wizard calls it on every step that shapes
+    the basket — the renew decisions, the items and the discount codes —
+    because the RENEWAL order is placed now, which makes Adobe the authority on
+    whether the basket is valid. Quoting it from the renewal step already
+    rejects a subscription Adobe will not renew at all, before the customer
+    edits a quantity: the preview carries the additions too, so a mixed renew-and-add
     basket (which Adobe forbids in one order) is rejected in the wizard instead
     of at fulfilment. A SKU that cannot renew at the anniversary is rejected
     here too, so no route quotes a plan the submit route would refuse.
