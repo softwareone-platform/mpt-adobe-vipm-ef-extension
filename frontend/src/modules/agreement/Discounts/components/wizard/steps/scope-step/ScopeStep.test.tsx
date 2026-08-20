@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 import { ANY_ORDER_TYPE, EMPTY_DRAFT } from "../../discountDraft";
 import { ScopeStep } from "./ScopeStep";

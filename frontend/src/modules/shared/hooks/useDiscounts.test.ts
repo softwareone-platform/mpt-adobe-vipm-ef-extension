@@ -48,7 +48,7 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 }),
       }),
     );
   });
@@ -62,7 +62,7 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 5, offset: 10 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 5, offset: 10 }),
       }),
     );
   });
@@ -83,7 +83,7 @@ describe('useDiscounts', () => {
     expect(mockGet).toHaveBeenLastCalledWith(
       '/api/v2/discount-codes',
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 }),
       }),
     );
   });

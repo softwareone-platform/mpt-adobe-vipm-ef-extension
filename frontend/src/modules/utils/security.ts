@@ -1,5 +1,5 @@
-import { ProductSegments } from '../shared/model';
 import type { ProductSegment } from '../shared/hooks/useSettings';
+import { ProductSegments } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { getProduct } from './settings';
 
@@ -71,6 +71,21 @@ export function canRequestGlobalCustomer(
   agreementProductId: string | undefined,
 ): boolean {
   return canRequestAdobeAction(accountType, products, agreementProductId);
+}
+
+export function canEditDiscountCode(
+  accountType: AccountType | undefined,
+  source: string | null | undefined,
+): boolean {
+  if (accountType === 'Vendor') {
+    return true;
+  }
+
+  if (accountType === 'Operations') {
+    return (source ?? '').trim().toLowerCase() !== 'open';
+  }
+
+  return false;
 }
 
 /**

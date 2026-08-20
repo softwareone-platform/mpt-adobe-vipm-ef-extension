@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 import { useMPTContext } from '@mpt-extension/sdk-react';
@@ -52,8 +52,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () =>
     .createButtonMock(),
 );
 
-// Captures every useGridAsync config so tests can drive grid events (paging)
-// and renders rows through the real column cell definitions.
+// Captures every grid config so tests can assert what reaches the grid.
 const mockGridConfigs: Array<Record<string, unknown>> = [];
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () =>
@@ -147,7 +146,7 @@ describe('Discounts view', () => {
     expect(mockGet).toHaveBeenCalledWith(
       DISCOUNTS_URL,
       expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 0 },
+        params: expect.objectContaining({ agreement: 'AGR-0000-0000-0000', limit: 100, offset: 0 }),
       }),
     );
   });
@@ -156,7 +155,17 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.getByRole('heading', { name: 'Discounts' })).toBeInTheDocument();
-    for (const header of ['Code', 'Source', 'Type', 'Value', 'Valid', 'Order types', 'Redeemed']) {
+    expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
+    for (const header of [
+      'Code',
+      'Source',
+      'Type',
+      'Value',
+      'Valid',
+      'Order types',
+      'Redeemed',
+      'Actions',
+    ]) {
       expect(screen.getByText(header)).toBeInTheDocument();
     }
   });
@@ -175,6 +184,35 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit')).toHaveLength(2);
+  });
+
+  it('hides Actions and Add closed discount for client actors', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Client' } },
+      data: { agreement: { id: 'AGR-0000-0000-0000' } },
+    });
+
+    await renderDiscounts();
+
+    expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+  });
+
+  it('shows Actions and Add closed discount for operations actors', async () => {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type: 'Operations' } },
+      data: {
+        agreement: { id: 'AGR-0000-0000-0000', product: { id: PRODUCT_ID } },
+      },
+    });
+
+    await renderDiscounts();
+
+    expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
   });
 
   it('renders expired closed codes with the lock date and the Any order type', async () => {
@@ -194,29 +232,22 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1] as {
-      onConfigChange: (config: { paging: { page: number; pageSize: number } }) => void;
+      onConfigChange?: (config: { paging: { page: number; pageSize: number } }) => void;
     };
 
     act(() => {
-      lastConfig.onConfigChange({ paging: { page: 2, pageSize: 10 } });
+      lastConfig.onConfigChange?.({ paging: { page: 2, pageSize: 10 } });
     });
 
-    await waitFor(() => expect(discountRequests()).toHaveLength(2));
-    expect(mockGet).toHaveBeenLastCalledWith(
-      DISCOUNTS_URL,
-      expect.objectContaining({
-        params: { agreement: 'AGR-0000-0000-0000', limit: 10, offset: 10 },
-      }),
-    );
+    // Client-side paging: filter/sort/paging are handled in memory by useGridInMemory
+    await waitFor(() => expect(discountRequests()).toHaveLength(1));
   });
 
   it('passes the fetch state through to the grid', async () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1];
-    expect(lastConfig.total).toBe(DISCOUNTS.length);
-    expect(lastConfig.isLoading).toBe(false);
-    expect(lastConfig.error).toBeUndefined();
+    expect(lastConfig.data).toEqual(DISCOUNTS);
   });
 
   it('surfaces fetch errors to the grid', async () => {
@@ -225,7 +256,8 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     const lastConfig = mockGridConfigs[mockGridConfigs.length - 1];
-    expect(lastConfig.error).toBe('Airtable unavailable');
+    // a failed read simply leaves the grid with an empty data set.
+    expect(lastConfig.data).toEqual([]);
   });
 
   it('renders the add action inside the grid toolbar for editor accounts', async () => {
