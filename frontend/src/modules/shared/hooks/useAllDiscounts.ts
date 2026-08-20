@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 
@@ -27,12 +27,16 @@ interface DiscountsResponse {
  * an `orderType` the backend returns only the codes an order of that type can
  * still apply: the right order type, and a validity window (or discount lock,
  * for a reusable code) that has not run out.
+ *
+ * `refresh` re-runs the read against the same agreement (used by the
+ * agreement discounts grid after the create/edit wizard closes).
  */
 export function useAllDiscounts(
   agreementId: string,
   orderType?: DiscountOrderType,
-): DiscountsPage {
+): DiscountsPage & { refresh: () => Promise<void> } {
   const [state, setState] = useState<DiscountsPage>(INITIAL_STATE);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     // The codes belong to one agreement's customer, so the previous
@@ -79,7 +83,11 @@ export function useAllDiscounts(
       });
 
     return () => controller.abort();
-  }, [agreementId, orderType]);
+  }, [agreementId, orderType, refreshToken]);
 
-  return state;
+  const refresh = useCallback(async () => {
+    setRefreshToken((token) => token + 1);
+  }, []);
+
+  return { ...state, refresh };
 }

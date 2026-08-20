@@ -29,3 +29,7 @@ export function formatOrderTypes(orderTypes?: DiscountOrderType[]): string {
     .map((type) => i18n.t(`Agreement:Discounts:OrderTypes:${type}`, { defaultValue: type }))
     .join(', ');
 }
+
+export function formatSource(source?: string | null): string {
+  return source ?? EM_DASH;
+}

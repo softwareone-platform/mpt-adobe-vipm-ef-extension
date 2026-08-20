@@ -1,5 +1,7 @@
 import { ProductSegment } from '../shared/hooks/useSettings';
 import {
+  canEditDiscountCode,
+  canManageDiscountCodes,
   canRequestGlobalCustomer,
   canRequestLinkedMembership,
   canRequestMidtermUpgradeAction,
@@ -151,5 +153,42 @@ describe('canRequestGlobalCustomer', () => {
 
   it('returns false when the product id is undefined', () => {
     expect(canRequestGlobalCustomer('Operations', products, undefined)).toBe(false);
+  });
+});
+
+describe('canManageDiscountCodes', () => {
+  it('returns true for operations accounts', () => {
+    expect(canManageDiscountCodes('Operations', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true for vendor accounts', () => {
+    expect(canManageDiscountCodes('Vendor', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns false for client accounts', () => {
+    expect(canManageDiscountCodes('Client', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canManageDiscountCodes('Operations', products, 'PRD-9999-9999')).toBe(false);
+  });
+});
+
+describe('canEditDiscountCode', () => {
+  it('returns true for vendors regardless of source', () => {
+    expect(canEditDiscountCode('Vendor', 'Open')).toBe(true);
+    expect(canEditDiscountCode('Vendor', 'Closed')).toBe(true);
+  });
+
+  it('returns false for operations when source is Open', () => {
+    expect(canEditDiscountCode('Operations', 'Open')).toBe(false);
+  });
+
+  it('returns true for operations when source is Closed', () => {
+    expect(canEditDiscountCode('Operations', 'Closed')).toBe(true);
+  });
+
+  it('returns false for clients', () => {
+    expect(canEditDiscountCode('Client', 'Closed')).toBe(false);
   });
 });

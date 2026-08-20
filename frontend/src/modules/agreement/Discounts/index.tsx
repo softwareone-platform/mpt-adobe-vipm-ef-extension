@@ -1,37 +1,37 @@
 import { useMPTContext, useMPTModal } from "@mpt-extension/sdk-react";
 import { Button } from "@softwareone-platform/sdk-react-ui-v0/button";
 import { Chip, ChipColor } from "@softwareone-platform/sdk-react-ui-v0/chip";
+import type { ListOption } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
 import {
   Grid,
+  GridCellActions,
   GridCellSimple,
   GridColumnDefinition,
-  GridDefaultConfiguration,
-  useGridAsync,
-} from "@softwareone-platform/sdk-react-ui-v0/grid";
-import {
-  MediumText,
-  RegularText,
-} from "@softwareone-platform/sdk-react-ui-v0/text";
-import { useCallback, useState } from "react";
-import { useTranslation } from "react-i18next";
+  GridFieldDefinition,
+  useGridInMemory,
+} from '@softwareone-platform/sdk-react-ui-v0/grid';
+import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
+import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { i18n } from "../../../i18n/translations";
-import { useAgreementId } from "../../shared/hooks/useAgreementId";
-import { useDiscounts } from "../../shared/hooks/useDiscounts";
+import { i18n } from '../../../i18n/translations';
+import { useAgreementId } from '../../shared/hooks/useAgreementId';
+import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useSettings } from "../../shared/hooks/useSettings";
-import { canManageDiscountCodes } from "../../utils/security";
+import { canManageDiscountCodes } from '../../utils/security';
 
-import { TextCell } from "./components/grid-cell/text-cell/TextCell";
-import { formatDate, formatOrderTypes, formatValue } from "./format";
+import { TextCell } from './components/grid-cell/text-cell/TextCell';
+import { formatDate, formatOrderTypes, formatSource, formatValue } from './format';
 
-import type { AccountType } from "../../shared/three-year-commitment";
-import type { Discount } from "../../shared/model";
+import type { Discount } from '../../shared/model';
+import type { AccountType } from '../../shared/three-year-commitment';
 
-import "./index.scss";
 import { EM_DASH } from "../../utils/date";
+import "./index.scss";
 
 const DEFAULT_PAGE_SIZE = 10;
 
+type DiscountAction = 'edit';
 /** Shared by the create and the future edit flow; the mode rides on the context. */
 const DISCOUNT_WIZARD_PLUG_ID = "request-discount-action";
 
@@ -40,7 +40,103 @@ const STATUS_CHIP_COLORS: Record<string, ChipColor> = {
   EXPIRED: "danger",
 };
 
-const columns: GridColumnDefinition<Discount>[] = [
+const DISCOUNT_ACTIONS: ListOption<DiscountAction>[] = [
+  {
+    value: 'edit',
+    label: i18n.t('Agreement:Discounts:Edit'),
+  },
+];
+
+type ExcludableGridField = GridFieldDefinition & { isExcluded?: boolean };
+
+function getFilteredGridFields(fields: ExcludableGridField[]): GridFieldDefinition[] {
+  return fields
+    .filter((field) => !field.isExcluded)
+    .map(({ isExcluded, ...field }) => {
+      void isExcluded;
+      return field;
+    });
+}
+
+function useGridFields(role: AccountType | undefined): GridFieldDefinition[] {
+  const { t } = useTranslation();
+
+  return useMemo(
+    () =>
+      getFilteredGridFields([
+        {
+          name: 'code',
+          title: t('Agreement:Discounts:Code'),
+          type: 'text',
+          allowedOperations: ['Filter', 'Sort'],
+        },
+        {
+          name: 'source',
+          title: t('Agreement:Discounts:Source'),
+          type: 'list',
+          allowedOperations: ['Filter', 'Sort'],
+          options: [
+            { value: 'OPEN', label: t('Agreement:Discounts:SourceOpen') },
+            { value: 'CLOSED', label: t('Agreement:Discounts:SourceClosed') },
+          ],
+        },
+        {
+          name: 'discountType',
+          title: t('Agreement:Discounts:Type'),
+          type: 'list',
+          allowedOperations: ['Filter', 'Sort'],
+          options: [
+            { value: 'PERCENTAGE', label: t('Agreement:Discounts:Types:PERCENTAGE') },
+            { value: 'FIXED_DISCOUNT', label: t('Agreement:Discounts:Types:FIXED_DISCOUNT') },
+            { value: 'FIXED_PRICE', label: t('Agreement:Discounts:Types:FIXED_PRICE') },
+          ],
+        },
+        {
+          name: 'status',
+          title: t('Common:Status'),
+          type: 'list',
+          allowedOperations: ['Filter', 'Sort'],
+          options: [
+            { value: 'ACTIVE', label: t('Agreement:Discounts:Status:ACTIVE') },
+            { value: 'EXPIRED', label: t('Agreement:Discounts:Status:EXPIRED') },
+          ],
+        },
+        {
+          name: 'applicableOrderTypes',
+          title: t('Agreement:Discounts:Order types'),
+          type: 'list',
+          allowedOperations: ['Filter'],
+          options: [
+            { value: 'NEW', label: t('Agreement:Discounts:OrderTypes:NEW') },
+            { value: 'RENEWAL', label: t('Agreement:Discounts:OrderTypes:RENEWAL') },
+            { value: 'SWITCH', label: t('Agreement:Discounts:OrderTypes:SWITCH') },
+          ],
+        },
+        {
+          name: 'startDate',
+          title: t('Agreement:Discounts:Valid'),
+          type: 'date',
+          allowedOperations: ['Filter', 'Sort'],
+        },
+        {
+          name: 'redeemedAt',
+          title: t('Agreement:Discounts:Redeemed'),
+          type: 'date',
+          allowedOperations: ['Filter', 'Sort'],
+        },
+        {
+          name: 'updatedAt',
+          title: t('Common:Updated'),
+          type: 'date',
+          allowedOperations: ['Filter', 'Sort'],
+          isExcluded: role !== 'Operations' && role !== 'Vendor',
+        },
+      ]),
+    [t, role],
+  );
+}
+
+const BASE_COLUMNS: GridColumnDefinition<Discount>[] = [
   {
     name: "code",
     title: i18n.t("Agreement:Discounts:Code"),
@@ -75,7 +171,7 @@ const columns: GridColumnDefinition<Discount>[] = [
     title: i18n.t("Agreement:Discounts:Source"),
     fields: ["source"],
     initialWidth: 110,
-    cell: (item) => <TextCell text={item.source ?? EM_DASH} />,
+    cell: (item) => <TextCell text={formatSource(item.source)} />,
   },
   {
     name: "type",
@@ -147,12 +243,11 @@ export function Discounts() {
     auth?: { account?: { type?: AccountType } };
     data?: { agreement?: { product?: { id?: string } } };
   }>();
+  const accountType = context.auth?.account?.type;
   const agreementId = useAgreementId();
-  const [paging, setPaging] = useState({
-    page: 1,
-    pageSize: DEFAULT_PAGE_SIZE,
-  });
-  const discounts = useDiscounts(agreementId, paging.page, paging.pageSize);
+  // The grid lists every code for the agreement, filter/sort/search are resolved client-side by useGridInMemory.
+  const discounts = useAllDiscounts(agreementId);
+  const fields = useGridFields(accountType);
 
   const canAddClosedDiscount = canManageDiscountCodes(
     context.auth?.account?.type,
@@ -170,37 +265,49 @@ export function Discounts() {
     });
   }, [open, context, discounts]);
 
-  // The grid owns the paging state; mirror page changes into the fetch so the
-  // backend receives the matching `offset`/`limit` query parameters.
-  const onConfigChange = useCallback(
-    (config: GridDefaultConfiguration<Discount>) => {
-      const page = config.paging.page ?? 1;
-      const pageSize = config.paging.pageSize ?? DEFAULT_PAGE_SIZE;
-      setPaging((prev) =>
-        prev.page === page && prev.pageSize === pageSize
-          ? prev
-          : { page, pageSize },
-      );
-    },
-    [],
+  const columns = useMemo<GridColumnDefinition<Discount>[]>(
+    () => [
+      ...BASE_COLUMNS,
+      ...(canAddClosedDiscount
+        ? [
+            {
+              name: 'actions',
+              title: i18n.t('Agreement:Discounts:Actions'),
+              fields: ['id'],
+              initialWidth: 80,
+              cell: (item: Discount) => (
+                <GridCellActions
+                  item={item}
+                  actions={DISCOUNT_ACTIONS}
+                  testId={`discounts-action-${item.id}`}
+                />
+              ),
+            } as GridColumnDefinition<Discount>,
+          ]
+        : []),
+    ],
+    [canAddClosedDiscount],
   );
 
-  const gridProps = useGridAsync<Discount>({
-    id: "modules__agreement__discounts--client",
-    columns,
-    data: discounts.data,
-    total: discounts.total,
-    isLoading: discounts.status === "loading" || discounts.status === "idle",
-    error: discounts.error ?? undefined,
-    refresh: discounts.refresh,
-    abort: discounts.abort,
-    paging: {
-      page: paging.page,
-      pageSize: paging.pageSize,
-      total: discounts.total,
-    },
-    onConfigChange,
-  });
+  const gridConfig = useMemo(
+    () => ({
+      id: "modules__agreement__discounts--client",
+      columns,
+      fields,
+      paging: {
+        page: 1,
+        pageSize: DEFAULT_PAGE_SIZE,
+        total: discounts.data.length,
+      },
+    }),
+    [columns, fields, discounts.data.length],
+  );
+
+  const gridProps = useGridInMemory<Discount>(
+    discounts.data,
+    gridConfig,
+    discounts.refresh,
+  );
 
   return (
     <div className="discounts">

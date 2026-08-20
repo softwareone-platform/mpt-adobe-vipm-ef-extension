@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { http } from '@mpt-extension/sdk';
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
@@ -388,7 +388,7 @@ describe('agreement plug app', () => {
       expect(mockGet).toHaveBeenCalledWith(
         '/api/v2/discount-codes',
         expect.objectContaining({
-          params: { agreement: 'AGR-1234-5678-9012', limit: 10, offset: 0 },
+          params: expect.objectContaining({ agreement: 'AGR-1234-5678-9012', limit: 100, offset: 0 }),
         }),
       );
     });
