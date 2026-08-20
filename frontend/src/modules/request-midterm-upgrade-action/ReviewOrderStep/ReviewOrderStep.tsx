@@ -264,13 +264,6 @@ export function ReviewOrderStep({
           {t('MidtermUpgrade:Steps:Review order')}
         </RegularText>
       </div>
-      {errorMessage ? (
-        <div className="review-order-step__error" data-testid="review-order-step-error">
-          <InlineNotification status="error" isStandalone>
-            {errorMessage}
-          </InlineNotification>
-        </div>
-      ) : null}
       {isSubmitting ? (
         <div className="review-order-step__submitting" data-testid="review-order-step-submitting">
           <RegularText as="p" size={2} color="grey-4">
@@ -281,6 +274,13 @@ export function ReviewOrderStep({
       <div className="review-order-step__highlights">
         <WizardHighlights agreement={subscription.agreement} parties={subscription} order={order} />
       </div>
+      {errorMessage ? (
+        <div className="review-order-step__error" data-testid="review-order-step-error">
+          <InlineNotification status="error">
+            {errorMessage}
+          </InlineNotification>
+        </div>
+      ) : null}
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('MidtermUpgrade:Review:Tabs:Items')}>
           <Tab.Content>

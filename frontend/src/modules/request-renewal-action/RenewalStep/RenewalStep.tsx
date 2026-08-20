@@ -242,7 +242,7 @@ export function RenewalStep({
       <div className="renewal-step__highlights">
         <WizardHighlights agreement={agreement} />
       </div>
-      <InlineNotification status="info" isStandalone>
+      <InlineNotification status="info">
         {t('Renewal:Grid:Prompt')}
       </InlineNotification>
       <div className="renewal-step__grid">

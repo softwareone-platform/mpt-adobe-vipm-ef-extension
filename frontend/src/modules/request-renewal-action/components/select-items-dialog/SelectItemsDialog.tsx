@@ -321,12 +321,12 @@ export function SelectItemsDialog({
       }
     >
       <div className="select-items-dialog">
-        <InlineNotification status="info" isStandalone>
+        <InlineNotification status="info">
           {t('Renewal:Items:Picker note')}
         </InlineNotification>
         {priceListItems.status === 'error' && (
           <>
-            <InlineNotification status="error" isStandalone>
+            <InlineNotification status="error">
               {priceListItems.error ?? t('Errors:LoadPriceListItems')}
             </InlineNotification>
             <Button onClick={priceListItems.refresh} testId="select-items-retry">

@@ -521,13 +521,13 @@ export function ItemsStep({
       <div className="items-step__highlights">
         <WizardHighlights agreement={agreement} />
       </div>
-      <InlineNotification status="info" isStandalone>
+      <InlineNotification status="info">
         {t('Renewal:Items:Prompt')}
       </InlineNotification>
       {conflict && <ConflictNotice conflict={conflict} />}
       {(quantityError || planError) && (
         <div className="items-step__validation" data-testid="items-step-error">
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {quantityError || planError}
           </InlineNotification>
         </div>

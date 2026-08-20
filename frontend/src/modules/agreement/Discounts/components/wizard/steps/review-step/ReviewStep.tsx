@@ -55,7 +55,7 @@ export function ReviewStep({
       </header>
 
       {errorMessage && (
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {errorMessage}
         </InlineNotification>
       )}

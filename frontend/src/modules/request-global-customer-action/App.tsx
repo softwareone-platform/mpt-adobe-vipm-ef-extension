@@ -58,27 +58,27 @@ export default function App() {
       </div>
 
       <div className="request-global-customer-modal__content">
-        <RegularText as="p" size={2} color="grey-5">
-          {t('GlobalCustomer:Description')}
-        </RegularText>
-
         {globalSalesEnabled && (
-          <InlineNotification status="warning" isStandalone>
+          <InlineNotification status="warning">
             {t('GlobalCustomer:AlreadyEnabled')}
           </InlineNotification>
         )}
 
         {status === 'error' && error && (
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {error}
           </InlineNotification>
         )}
 
         {status === 'success' && (
-          <InlineNotification status="success" isStandalone>
+          <InlineNotification status="success">
             {t('GlobalCustomer:Success')}
           </InlineNotification>
         )}
+
+        <RegularText as="p" size={2} color="grey-5">
+          {t('GlobalCustomer:Description')}
+        </RegularText>
       </div>
 
       <div className="request-global-customer-modal__actions">

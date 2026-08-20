@@ -110,3 +110,9 @@
 .extension__field-value {
   margin: 0;
 }
+
+/* The SDK's shadowless notification puts its padding and border on the same
+   100%-wide box, so without border-box it overflows its container. */
+[class*='inline-notification-card__not-standalone'] {
+  box-sizing: border-box;
+}
