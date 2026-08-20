@@ -84,7 +84,7 @@ export function DefinitionStep({
       </header>
 
       {error && (
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {error}
         </InlineNotification>
       )}

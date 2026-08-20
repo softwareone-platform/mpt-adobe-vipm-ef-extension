@@ -63,12 +63,12 @@ export function LinkedMembership() {
         </header>
 
         {adobeCustomer.status === 'loading' && (
-          <InlineNotification status="info" isStandalone>
+          <InlineNotification status="info">
             {t('Agreement:Loading')}
           </InlineNotification>
         )}
         {adobeCustomer.status === 'error' && (
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {adobeCustomer.error}
           </InlineNotification>
         )}

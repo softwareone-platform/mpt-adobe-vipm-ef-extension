@@ -97,7 +97,7 @@ export function SplitBillingStep({
       </div>
       {(error || noBuyers) && (
         <div className="split-billing-step__error">
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {error || t('MidtermUpgrade:SplitBilling:NoBuyers')}
           </InlineNotification>
         </div>

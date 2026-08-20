@@ -58,7 +58,7 @@ export function ValidityStep({
       </header>
 
       {error && (
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {error}
         </InlineNotification>
       )}

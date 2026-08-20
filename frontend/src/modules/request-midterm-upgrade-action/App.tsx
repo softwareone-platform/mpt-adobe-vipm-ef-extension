@@ -239,7 +239,7 @@ export default function App() {
   if (status === 'error' || (status === 'success' && !subscription)) {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {error || t('MidtermUpgrade:Errors:Subscription could not be loaded')}
         </InlineNotification>
         <Button onClick={() => syncSubscription()}>
@@ -252,7 +252,7 @@ export default function App() {
   if (settingsStatus === 'error') {
     return (
       <div className="request-midterm-upgrade__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {t('MidtermUpgrade:Errors:Settings could not be loaded')}
         </InlineNotification>
         <Button onClick={refetchSettings}>
