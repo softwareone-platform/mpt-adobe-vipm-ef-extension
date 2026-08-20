@@ -19,6 +19,7 @@ import type { StepNavigationProperties } from '@softwareone-platform/sdk-react-u
 import { i18n } from '../../../i18n/translations';
 import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
+import { ProgressModal } from '../../shared/components/ProgressModal/ProgressModal';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
 import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
@@ -237,7 +238,7 @@ export function RenewalStep({
   // The toggles are the only edit this step allows, so the plan is gated on the
   // 3YC floor alone: Adobe's quote is left to the Items step, where the
   // customer owns the quantities it would reject.
-  const { error: planError, validatePlan, reset } = useRenewalPlanValidation(agreement.id, {
+  const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(agreement.id, {
     quoteThroughAdobe: false,
   });
   const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
@@ -285,6 +286,11 @@ export function RenewalStep({
       <InlineNotification status="info">
         {t('Renewal:Grid:Prompt')}
       </InlineNotification>
+      <ProgressModal
+        isOpen={planStatus === 'loading'}
+        label={t('Common:Validating')}
+        onCancel={cancel}
+      />
       {planError && (
         <div className="renewal-step__validation" data-testid="renewal-step-error">
           <InlineNotification status="error">

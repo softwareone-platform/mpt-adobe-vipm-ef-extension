@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 
 import { act, fireEvent, render, within } from '@testing-library/react';
 
+import type { GenericAbortSignal } from 'axios';
+
 import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
@@ -136,6 +138,20 @@ interface DialogProps {
   onAdd: (items: NetNewItem[]) => void;
 }
 let dialogProps: DialogProps;
+
+interface ProgressProps {
+  isOpen: boolean;
+  label: string;
+  onCancel: () => void;
+}
+let progressProps: ProgressProps;
+
+jest.mock('../../shared/components/ProgressModal/ProgressModal', () => ({
+  ProgressModal: (props: ProgressProps) => {
+    progressProps = props;
+    return props.isOpen ? <div data-testid="progress-modal">{props.label}</div> : null;
+  },
+}));
 
 jest.mock('../components/select-items-dialog/SelectItemsDialog', () => ({
   SelectItemsDialog: (props: DialogProps) => {
@@ -537,6 +553,59 @@ describe('ItemsStep', () => {
       expect(registeredOnNext).toBeDefined();
     });
 
+    it('holds the customer with the validating modal while the plan is in flight', async () => {
+      let releasePost: (() => void) | undefined;
+      mockPost.mockImplementation(
+        () => new Promise((resolve) => {
+          releasePost = () => resolve({ data: { data: {} } });
+        }),
+      );
+      const { getByTestId, queryByTestId } = renderStep();
+
+      expect(queryByTestId('progress-modal')).toBeNull();
+
+      let pending: Promise<number> | undefined;
+      await act(async () => {
+        pending = registeredOnNext!(NAVIGATION) as Promise<number>;
+      });
+
+      expect(getByTestId('progress-modal').textContent).toBe('Validating');
+
+      await act(async () => {
+        releasePost?.();
+        await pending;
+      });
+
+      expect(queryByTestId('progress-modal')).toBeNull();
+    });
+
+    it('cancels the plan validation from the modal', async () => {
+      mockPost.mockImplementation(
+        (_url: string, _body?: unknown, config?: { signal?: GenericAbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            config?.signal?.addEventListener?.('abort', () => reject(new Error('canceled')));
+          }),
+      );
+      const { getByTestId, queryByTestId } = renderStep();
+
+      let pending: Promise<number> | undefined;
+      await act(async () => {
+        pending = registeredOnNext!(NAVIGATION) as Promise<number>;
+      });
+
+      expect(getByTestId('progress-modal')).toBeTruthy();
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        progressProps.onCancel();
+        nextIndex = await pending;
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(queryByTestId('progress-modal')).toBeNull();
+      expect(queryByTestId('items-step-error')).toBeNull();
+    });
+
     it('blocks the step while a renewal quantity is invalid, without calling the backend', async () => {
       const { getByTestId } = renderStep({ quantities: { 'SUB-1': null } });
 
@@ -575,6 +644,7 @@ describe('ItemsStep', () => {
           subscriptions: PLAN_SUBSCRIPTIONS,
           netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
         },
+        expect.objectContaining({ signal: expect.anything() }),
       );
     });
 
@@ -593,7 +663,7 @@ describe('ItemsStep', () => {
         subscriptions: PLAN_SUBSCRIPTIONS,
         netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
       };
-      expect(mockPost.mock.calls).toEqual([
+      expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
         ['/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check', plan],
         [
           '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',

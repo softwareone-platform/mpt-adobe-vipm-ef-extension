@@ -49,6 +49,7 @@ describe('useUpgradeOrderRequest', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/subscriptions/SUB-1234-5678/upgrade-order',
       ORDER_INPUT,
+      expect.objectContaining({ signal: expect.anything() }),
     );
     expect(resolved).toEqual(CREATED_ORDER);
     await waitFor(() => expect(result.current.status).toBe('success'));

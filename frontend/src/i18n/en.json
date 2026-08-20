@@ -2,6 +2,9 @@
   "Common": {
     "Terms title": "Terms",
     "Retry": "Retry",
+    "Cancel": "Cancel",
+    "Validating": "Validating",
+    "Placing order": "Placing order",
     "Close": "Close",
     "Yes": "Yes",
     "No": "No",
@@ -422,7 +425,6 @@
         "Outro": "You can place whatever you remove as a separate order by using this wizard again.",
         "Learn more": "Learn more"
       },
-      "Validating": "Validating the renewal plan…",
       "Validation": {
         "Required": "Quantity is required",
         "AtLeast": "Quantity must be at least {{quantity}}",
@@ -442,7 +444,6 @@
         "Title": "No items to discount",
         "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
       },
-      "Validating": "Validating the selected discount codes…",
       "Errors": {
         "Discounts could not be loaded": "Your discount codes could not be loaded."
       }

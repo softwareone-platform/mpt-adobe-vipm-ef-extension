@@ -21,6 +21,7 @@ import { ChipCell } from '../../shared/components/GridCell/ChipCell/ChipCell';
 import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
+import { ProgressModal } from '../../shared/components/ProgressModal/ProgressModal';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import {
   BILLING_MODEL_LABELS,
@@ -368,6 +369,7 @@ export function PromotionsStep({
     error: discountValidationError,
     status: discountValidationStatus,
     validateDiscounts,
+    cancel: cancelDiscountValidation,
     reset: resetDiscountValidation,
   } = useRenewalDiscountValidation(agreement.id);
 
@@ -486,11 +488,11 @@ export function PromotionsStep({
             </InlineNotification>
           </div>
         )}
-        {discountValidationStatus === 'loading' && (
-          <RegularText as="p" size={2} color="grey-4" className="promotions-step__validating">
-            {t('Renewal:Promotions:Validating')}
-          </RegularText>
-        )}
+        <ProgressModal
+          isOpen={discountValidationStatus === 'loading'}
+          label={t('Common:Validating')}
+          onCancel={cancelDiscountValidation}
+        />
         {rows.length === 0 ? (
           <NoDataCard
             title={t('Renewal:Promotions:Empty:Title')}

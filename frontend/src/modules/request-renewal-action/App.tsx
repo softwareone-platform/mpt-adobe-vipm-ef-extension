@@ -10,6 +10,7 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { Loader } from '../shared/components/Loader/Loader';
+import { ProgressModal } from '../shared/components/ProgressModal/ProgressModal';
 import { COTERM_DATE_PARAM } from '../shared/constants';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscriptions';
@@ -79,6 +80,7 @@ export default function App() {
     error: submitError,
     status: submitStatus,
     submitOrder,
+    cancel: cancelSubmit,
   } = useRenewalOrderRequest(agreementId);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
@@ -446,6 +448,11 @@ export default function App() {
           </Wizard.Content>
           <Wizard.Actions />
         </Wizard>
+        <ProgressModal
+          isOpen={submitStatus === 'loading'}
+          label={t('Common:Placing order')}
+          onCancel={cancelSubmit}
+        />
       </div>
     </BrowserRouter>
   );

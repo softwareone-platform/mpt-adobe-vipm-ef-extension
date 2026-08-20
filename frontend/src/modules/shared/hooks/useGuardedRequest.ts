@@ -18,30 +18,40 @@ import type { RequestState } from '../constants';
 export function useGuardedRequest(fallbackErrorKey: string) {
   const [state, setState] = useState<RequestState>(INITIAL_REQUEST_STATE);
   const inFlightRef = useRef(false);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const run = useCallback(
-    async <T>(task: () => Promise<T>): Promise<T | false> => {
+    async <T>(task: (signal: AbortSignal) => Promise<T>): Promise<T | false> => {
       if (inFlightRef.current) {
         return false;
       }
       inFlightRef.current = true;
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setState({ error: '', status: 'loading' });
 
       try {
-        const result = await task();
+        const result = await task(controller.signal);
         setState({ error: '', status: 'success' });
         return result;
       } catch (requestError) {
-        setState({ error: toErrorMessage(requestError, fallbackErrorKey), status: 'error' });
+        setState(
+          controller.signal.aborted
+            ? INITIAL_REQUEST_STATE
+            : { error: toErrorMessage(requestError, fallbackErrorKey), status: 'error' },
+        );
         return false;
       } finally {
         inFlightRef.current = false;
+        controllerRef.current = null;
       }
     },
     [fallbackErrorKey],
   );
 
+  const cancel = useCallback(() => controllerRef.current?.abort(), []);
+
   const reset = useCallback(() => setState(INITIAL_REQUEST_STATE), []);
 
-  return { ...state, run, reset };
+  return { ...state, run, cancel, reset };
 }
