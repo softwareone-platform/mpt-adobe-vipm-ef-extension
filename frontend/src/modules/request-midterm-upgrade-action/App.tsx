@@ -20,7 +20,7 @@ import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { Loader } from '../shared/components/Loader/Loader';
-import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from '../utils/window';
 import { getPortalOrigin } from '../utils/link';
 import { getMonthlyPrice, getYearlyPrice } from '../utils/price';
 import { UpgradeFromStep } from './UpgradeFromStep';
@@ -69,6 +69,11 @@ export default function App() {
   const split = subscription?.split ?? null;
   const agreementSplit = subscription?.agreement?.split ?? null;
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+
+  const changeStep = useCallback((index: number) => {
+    setActiveStepIndex(index);
+    scrollStepToTop();
+  }, []);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
@@ -349,7 +354,7 @@ export default function App() {
         <Wizard
           stepsProps={wizardSteps.map((step) => ({ title: step.title, nextButton: step.nextButton }))}
           activeStepIndex={activeStepIndex}
-          onActiveStepIndexChange={setActiveStepIndex}
+          onActiveStepIndexChange={changeStep}
           onClose={onClose}
           onSave={viewOrder}
           isToDisableSideNavigation={Boolean(order.id)}

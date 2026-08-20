@@ -86,13 +86,27 @@ describe('TimingStep', () => {
   });
 
   it('counts a renewal date one day out in the singular', () => {
-    const { getByText } = renderStep({ renewalDate: dateInDays(1) });
+    const { getByText } = renderStep({
+      pathState: { ...pathState, anniversaryDate: dateInDays(1) },
+    });
 
     expect(getByText(/\(1 day away\)/)).toBeTruthy();
   });
 
+  it('states the anniversary Adobe reports, not the stored agreement parameter', () => {
+    const { getByText } = renderStep({
+      renewalDate: dateInDays(30),
+      pathState: { ...pathState, anniversaryDate: dateInDays(7) },
+    });
+
+    expect(getByText(/\(7 days away\)/)).toBeTruthy();
+  });
+
   it('asks for the timing without a date when the renewal date is unknown', () => {
-    const { getByText, queryByText } = renderStep({ renewalDate: undefined });
+    const { getByText, queryByText } = renderStep({
+      renewalDate: undefined,
+      pathState: { ...pathState, anniversaryDate: '' },
+    });
 
     expect(getByText('When would you like your renewal to occur?')).toBeTruthy();
     expect(queryByText(/Your renewal date is/)).toBeNull();

@@ -4,7 +4,7 @@ import {
   SCREEN_HEIGHT_FACTOR,
   SCREEN_WIDTH_FACTOR,
 } from '../shared/constants';
-import { relativeScreenHeight, relativeScreenWidth } from './window';
+import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from './window';
 
 function setScreen(availHeight: number, availWidth: number): void {
   Object.defineProperty(window.screen, 'availHeight', { value: availHeight, configurable: true });
@@ -52,5 +52,31 @@ describe('relativeScreenWidth', () => {
   it('never exceeds the modal width ceiling', () => {
     setScreen(4000, 4000);
     expect(relativeScreenWidth()).toBe(MAX_MODAL_WIDTH);
+  });
+});
+
+describe('scrollStepToTop', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('returns the wizard step content to its top', () => {
+    document.body.innerHTML = '<div class="_wizard__step-content_abc123"></div>';
+    const stepContent = document.body.firstElementChild as HTMLElement;
+    stepContent.scrollTop = 420;
+
+    scrollStepToTop();
+
+    expect(stepContent.scrollTop).toBe(0);
+  });
+
+  it('leaves anything else alone', () => {
+    document.body.innerHTML = '<div class="grid"></div>';
+    const other = document.body.firstElementChild as HTMLElement;
+    other.scrollTop = 120;
+
+    scrollStepToTop();
+
+    expect(other.scrollTop).toBe(120);
   });
 });

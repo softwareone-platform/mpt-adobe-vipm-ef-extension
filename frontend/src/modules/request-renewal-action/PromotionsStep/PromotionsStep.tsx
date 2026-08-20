@@ -247,7 +247,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'item',
     title: i18n.t('Common:Item'),
-    fields: ['itemName'],
+    fields: ['itemName', 'itemId', 'sku'],
     cell: (row) => (
       <GridCellSimple>
         <LinkReference
@@ -269,7 +269,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'subscription',
     title: i18n.t('Common:Subscription'),
-    fields: ['subscriptionName'],
+    fields: ['subscriptionName', 'subscriptionId'],
     cell: (row) =>
       row.kind === 'net-new' ? (
         <ChipCell label={i18n.t('Renewal:Items:New')} color="gray" />
@@ -287,7 +287,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'terms',
     title: i18n.t('Common:Terms title'),
-    fields: ['terms'],
+    fields: ['terms', 'commitment'],
     initialWidth: 140,
     cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
   },
@@ -335,17 +335,21 @@ const columns: GridColumnDefinition<Row>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'itemName', title: i18n.t('Common:Item') },
+  { name: 'itemName', title: i18n.t('Common:Item name') },
+  { name: 'itemId', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
   { name: 'billingModel', title: i18n.t('Renewal:Items:Billing model') },
-  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'code', title: i18n.t('Renewal:Promotions:Discount code') },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
   { name: 'spxM', title: i18n.t('Renewal:Grid:SPxM'), type: 'number' },
   { name: 'spxY', title: i18n.t('Renewal:Grid:SPxY'), type: 'number' },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'itemName', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [];
 
 export function PromotionsStep({
   agreement,

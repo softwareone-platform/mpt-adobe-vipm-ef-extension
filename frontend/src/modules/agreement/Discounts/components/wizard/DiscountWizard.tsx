@@ -3,6 +3,7 @@ import { Wizard } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import {
   relativeScreenHeight,
   relativeScreenWidth,
+  scrollStepToTop,
 } from "../../../../utils/window";
 
 import type { StepProps } from "@softwareone-platform/sdk-react-ui-v0/wizard";
@@ -79,7 +80,10 @@ export function DiscountWizard({
           closeButton: step.closeButton,
         }))}
         activeStepIndex={activeStepIndex}
-        onActiveStepIndexChange={onActiveStepIndexChange}
+        onActiveStepIndexChange={(index: number) => {
+          onActiveStepIndexChange(index);
+          scrollStepToTop();
+        }}
         onClose={onClose}
         onSave={onFinish}
         // The rail is clickable in both directions by default, which would let
