@@ -26,7 +26,7 @@ import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
 import { canRequestRenewalAction } from '../utils/security';
 import { getPartialSku } from '../utils/sku';
-import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from '../utils/window';
 import { DetailsStep } from './DetailsStep';
 import { ItemsStep } from './ItemsStep';
 import { PromotionsStep } from './PromotionsStep';
@@ -63,6 +63,11 @@ export default function App() {
   const subscriptions = useAgreementSubscriptions(agreementId);
   const renewalDate = readParameter(agreement?.parameters?.fulfillment, COTERM_DATE_PARAM);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+
+  const changeStep = useCallback((index: number) => {
+    setActiveStepIndex(index);
+    scrollStepToTop();
+  }, []);
   const [renewalPath, setRenewalPath] = useState<RenewalPath>('anniversary');
   const [renewalSelections, setRenewalSelections] = useState<RenewalSelections | null>(null);
   const [renewalQuantities, setRenewalQuantities] = useState<RenewalQuantities>({});
@@ -425,7 +430,7 @@ export default function App() {
             nextButton: step.nextButton,
           }))}
           activeStepIndex={activeStepIndex}
-          onActiveStepIndexChange={setActiveStepIndex}
+          onActiveStepIndexChange={changeStep}
           onClose={onClose}
           onSave={viewOrder}
           isToDisableSideNavigation={Boolean(order?.id)}

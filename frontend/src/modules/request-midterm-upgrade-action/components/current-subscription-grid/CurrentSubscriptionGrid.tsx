@@ -70,7 +70,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'name',
     title: i18n.t('Common:Name'),
-    fields: ['name'],
+    fields: ['item.name', 'item.id', 'item.externalId'],
     cell: (item) => (
       <PopoverCell
         title={i18n.t('Common:Item')}
@@ -84,7 +84,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'subscription',
     title: i18n.t('Common:Subscription'),
-    fields: ['subscription'],
+    fields: ['subscriptionName', 'subscriptionId'],
     cell: (item) => (
       <PopoverCell
         title={i18n.t('Common:Subscription')}
@@ -143,8 +143,11 @@ const columns: GridColumnDefinition<Row>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'name', title: i18n.t('Common:Name') },
-  { name: 'subscription', title: i18n.t('Common:Subscription') },
+  { name: 'item.name', title: i18n.t('Common:Item name') },
+  { name: 'item.id', title: i18n.t('Common:Item ID') },
+  { name: 'item.externalId', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'quantity', title: i18n.t('MidtermUpgrade:Grid:Qty'), type: 'number' },
   { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP'), type: 'number' },
   { name: 'spxM', title: i18n.t('MidtermUpgrade:Grid:SPxM'), type: 'number' },
@@ -152,7 +155,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'status', title: i18n.t('Common:Status') },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [{ field: 'item.name', direction: 'asc' }];
 
 function isEqual(a: Row, b: Row): boolean {
   return a?.id === b?.id;

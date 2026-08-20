@@ -12,6 +12,8 @@ interface TestRow {
 
 interface GridColumn {
   name: string;
+  title?: string;
+  fields?: string[];
   cell?: (row: TestRow) => ReactNode;
 }
 
@@ -321,6 +323,17 @@ describe('SelectItemsDialog', () => {
         expect(row).toHaveProperty(field.name);
       }
     }
+  });
+
+  it('leaves the checkbox column unheaded and splits the item column', () => {
+    renderDialog();
+
+    const columns = Object.fromEntries(
+      capturedConfig.columns.map((column) => [column.name, column]),
+    );
+    expect(columns.select.title).toBe('');
+    expect(columns.item.fields).toEqual(['item', 'id', 'sku']);
+    expect(columns.terms.fields).toEqual(['terms', 'commitment']);
   });
 
   it('feeds numeric grid fields with numbers', () => {

@@ -102,7 +102,7 @@ function buildColumns(
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['itemName'],
+      fields: ['itemName', 'itemId', 'sku'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -117,7 +117,7 @@ function buildColumns(
     {
       name: 'subscription',
       title: i18n.t('Common:Subscription'),
-      fields: ['subscriptionName'],
+      fields: ['subscriptionName', 'subscriptionId'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -132,7 +132,7 @@ function buildColumns(
     {
       name: 'terms',
       title: i18n.t('Common:Terms title'),
-      fields: ['terms'],
+      fields: ['terms', 'commitment'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
     },
@@ -207,9 +207,13 @@ function buildColumns(
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'itemName', title: i18n.t('Common:Item') },
-  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'itemName', title: i18n.t('Common:Item name') },
+  { name: 'itemId', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'quantity', title: i18n.t('Renewal:Grid:Current qty'), type: 'number' },
   { name: 'renew', title: i18n.t('Renewal:Grid:Renew') },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
