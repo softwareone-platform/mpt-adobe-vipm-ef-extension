@@ -230,7 +230,12 @@ export function RenewalStep({
 }: RenewalStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
-  const { error: planError, validatePlan, reset } = useRenewalPlanValidation(agreement.id);
+  // The toggles are the only edit this step allows, so the plan is gated on the
+  // 3YC floor alone: Adobe's quote is left to the Items step, where the
+  // customer owns the quantities it would reject.
+  const { error: planError, validatePlan, reset } = useRenewalPlanValidation(agreement.id, {
+    quoteThroughAdobe: false,
+  });
   const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
   const columns = useMemo(() => buildColumns(onRenewChange), [onRenewChange]);
 

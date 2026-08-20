@@ -270,14 +270,14 @@ describe('RenewalStep', () => {
     expect(getByTestId('row-SUB-3').textContent).toContain('—');
   });
 
-  describe('preview gate', () => {
+  describe('validation gate', () => {
     beforeEach(() => {
       mockPost.mockReset();
       registeredOnNext = undefined;
       mockPost.mockResolvedValue({ data: { data: {} } });
     });
 
-    it('quotes the toggles through Adobe before advancing', async () => {
+    it('checks the 3YC floor before advancing and leaves the Adobe quote to the Items step', async () => {
       renderStep({ path: 'now', selections: { 'SUB-1': true } });
 
       let nextIndex: number | undefined;
@@ -288,11 +288,10 @@ describe('RenewalStep', () => {
       expect(nextIndex).toBe(NAVIGATION.targetStepIndex);
       expect(mockPost.mock.calls.map(([url]) => url)).toEqual([
         '/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check',
-        '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',
       ]);
     });
 
-    it('keeps the customer on the step and shows what Adobe rejected', async () => {
+    it('keeps the customer on the step and shows what the pre-check rejected', async () => {
       mockPost.mockRejectedValue({
         response: { data: { detail: '3121 - Subscription Not allowed for Renewal.' } },
       });

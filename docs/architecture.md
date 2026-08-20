@@ -52,6 +52,15 @@ frontend/                    TypeScript plug UI (esbuild)
     eligibility); on the `now` path
     the quote also carries the net-new additions, which ride the RENEWAL order
     itself, so Adobe rejects the renew-and-add basket it forbids in one order.
+    `path-state` reports whether a renewal can be planned at all — Adobe takes
+    a renewal order and a scheduled net-new subscription only between 30 and 3
+    days before the anniversary, and only for a customer holding an active
+    subscription — and which path is already established: `lockedPath` is `now`
+    once an early renewal has rolled the customer's `cotermDate` past the
+    subscriptions' `renewalDate`, which the wizard's first step presents as
+    confirmed state. The submit route repeats that lock check: an
+    at-anniversary plan is rejected once an early renewal has moved the
+    anniversary, because the wizard's gate is a display, not the boundary.
     `renewal-state` reports how much of each subscription is already
     early-renewed, whether its SKU can be early-renewed at all, and whether the
     Items step may offer an increase beyond the current quantity, which only a
