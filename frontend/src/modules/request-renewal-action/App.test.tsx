@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+import type { GenericAbortSignal } from 'axios';
+
 import { http } from '@mpt-extension/sdk';
 
 import App from './App';
@@ -224,6 +226,20 @@ interface ReviewOrderStepProps {
 }
 let reviewProps: ReviewOrderStepProps;
 
+interface ProgressProps {
+  isOpen: boolean;
+  label: string;
+  onCancel: () => void;
+}
+let progressProps: ProgressProps;
+
+jest.mock('../shared/components/ProgressModal/ProgressModal', () => ({
+  ProgressModal: (props: ProgressProps) => {
+    progressProps = props;
+    return props.isOpen ? <div data-testid="progress-modal">{props.label}</div> : null;
+  },
+}));
+
 jest.mock('./ReviewOrderStep', () => ({
   ReviewOrderStep: (props: ReviewOrderStepProps) => {
     reviewProps = props;
@@ -420,6 +436,7 @@ describe('request-renewal-action App', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1/renewal-order',
       expect.objectContaining({ renewalPath: 'now' }),
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 
@@ -546,6 +563,7 @@ describe('request-renewal-action App', () => {
         '/api/v2/agreements/AGR-1/recommendations',
         expect.anything(),
       ),
+      expect.objectContaining({ signal: expect.anything() }),
     );
     await act(async () => {});
 
@@ -566,7 +584,42 @@ describe('request-renewal-action App', () => {
       recommendationTrackerId: 'TRACKER-1',
       notes: '',
       externalIds: { client: '' },
+    }, expect.objectContaining({ signal: expect.anything() }));
+  });
+
+  it('holds the customer with the placing-order modal, and cancels the submission', async () => {
+    mockActiveStepIndex = 5;
+    let abortSubmission: (() => void) | undefined;
+    mockPost.mockImplementation(
+      (url: string, _body?: unknown, config?: { signal?: GenericAbortSignal }) => {
+        if (url === '/api/v2/agreements/AGR-1/renewal-order') {
+          return new Promise((_resolve, reject) => {
+            abortSubmission = () => reject(new Error('canceled'));
+            config?.signal?.addEventListener?.('abort', () => abortSubmission?.());
+          });
+        }
+        return respondToPost(url);
+      },
+    );
+    render(<App />);
+
+    await screen.findByText('Review step');
+    expect(screen.queryByTestId('progress-modal')).toBeNull();
+
+    let placed: Promise<boolean> | undefined;
+    await act(async () => {
+      placed = reviewProps.onPlaceOrder();
     });
+
+    expect(screen.getByTestId('progress-modal').textContent).toBe('Placing order');
+
+    await act(async () => {
+      progressProps.onCancel();
+      await placed;
+    });
+
+    expect(screen.queryByTestId('progress-modal')).toBeNull();
+    expect(summaryProps).toBeUndefined();
   });
 
   it('locks the side navigation once the order is placed', async () => {

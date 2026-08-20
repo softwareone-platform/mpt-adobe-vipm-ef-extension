@@ -48,6 +48,7 @@ describe('useRenewalDiscountValidation', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
       { ...PLAN, flexDiscountCodes: ['CODE-ONE'] },
+      expect.objectContaining({ signal: expect.anything() }),
     );
     await waitFor(() => expect(result.current.status).toBe('success'));
   });

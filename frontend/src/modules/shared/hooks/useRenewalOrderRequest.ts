@@ -7,15 +7,16 @@ import type { RenewalOrderInput, RenewalOrderResult } from '../model';
 import { useGuardedRequest } from './useGuardedRequest';
 
 export function useRenewalOrderRequest(agreementId: string) {
-  const { run, reset, ...state } = useGuardedRequest('Errors:OrderSubmission');
+  const { run, cancel, reset, ...state } = useGuardedRequest('Errors:OrderSubmission');
 
   const submitOrder = useCallback(
     (input: RenewalOrderInput): Promise<RenewalOrderResult | false> =>
-      run(async () => {
+      run(async (signal) => {
         const encodedAgreementId = encodeURIComponent(agreementId);
         const response = await http.post(
           `/api/v2/agreements/${encodedAgreementId}/renewal-order`,
           input,
+          { signal },
         );
         const order = (response.data as { data?: RenewalOrderResult } | undefined)?.data;
         if (!order?.id) {
@@ -26,5 +27,5 @@ export function useRenewalOrderRequest(agreementId: string) {
     [agreementId, run],
   );
 
-  return { ...state, submitOrder, reset };
+  return { ...state, submitOrder, cancel, reset };
 }

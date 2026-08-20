@@ -155,4 +155,25 @@ describe('useGuardedRequest', () => {
     expect(result.current.status).toBe('idle');
     expect(result.current.error).toBe('');
   });
+  it('aborts the request in flight and returns to idle when cancelled', async () => {
+    const { result } = renderHook(() => useGuardedRequest('Errors:OrderSubmission'));
+
+    let seenSignal: AbortSignal | undefined;
+    let outcome: boolean | false | undefined;
+    await act(async () => {
+      const pending = result.current.run((signal) => {
+        seenSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('canceled')));
+        });
+      });
+      result.current.cancel();
+      outcome = (await pending) as boolean | false;
+    });
+
+    expect(seenSignal?.aborted).toBe(true);
+    expect(outcome).toBe(false);
+    expect(result.current.status).toBe('idle');
+    expect(result.current.error).toBe('');
+  });
 });

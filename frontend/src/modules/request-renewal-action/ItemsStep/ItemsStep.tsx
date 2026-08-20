@@ -21,6 +21,7 @@ import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { TextInputCell } from '../../shared/components/GridCell/TextInputCell/TextInputCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
+import { ProgressModal } from '../../shared/components/ProgressModal/ProgressModal';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import {
   RENEWAL_LEARN_MORE_URL,
@@ -407,7 +408,7 @@ export function ItemsStep({
   const [isDialogOpen, setDialogOpen] = useState(false);
   const listingId = agreement.listing?.id ?? '';
   const { registerOnNextCallback } = useStepActions();
-  const { error: planError, status: planStatus, validatePlan, reset } = useRenewalPlanValidation(
+  const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(
     agreement.id,
   );
   const [quantityError, setQuantityError] = useState('');
@@ -536,11 +537,11 @@ export function ItemsStep({
           </InlineNotification>
         </div>
       )}
-      {planStatus === 'loading' && (
-        <RegularText as="p" size={2} color="grey-4" className="items-step__validating">
-          {t('Renewal:Items:Validating')}
-        </RegularText>
-      )}
+      <ProgressModal
+        isOpen={planStatus === 'loading'}
+        label={t('Common:Validating')}
+        onCancel={cancel}
+      />
       <div className="items-step__toolbar">
         <Button
           isDisabled={!listingId}
