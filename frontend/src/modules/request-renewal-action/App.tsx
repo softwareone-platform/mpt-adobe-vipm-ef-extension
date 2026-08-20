@@ -309,6 +309,9 @@ export default function App() {
           agreement={agreement}
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
+          quantities={renewalQuantities}
+          netNewItems={netNewItems}
+          path={renewalPath}
           onRenewChange={onRenewChange}
         />
       ),

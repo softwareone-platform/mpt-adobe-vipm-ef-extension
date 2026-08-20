@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
@@ -13,16 +13,26 @@ import {
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { Toggle } from '@softwareone-platform/sdk-react-ui-v0/toggle';
+import { useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
+import type { StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { i18n } from '../../../i18n/translations';
 import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
+import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
 import type { Agreement, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice } from '../../utils/price';
-import { isRenewedByDefault, type RenewalSelections } from '../model';
+import {
+  buildRenewalPlanRequest,
+  isRenewedByDefault,
+  type NetNewItem,
+  type RenewalPath,
+  type RenewalQuantities,
+  type RenewalSelections,
+} from '../model';
 
 import './RenewalStep.scss';
 
@@ -33,6 +43,9 @@ export interface RenewalStepProps {
   agreement: Agreement;
   subscriptions: Subscription[];
   selections: RenewalSelections;
+  quantities: RenewalQuantities;
+  netNewItems: NetNewItem[];
+  path: RenewalPath;
   onRenewChange: (subscriptionId: string, renew: boolean) => void;
 }
 
@@ -210,11 +223,29 @@ export function RenewalStep({
   agreement,
   subscriptions,
   selections,
+  quantities,
+  netNewItems,
+  path,
   onRenewChange,
 }: RenewalStepProps) {
   const { t } = useTranslation();
+  const { registerOnNextCallback } = useStepActions();
+  const { error: planError, validatePlan, reset } = useRenewalPlanValidation(agreement.id);
   const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
   const columns = useMemo(() => buildColumns(onRenewChange), [onRenewChange]);
+
+  useEffect(() => reset(), [selections, reset]);
+
+  const onNext = useCallback(
+    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      const plan = buildRenewalPlanRequest(subscriptions, selections, quantities, netNewItems, path);
+      const isValid = await validatePlan(plan);
+      return isValid ? targetStepIndex : currentStepIndex;
+    },
+    [subscriptions, selections, quantities, netNewItems, path, validatePlan],
+  );
+
+  useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
   // The grid re-applies the paging config whenever its identity changes, so
   // an inline object would reset the page on every render and dead-lock the
@@ -245,6 +276,13 @@ export function RenewalStep({
       <InlineNotification status="info">
         {t('Renewal:Grid:Prompt')}
       </InlineNotification>
+      {planError && (
+        <div className="renewal-step__validation" data-testid="renewal-step-error">
+          <InlineNotification status="error" isStandalone>
+            {planError}
+          </InlineNotification>
+        </div>
+      )}
       <div className="renewal-step__grid">
         <Grid {...gridProps} />
       </div>
