@@ -248,6 +248,7 @@
     "CommitmentNoData": "Commitment response did not include customer data.",
     "CommitmentRequest": "Commitment request failed.",
     "LoadAutoRenewSupport": "Failed to load which products can renew at the anniversary date.",
+    "LoadRenewalState": "Failed to load how much of each subscription is already renewed.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated."
   },
@@ -389,6 +390,16 @@
       "Empty": {
         "Title": "No subscriptions to renew",
         "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
+      },
+      "Conflict": {
+        "Intro": "Adobe handles a renewal and any additions as separate orders, so this order cannot include both. To continue, choose one:",
+        "Keep renewal": "Keep only the renewal: {{actions}}, or",
+        "Keep additions": "Keep only the additions: {{actions}}",
+        "Undo lines": "undo the changes to {{lines}}",
+        "Remove lines": "remove {{lines}}",
+        "Line": "line {{number}} ({{itemId}})",
+        "Outro": "You can place whatever you remove as a separate order by using this wizard again.",
+        "Learn more": "Learn more"
       },
       "Validating": "Validating the renewal plan…",
       "Validation": {

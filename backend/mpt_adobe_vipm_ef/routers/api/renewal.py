@@ -2,6 +2,7 @@ import asyncio
 import logging
 from dataclasses import replace
 from http import HTTPStatus
+from typing import cast
 
 from mpt_api_client.exceptions import MPTHttpError
 from mpt_extension_sdk.api import (
@@ -60,7 +61,15 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     resolve_net_new_offer_ids,
     resolve_no_change_line,
 )
-from mpt_adobe_vipm_ef.services.renewal_three_yc import check_renewal_plan_three_yc_floor
+from mpt_adobe_vipm_ef.services.renewal_state import (
+    build_now_path_eligibility,
+    build_renewal_states,
+    load_lifecycle,
+)
+from mpt_adobe_vipm_ef.services.renewal_three_yc import (
+    check_renewal_plan_three_yc_floor,
+    has_three_yc_in_force,
+)
 from mpt_adobe_vipm_ef.services.switch_order import (
     mpt_order_error_detail,
     require_active_agreement,
@@ -105,6 +114,40 @@ async def get_renewal_auto_renew_support(
     )
 
 
+@renewal_router.get(
+    path="/{agreement_id}/renewal-order/renewal-state",
+    name="agreements-renewal-order-renewal-state",
+)
+@validate_agreement_access
+@log_inputs
+async def get_renewal_state(agreement_id: str, ctx: APIContext) -> APIResponse:
+    """Report how much of each subscription has already been early-renewed.
+
+    The early-renewal path branches per line on this state — the renewal-state
+    label, the remainder control on a partially-renewed line and whether an
+    increase control is offered — so the wizard reads it before it renders.
+    Keyed by Adobe subscription id, which the wizard holds as the
+    subscription's vendor external id. State drives what is displayed only: the
+    customer may still assemble any basket, and its validity is settled by the
+    preview.
+
+    Each entry also carries ``earlyRenewable``, false for a SKU Adobe will not
+    early-renew — end of sale always, end of life unless the customer holds a
+    three-year commitment — which the wizard omits rather than shows.
+    """
+    _require_client_account(ctx)
+    agreement = await load_agreement(ctx, agreement_id)
+    subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    customer = await _load_adobe_customer(ctx, agreement_id)
+    lifecycle = await load_lifecycle(
+        ctx, _held_partial_skus(subscriptions), resolve_market_segment(ctx, agreement)
+    )
+    states = build_renewal_states(
+        subscriptions, lifecycle, is_three_yc=has_three_yc_in_force(customer)
+    )
+    return APIResponse.ok(payload={"subscriptions": states})
+
+
 @renewal_router.post(
     path="/{agreement_id}/renewal-order/3yc-check",
     name="agreements-renewal-order-3yc-check",
@@ -131,7 +174,9 @@ async def check_renewal_order_three_yc(  # noqa: WPS217
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
     customer = await _load_adobe_customer(ctx, agreement_id)
     summary = await _check_three_yc_floor(
         ctx, agreement, customer, plan_subscriptions, net_new_lines
@@ -164,13 +209,19 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     basket (which Adobe forbids in one order) is rejected in the wizard instead
     of at fulfilment. A SKU that cannot renew at the anniversary is rejected
     here too, so no route quotes a plan the submit route would refuse.
+
+    Returns the Adobe quote under ``preview`` alongside ``eligibility``, the
+    per-subscription now-path eligibility read from the quote's line statuses —
+    the only place Adobe reports it.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
 
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
     plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
     net_new_lines = await _resolve_preview_net_new_lines(ctx, agreement, body)
     line_items = build_preview_renewal_line_items(
@@ -182,7 +233,12 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
         )
     currency_code = agreement.authorization.currency or ""
     preview = await _preview_renewal(ctx, agreement_id, currency_code, line_items)
-    return APIResponse.ok(payload=preview)
+    return APIResponse.ok(
+        payload={
+            "preview": preview,
+            "eligibility": build_now_path_eligibility(preview or {}),
+        },
+    )
 
 
 @renewal_router.post(
@@ -204,7 +260,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     the changed lines plus the plan snapshot — the renewal path the customer
     picked, renew decisions, quantities, discount codes and the recommendation
     tracker id — on the hidden ``renewalPayload`` order parameter, which is
-    what tells fulfilment whether to renew at the anniversary or now.
+    what tells fulfillment whether to renew at the anniversary or now.
     Otherwise it is submitted as a Configuration order carrying only the
     AutoRenew-changed subscriptions (the platform rejects a subscription whose
     AutoRenew value does not change) — plus, on the early-renewal path alone,
@@ -215,7 +271,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     is always a change, so a plan that repeats the current quantities and
     AutoRenew decisions still becomes a Change order carrying the platform's
     ``adobe-early-renewal-no-change`` placeholder item as its single line,
-    with fulfilment executing the plan from the snapshot alone.
+    with fulfillment executing the plan from the snapshot alone.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -225,7 +281,9 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     plan_subscriptions = await _load_plan_subscriptions(ctx, agreement, body.subscriptions)
     net_new_lines = await resolve_net_new_lines(ctx, agreement, body.net_new_items)
     require_renewal_changes(body, plan_subscriptions, net_new_lines)
-    await _check_auto_renew_support(ctx, agreement, plan_subscriptions, body.net_new_items)
+    await _check_auto_renew_support(
+        ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
+    )
 
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
@@ -273,8 +331,18 @@ async def _check_auto_renew_support(
     agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     net_new_items: list[NetNewItemSelection],
+    renewal_path: RenewalPath,
 ) -> None:
-    return await check_renewal_plan_auto_renew_support(
+    """Gate the plan on per-SKU auto-renewal support, which only the anniversary path needs.
+
+    The at-anniversary path renews through Adobe's auto-renewal preferences, so
+    a SKU that cannot auto-renew cannot take it. An early renewal places an
+    explicit RENEWAL order instead and never touches those preferences, so the
+    same SKU is orderable and the gate does not apply.
+    """
+    if renewal_path is RenewalPath.NOW:
+        return
+    await check_renewal_plan_auto_renew_support(
         ctx,
         lambda: resolve_market_segment(ctx, agreement),
         plan_subscriptions,
@@ -443,6 +511,29 @@ async def _load_adobe_subscription_offer_ids(ctx: APIContext, agreement_id: str)
     the full offer id: MPT's subscription and its catalog item both only ever
     carry the partial vendor SKU.
     """
+    subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    raw_items = subscriptions.get("items") or []
+    subscription_items = cast(list[dict[str, str]], raw_items)
+    return {
+        subscription_item["subscriptionId"]: subscription_item["offerId"]
+        for subscription_item in subscription_items
+        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
+    }
+
+
+def _held_partial_skus(subscriptions: dict[str, object]) -> list[str]:
+    """List the partial SKUs of the customer's Adobe subscriptions, for the SKU lookups."""
+    raw_items = subscriptions.get("items") or []
+    subscription_items = cast(list[dict[str, str]], raw_items)
+    return sorted({
+        get_partial_sku(subscription_item["offerId"])
+        for subscription_item in subscription_items
+        if subscription_item.get("offerId")
+    })
+
+
+async def _load_adobe_subscriptions(ctx: APIContext, agreement_id: str) -> dict[str, object]:
+    """Load the customer's Adobe subscriptions behind the agreement."""
     authorization_id = await get_authorization_id(ctx, agreement_id)
     customer_id = await require_customer_id(ctx, agreement_id)
     try:
@@ -467,11 +558,7 @@ async def _load_adobe_subscription_offer_ids(ctx: APIContext, agreement_id: str)
             "Adobe configuration error loading subscriptions for %s: %s", customer_id, error
         )
         raise ValidationError(detail=str(error))
-    return {
-        subscription_item["subscriptionId"]: subscription_item["offerId"]
-        for subscription_item in subscriptions.get("items") or []
-        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
-    }
+    return subscriptions
 
 
 async def _preview_renewal(

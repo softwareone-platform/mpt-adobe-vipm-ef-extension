@@ -8,6 +8,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import NetNewLine, PlanSubscription
 from mpt_adobe_vipm_ef.services.renewal_three_yc import (
     check_renewal_plan_three_yc_floor,
     get_three_yc_commitment,
+    has_three_yc_in_force,
 )
 from mpt_adobe_vipm_ef.services.sku_mapping import THREE_YC_TYPE_CONSUMABLE, THREE_YC_TYPE_LICENSE
 
@@ -114,6 +115,28 @@ def test_get_three_yc_commitment_returns_empty_when_absent(customer):
     result = get_three_yc_commitment(customer)
 
     assert result == {}
+
+
+def test_has_three_yc_in_force_accepts_a_committed_customer():
+    customer = _customer(benefits=[_commitment_benefit(licenses=10)])
+
+    result = has_three_yc_in_force(customer)
+
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    "benefits",
+    [
+        None,
+        [_commitment_benefit(status="REQUESTED", licenses=10)],
+        [_commitment_benefit(licenses=10, end_date="2026-01-01")],
+    ],
+)
+def test_has_three_yc_in_force_rejects_a_commitment_not_covering_the_anniversary(benefits):
+    result = has_three_yc_in_force(_customer(benefits=benefits))
+
+    assert result is False
 
 
 async def test_check_skips_customers_without_a_commitment(ctx, sku_mapping_store):

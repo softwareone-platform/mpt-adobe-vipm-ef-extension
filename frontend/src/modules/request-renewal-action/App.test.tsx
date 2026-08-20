@@ -316,6 +316,26 @@ describe('request-renewal-action App', () => {
     );
   });
 
+  it('carries a subscription that cannot auto-renew on the early path', async () => {
+    mockPost.mockImplementation((url: string) =>
+      respondToPost(url, { '65322587CA': true, '65322588CA': false }),
+    );
+    const { rerender } = render(<App />);
+
+    await screen.findByText('Timing step');
+    act(() => timingProps.onPathChange('now'));
+    await waitFor(() => expect(timingProps.path).toBe('now'));
+
+    mockActiveStepIndex = 1;
+    rerender(<App />);
+    await screen.findByText('Renewal step');
+
+    expect(renewalProps.subscriptions.map((subscription) => subscription.id)).toEqual([
+      'SUB-1',
+      'SUB-2',
+    ]);
+  });
+
   it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {
     mockPost.mockImplementation((url: string) =>
       respondToPost(url, { '65322587CA': false, '65322588CA': false }),

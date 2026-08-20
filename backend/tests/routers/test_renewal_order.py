@@ -25,6 +25,7 @@ from mpt_adobe_vipm_ef.routers.api.renewal import (
     check_renewal_order_three_yc,
     create_renewal_order,
     get_renewal_auto_renew_support,
+    get_renewal_state,
     preview_renewal_plan,
 )
 from mpt_adobe_vipm_ef.services.sku_mapping import THREE_YC_TYPE_LICENSE
@@ -117,13 +118,14 @@ def _body(  # noqa: WPS211
     })
 
 
-def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None):
+def _plan_body(*, renew=True, quantity=7, net_new=None, subscriptions=None, path="anniversary"):
     default_subscriptions = [
         {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": renew, "renewalQuantity": quantity},
     ]
     return RenewalPlanRequest.model_validate({
         "subscriptions": default_subscriptions if subscriptions is None else subscriptions,
         "netNewItems": net_new or [],
+        "renewalPath": path,
     })
 
 
@@ -260,6 +262,16 @@ def auto_renew_support_store(mocker, fake_ctx, allowed_product_id):
     store_cls = mocker.patch("mpt_adobe_vipm_ef.services.renewal_auto_renew.SkuMappingStore")
     store = store_cls.from_settings.return_value
     store.list_auto_renew_supported.return_value = {_SKU: True, _NET_NEW_SKU: True}
+    return store
+
+
+@pytest.fixture
+def lifecycle_store(mocker, fake_ctx, allowed_product_id):
+    """Stub the Airtable lifecycle lookup (the SKU neither end of sale nor end of life)."""
+    fake_ctx.ext_settings.product_segments = (ProductSegment(id=allowed_product_id, segment="COM"),)
+    store_cls = mocker.patch("mpt_adobe_vipm_ef.services.renewal_state.SkuMappingStore")
+    store = store_cls.from_settings.return_value
+    store.list_lifecycle.return_value = {_SKU: {"endOfSale": False, "endOfLife": False}}
     return store
 
 
@@ -879,6 +891,75 @@ async def test_check_renewal_order_three_yc_rejects_non_client_account(
         await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body())
 
 
+# --- GET /agreements/{id}/renewal-order/renewal-state ---
+
+
+async def test_get_renewal_state_reports_each_subscription_renewal_state(
+    fake_ctx, renewal_agreement, lifecycle_store, adobe_call
+):
+    adobe_call.returns = {
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "currentQuantity": _CURRENT_QUANTITY,
+                "renewedQuantity": 4,
+            },
+        ],
+    }
+
+    result = await get_renewal_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {
+        "subscriptions": {
+            _ADOBE_SUBSCRIPTION_ID: {
+                "currentQuantity": _CURRENT_QUANTITY,
+                "renewedQuantity": 4,
+                "state": "partiallyRenewed",
+                "remainingQuantity": 6,
+                "earlyRenewable": True,
+                "increaseAllowed": False,
+            },
+        },
+    }
+    lifecycle_store.list_lifecycle.assert_called_once_with([_SKU], "COM")
+
+
+async def test_get_renewal_state_omits_an_end_of_sale_line(
+    fake_ctx, renewal_agreement, lifecycle_store, adobe_call
+):
+    """An end-of-sale SKU cannot be early-renewed, so the wizard leaves it out."""
+    lifecycle_store.list_lifecycle.return_value = {_SKU: {"endOfSale": True, "endOfLife": False}}
+    adobe_call.returns = {
+        "items": [{"subscriptionId": _ADOBE_SUBSCRIPTION_ID, "offerId": _OFFER_ID}],
+    }
+
+    result = await get_renewal_state(_AGREEMENT_ID, fake_ctx)
+
+    states = result.payload["subscriptions"]
+    assert states[_ADOBE_SUBSCRIPTION_ID]["earlyRenewable"] is False
+
+
+async def test_get_renewal_state_maps_an_adobe_failure_to_a_bad_gateway(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.error = _ADOBE_API_ERROR
+
+    with pytest.raises(UpstreamServiceError):
+        await get_renewal_state(_AGREEMENT_ID, fake_ctx)
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_get_renewal_state_rejects_non_client_account(
+    fake_ctx, renewal_agreement, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await get_renewal_state(_AGREEMENT_ID, fake_ctx)
+
+
 # --- POST /agreements/{id}/renewal-order/preview ---
 
 
@@ -892,7 +973,10 @@ async def test_preview_renewal_plan_returns_the_adobe_quote(
     )
 
     assert result.status_code == http.HTTPStatus.OK
-    assert result.payload == {"lineItems": [{"extLineItemNumber": 1, "pricing": {}}]}
+    assert result.payload == {
+        "preview": {"lineItems": [{"extLineItemNumber": 1, "pricing": {}}]},
+        "eligibility": {},
+    }
     # calls[0] resolves the full offer id from Adobe's live subscriptions;
     # calls[1] is the PREVIEW_RENEWAL quote itself.
     call_args, _ = adobe_call.calls[1]
@@ -1102,6 +1186,17 @@ async def test_check_renewal_order_blocks_a_sku_without_auto_renewal_support(
         await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body())
 
     auto_renew_support_store.list_auto_renew_supported.assert_called_once_with([_SKU], "COM")
+
+
+async def test_check_renewal_order_skips_the_gate_on_the_early_path(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_customer, auto_renew_support_store
+):
+    """An early renewal orders explicitly, so auto-renewal support does not apply."""
+    auto_renew_support_store.list_auto_renew_supported.return_value = {_SKU: False}
+
+    await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, _plan_body(path="now"))  # act
+
+    auto_renew_support_store.list_auto_renew_supported.assert_not_called()
 
 
 async def test_preview_renewal_plan_blocks_a_sku_without_auto_renewal_support(

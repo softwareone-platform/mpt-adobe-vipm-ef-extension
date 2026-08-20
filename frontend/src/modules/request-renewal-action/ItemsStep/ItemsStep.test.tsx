@@ -6,7 +6,13 @@ import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
 import type { Agreement, Subscription } from '../../shared/model';
-import type { NetNewItem, RenewalPath, RenewalQuantities, RenewalSelections } from '../model';
+import type {
+  NetNewItem,
+  RenewalPath,
+  RenewalQuantities,
+  RenewalSelections,
+  RenewalStates,
+} from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -141,11 +147,14 @@ const agreement: Agreement = {
   price: { billingCurrency: 'USD' },
 };
 
+const ADOBE_SUBSCRIPTION_ID = 'a1b2c3d4e5NA';
+
 const subscriptions: Subscription[] = [
   {
     id: 'SUB-1',
     name: 'Subscription for Creative Cloud',
     autoRenew: true,
+    externalIds: { vendor: ADOBE_SUBSCRIPTION_ID },
     terms: { period: '1y', commitment: '1y' },
     lines: [
       {
@@ -200,6 +209,7 @@ const renderStep = ({
   subscriptionList = subscriptions,
   agreementOverride = agreement,
   path = 'anniversary',
+  renewalStates = {},
 }: {
   selections?: RenewalSelections;
   quantities?: RenewalQuantities;
@@ -210,6 +220,7 @@ const renderStep = ({
   subscriptionList?: Subscription[];
   agreementOverride?: Agreement;
   path?: RenewalPath;
+  renewalStates?: RenewalStates;
 } = {}) =>
   render(
     <ItemsStep
@@ -220,6 +231,7 @@ const renderStep = ({
       netNewItems={netNewItems}
       recommendedSkus={recommendedSkus}
       path={path}
+      renewalStates={renewalStates}
       onQuantityChange={onQuantityChange}
       onNetNewItemsChange={onNetNewItemsChange}
     />,
@@ -426,6 +438,39 @@ describe('ItemsStep', () => {
     expect((getByTestId('add-items') as HTMLButtonElement).disabled).toBe(false);
   });
 
+  describe('renew-and-add conflict', () => {
+    const conflictingPlan = {
+      path: 'now' as const,
+      quantities: { 'SUB-1': 53, 'SUB-2': 6 },
+      selections: { 'SUB-1': true, 'SUB-2': true },
+    };
+
+    it('names the lines to undo and remove on each side, numbered as the grid shows them', () => {
+      const { getByTestId } = renderStep({ ...conflictingPlan, netNewItems: [NET_NEW_ITEM] });
+
+      const notice = getByTestId('items-step-conflict').textContent;
+      expect(notice).toContain('this order cannot include both');
+      expect(notice).toContain('undo the changes to line 1 (ITM-1) and remove line 3 (ITM-9)');
+      expect(notice).toContain('undo the changes to line 2 (ITM-2)');
+    });
+
+    it('stays quiet when the basket only renews', () => {
+      const { queryByTestId } = renderStep({ path: 'now', quantities: { 'SUB-1': 30 } });
+
+      expect(queryByTestId('items-step-conflict')).toBeNull();
+    });
+
+    it('stays quiet at the anniversary', () => {
+      const { queryByTestId } = renderStep({
+        ...conflictingPlan,
+        path: 'anniversary',
+        netNewItems: [NET_NEW_ITEM],
+      });
+
+      expect(queryByTestId('items-step-conflict')).toBeNull();
+    });
+  });
+
   it('pages the grid ten rows at a time', () => {
     renderStep({ netNewItems: [NET_NEW_ITEM] });
 
@@ -573,6 +618,7 @@ describe('ItemsStep', () => {
           netNewItems={[]}
           recommendedSkus={new Set<string>()}
           path="anniversary"
+          renewalStates={{}}
           onQuantityChange={onQuantityChange}
           onNetNewItemsChange={jest.fn()}
         />,

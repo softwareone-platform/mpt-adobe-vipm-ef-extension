@@ -155,6 +155,27 @@ def test_list_auto_renew_supported_queries_the_segment_rows(api, table, store):
     )
 
 
+def test_list_lifecycle_reads_both_retirement_flags(api, table, store):
+    table.all.return_value = [
+        {"id": "rec1", "fields": {"vendor_external_id": _LICENSE_SKU, "end_of_sale": True}},
+        {"id": "rec2", "fields": {"vendor_external_id": _CONSUMABLE_SKU, "end_of_life": True}},
+    ]
+
+    result = store.list_lifecycle([_LICENSE_SKU, _CONSUMABLE_SKU], _MARKET_SEGMENT)
+
+    assert result == {
+        _LICENSE_SKU: {"endOfSale": True, "endOfLife": False},
+        _CONSUMABLE_SKU: {"endOfSale": False, "endOfLife": True},
+    }
+
+
+def test_list_lifecycle_returns_empty_without_skus(api, store):
+    result = store.list_lifecycle([], _MARKET_SEGMENT)
+
+    assert result == {}
+    api.return_value.table.assert_not_called()
+
+
 def test_list_auto_renew_supported_returns_empty_without_skus(api, store):
     result = store.list_auto_renew_supported([], _MARKET_SEGMENT)
 

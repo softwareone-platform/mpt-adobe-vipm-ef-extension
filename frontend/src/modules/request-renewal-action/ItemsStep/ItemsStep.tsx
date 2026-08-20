@@ -22,7 +22,11 @@ import { TextInputCell } from '../../shared/components/GridCell/TextInputCell/Te
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
-import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
+import {
+  RENEWAL_LEARN_MORE_URL,
+  TERM_COMMITMENT_LABELS,
+  TERM_PERIOD_LABELS,
+} from '../../shared/constants';
 import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
 import type { Agreement, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
@@ -32,13 +36,20 @@ import { SelectItemsDialog } from '../components/select-items-dialog/SelectItems
 import {
   buildRenewalPlanRequest,
   getDefaultRenewalQuantity,
+  findRenewAndAddConflict,
   getHeldSkus,
+  getRemainingQuantity,
   getRenewalQuantity,
+  getRenewalState,
+  isIncreaseAllowed,
   isRenewing,
   type NetNewItem,
   type RenewalPath,
   type RenewalQuantities,
   type RenewalSelections,
+  type RenewalStates,
+  type RenewalLine,
+  type RenewAndAddConflict,
 } from '../model';
 
 import './ItemsStep.scss';
@@ -56,6 +67,8 @@ export interface ItemsStepProps {
   recommendedSkus: Set<string>;
   /** The path picked on the first step; the early one gates Next on Adobe's preview. */
   path: RenewalPath;
+  /** How much of each subscription is already early-renewed, keyed by Adobe id. */
+  renewalStates: RenewalStates;
   onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
   onNetNewItemsChange: (items: NetNewItem[]) => void;
 }
@@ -76,6 +89,9 @@ interface Row {
   unitSP: number | null;
   spxM: number | null;
   spxY: number | null;
+  renewedQuantity: number | null;
+  remainingQuantity: number | null;
+  increaseAllowed: boolean;
 }
 
 function totalPrice(unitSP: number | null, quantity: number | null, months: number): number | null {
@@ -86,6 +102,8 @@ function toSubscriptionRows(
   subscriptions: Subscription[],
   selections: RenewalSelections,
   quantities: RenewalQuantities,
+  renewalStates: RenewalStates,
+  path: RenewalPath,
 ): Row[] {
   return subscriptions
     .filter((subscription) => isRenewing(subscription, selections))
@@ -93,6 +111,9 @@ function toSubscriptionRows(
       // Adobe subscriptions hold exactly one item, so the first line carries
       // the SKU, quantity and prices — the same line the renewal order acts on.
       const line = subscription.lines?.[0];
+      const renewalState = getRenewalState(subscription, renewalStates);
+      const remainingQuantity = getRemainingQuantity(subscription, renewalStates);
+      const increaseAllowed = isIncreaseAllowed(subscription, renewalStates, path);
       return {
         id: subscription.id,
         kind: 'subscription' as const,
@@ -117,6 +138,9 @@ function toSubscriptionRows(
           getRenewalQuantity(subscription, quantities),
           1,
         ),
+        renewedQuantity: renewalState?.renewedQuantity ?? null,
+        remainingQuantity,
+        increaseAllowed,
       };
     });
 }
@@ -138,6 +162,9 @@ function toNetNewRows(netNewItems: NetNewItem[]): Row[] {
     unitSP: item.unitSP,
     spxM: totalPrice(item.unitSP, item.quantity, 12),
     spxY: totalPrice(item.unitSP, item.quantity, 1),
+    renewedQuantity: null,
+    remainingQuantity: null,
+    increaseAllowed: true,
   }));
 }
 
@@ -156,6 +183,71 @@ interface RowHandlers {
 
 function pricedWhileValid(row: Row, price: (unitSP: number | null, quantity: number) => string) {
   return row.renewalQuantity == null ? '' : price(row.unitSP, row.renewalQuantity);
+}
+
+// The guidance names each line by the position the customer sees, so the rows
+// arrive in the grid's own order — sorting included — and are numbered as given.
+function toRenewalLines(rows: Row[]): RenewalLine[] {
+  return rows.map((row, index) => ({
+    lineNumber: index + 1,
+    itemId: row.itemId,
+    isNetNew: row.kind === 'net-new',
+    currentQuantity: row.currentQuantity,
+    renewalQuantity: row.renewalQuantity,
+  }));
+}
+
+function namedLines(lines: RenewalLine[]): string {
+  return lines
+    .map((line) => i18n.t('Renewal:Items:Conflict:Line', {
+      number: line.lineNumber,
+      itemId: line.itemId,
+    }))
+    .join(', ');
+}
+
+function keepRenewalActions(additions: RenewalLine[]): string {
+  const increases = additions.filter((line) => !line.isNetNew);
+  const netNew = additions.filter((line) => line.isNetNew);
+  return [
+    increases.length &&
+      i18n.t('Renewal:Items:Conflict:Undo lines', { lines: namedLines(increases) }),
+    netNew.length && i18n.t('Renewal:Items:Conflict:Remove lines', { lines: namedLines(netNew) }),
+  ]
+    .filter(Boolean)
+    .join(' and ');
+}
+
+function ConflictNotice({ conflict }: { conflict: RenewAndAddConflict }) {
+  return (
+    <div className="items-step__conflict" data-testid="items-step-conflict">
+      <InlineNotification status="error" isStandalone>
+        <RegularText as="p" size={2}>
+          {i18n.t('Renewal:Items:Conflict:Intro')}
+        </RegularText>
+        <ul>
+          <li>
+            {i18n.t('Renewal:Items:Conflict:Keep renewal', {
+              actions: keepRenewalActions(conflict.additions),
+            })}
+          </li>
+          <li>
+            {i18n.t('Renewal:Items:Conflict:Keep additions', {
+              actions: i18n.t('Renewal:Items:Conflict:Undo lines', {
+                lines: namedLines(conflict.renewals),
+              }),
+            })}
+          </li>
+        </ul>
+        <RegularText as="p" size={2}>
+          {i18n.t('Renewal:Items:Conflict:Outro')}
+        </RegularText>
+        <a href={RENEWAL_LEARN_MORE_URL} target="_blank" rel="noreferrer">
+          {i18n.t('Renewal:Items:Conflict:Learn more')}
+        </a>
+      </InlineNotification>
+    </div>
+  );
 }
 
 function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
@@ -303,6 +395,7 @@ export function ItemsStep({
   netNewItems,
   recommendedSkus,
   path,
+  renewalStates,
   onQuantityChange,
   onNetNewItemsChange,
 }: ItemsStepProps) {
@@ -317,10 +410,10 @@ export function ItemsStep({
 
   const rows = useMemo(
     () => [
-      ...toSubscriptionRows(subscriptions, selections, quantities),
+      ...toSubscriptionRows(subscriptions, selections, quantities, renewalStates, path),
       ...toNetNewRows(netNewItems),
     ],
-    [subscriptions, selections, quantities, netNewItems],
+    [subscriptions, selections, quantities, netNewItems, renewalStates, path],
   );
 
   // Any plan edit invalidates the previous validation outcome.
@@ -328,28 +421,6 @@ export function ItemsStep({
     setQuantityError('');
     reset();
   }, [selections, quantities, netNewItems, reset]);
-
-  const onNext = useCallback(
-    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
-      if (rows.some((row) => validateRenewalQuantity(row.renewalQuantity))) {
-        setQuantityError(t('Renewal:Items:Validation:FixQuantities'));
-        return currentStepIndex;
-      }
-      setQuantityError('');
-      const plan = buildRenewalPlanRequest(
-        subscriptions,
-        selections,
-        quantities,
-        netNewItems,
-        path,
-      );
-      const isValid = await validatePlan(plan);
-      return isValid ? targetStepIndex : currentStepIndex;
-    },
-    [rows, subscriptions, selections, quantities, netNewItems, path, validatePlan, t],
-  );
-
-  useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
   const onRowQuantityChange = useCallback(
     (row: Row, quantity: number | null) => {
@@ -413,6 +484,33 @@ export function ItemsStep({
     paging,
   });
 
+  const conflict = findRenewAndAddConflict(toRenewalLines(gridProps.data), path);
+
+  const onNext = useCallback(
+    async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      if (rows.some((row) => validateRenewalQuantity(row.renewalQuantity))) {
+        setQuantityError(t('Renewal:Items:Validation:FixQuantities'));
+        return currentStepIndex;
+      }
+      if (conflict) {
+        return currentStepIndex;
+      }
+      setQuantityError('');
+      const plan = buildRenewalPlanRequest(
+        subscriptions,
+        selections,
+        quantities,
+        netNewItems,
+        path,
+      );
+      const isValid = await validatePlan(plan);
+      return isValid ? targetStepIndex : currentStepIndex;
+    },
+    [rows, conflict, subscriptions, selections, quantities, netNewItems, path, validatePlan, t],
+  );
+
+  useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
+
   return (
     <div className="items-step">
       <div className="items-step__header">
@@ -426,6 +524,7 @@ export function ItemsStep({
       <InlineNotification status="info" isStandalone>
         {t('Renewal:Items:Prompt')}
       </InlineNotification>
+      {conflict && <ConflictNotice conflict={conflict} />}
       {(quantityError || planError) && (
         <div className="items-step__validation" data-testid="items-step-error">
           <InlineNotification status="error" isStandalone>

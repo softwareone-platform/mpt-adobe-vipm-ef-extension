@@ -2,6 +2,7 @@ import type {
   Discount,
   RenewalPath,
   RenewalPlanBody,
+  RenewalStateEntry,
   Subscription,
   Terms,
 } from '../shared/model';
@@ -59,6 +60,135 @@ export function getRenewalQuantity(
 ): number | null {
   const stored = quantities[subscription.id];
   return stored !== undefined ? stored : getDefaultRenewalQuantity(subscription);
+}
+
+/** The per-subscription early-renewal states, keyed by Adobe subscription id. */
+export type RenewalStates = Record<string, RenewalStateEntry>;
+
+/**
+ * The subscription's early-renewal state, or ``undefined`` when there is none.
+ *
+ * Adobe reports the state against its own subscription id, which the platform
+ * mirrors on the subscription's vendor external id. A subscription missing from
+ * the reply has never been early-renewed — Adobe only returns the renewed
+ * quantity inside the pre-anniversary window — so the caller falls back to the
+ * not-renewed reading rather than treating it as an error.
+ */
+export function getRenewalState(
+  subscription: Subscription,
+  states: RenewalStates,
+): RenewalStateEntry | undefined {
+  const adobeSubscriptionId = subscription.externalIds?.vendor;
+  return adobeSubscriptionId ? states[adobeSubscriptionId] : undefined;
+}
+
+/**
+ * Whether the early path can carry the subscription at all.
+ *
+ * A SKU Adobe will not early-renew (end of sale always, end of life for a
+ * customer without a three-year commitment) is left out of the wizard rather
+ * than shown in a restricted state. An unknown state does not hide the line:
+ * the preview rejects it if Adobe disagrees.
+ */
+export function isEarlyRenewable(subscription: Subscription, states: RenewalStates): boolean {
+  return getRenewalState(subscription, states)?.earlyRenewable !== false;
+}
+
+/**
+ * How many of the existing seats this renewal can still early-renew.
+ *
+ * The figure the remainder control surfaces on a partially-renewed line ("X of
+ * Y renewed, renew remaining Z"). Without a state the whole line is still
+ * renewable.
+ */
+export function getRemainingQuantity(
+  subscription: Subscription,
+  states: RenewalStates,
+): number | null {
+  const state = getRenewalState(subscription, states);
+  return state ? state.remainingQuantity : getDefaultRenewalQuantity(subscription);
+}
+
+/**
+ * Whether the Items step offers an increase beyond the current quantity.
+ *
+ * An increase rides a later add-mode order, so it is offered only once every
+ * existing seat is already early-renewed; a partially-renewed line renews its
+ * remainder first. Only the early path can increase at all.
+ */
+export function isIncreaseAllowed(
+  subscription: Subscription,
+  states: RenewalStates,
+  path: RenewalPath,
+): boolean {
+  return path === 'now' && getRenewalState(subscription, states)?.increaseAllowed === true;
+}
+
+/** One Items-step line as the renew-and-add check reads it. */
+export interface RenewalLine {
+  /** The line's position in the grid, which the guidance names. */
+  lineNumber: number;
+  itemId: string;
+  isNetNew: boolean;
+  currentQuantity: number | null;
+  renewalQuantity: number | null;
+}
+
+/** The two sides of a basket Adobe cannot place as one order. */
+export interface RenewAndAddConflict {
+  renewals: RenewalLine[];
+  additions: RenewalLine[];
+}
+
+/**
+ * Whether the line asks for seats beyond what the customer holds.
+ *
+ * A net-new product and an increase beyond the current quantity are the same
+ * thing to Adobe: both ride an add-mode order.
+ */
+export function isAddition(line: RenewalLine): boolean {
+  if (line.isNetNew) return true;
+  return (
+    line.currentQuantity != null &&
+    line.renewalQuantity != null &&
+    line.renewalQuantity > line.currentQuantity
+  );
+}
+
+/**
+ * Whether the line changes the renewal of existing seats.
+ *
+ * Only a line renewing fewer seats than the customer holds counts: an
+ * unchanged line is what the guidance asks the customer to fall back to
+ * ("undo the changes"), so treating it as a renewal would leave the conflict
+ * unresolvable.
+ */
+export function isRenewalChange(line: RenewalLine): boolean {
+  return (
+    !line.isNetNew &&
+    line.currentQuantity != null &&
+    line.renewalQuantity != null &&
+    line.renewalQuantity < line.currentQuantity
+  );
+}
+
+/**
+ * The renew-and-add combination Adobe forbids in a single order, if the basket has it.
+ *
+ * An early renewal is placed as one Adobe order, and that order either renews
+ * existing products or adds beyond them — never both. The customer keeps one
+ * side and places the other as a later order, so both sides are returned for
+ * the guidance to name. Nothing is forbidden at the anniversary, where the
+ * order is a plain change.
+ */
+export function findRenewAndAddConflict(
+  lines: RenewalLine[],
+  path: RenewalPath,
+): RenewAndAddConflict | null {
+  if (path !== 'now') return null;
+  const additions = lines.filter(isAddition);
+  const renewals = lines.filter(isRenewalChange);
+  return additions.length && renewals.length ? { renewals, additions } : null;
 }
 
 /**

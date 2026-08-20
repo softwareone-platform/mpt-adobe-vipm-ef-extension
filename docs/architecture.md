@@ -40,16 +40,23 @@ frontend/                    TypeScript plug UI (esbuild)
     which decides how strictly the plan is validated.
     `auto-renew-support` reports which SKUs can renew at the
     anniversary at all (the hand-curated `auto_renew_supported` column of the
-    Airtable SKU mapping), which the wizard uses to route: a subscription whose
-    SKU has no support is left out of the renewal plan. `3yc-check`
+    Airtable SKU mapping), which the wizard uses to route: on the `anniversary`
+    path a subscription whose SKU has no support is left out of the renewal
+    plan. The `now` path carries that same SKU, since an early renewal places an
+    explicit RENEWAL order and never uses those preferences. `3yc-check`
     re-checks that routing and pre-checks the plan against the customer's 3YC
     commitment floors (splitting licenses and consumables through the same SKU
     mapping), `preview` re-checks the routing and quotes the plan through an
     Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
-    codes and returning the renewal pricing); on the `now` path the quote also
-    carries the net-new additions, which ride the RENEWAL order itself, so
-    Adobe rejects the renew-and-add basket it forbids in one order. The submit
-    route repeats every gate and creates the
+    codes and returning the renewal pricing plus each line's now-path
+    eligibility); on the `now` path
+    the quote also carries the net-new additions, which ride the RENEWAL order
+    itself, so Adobe rejects the renew-and-add basket it forbids in one order.
+    `renewal-state` reports how much of each subscription is already
+    early-renewed, whether its SKU can be early-renewed at all, and whether the
+    Items step may offer an increase beyond the current quantity, which only a
+    fully-renewed line can carry. The
+    submit route repeats every gate and creates the
     change order carrying the plan snapshot (the renewal path, renew decisions,
     quantities, discount codes and the recommendation tracker id) on the hidden
     `renewalPayload` order parameter, the discriminator fulfilment reads to pick
