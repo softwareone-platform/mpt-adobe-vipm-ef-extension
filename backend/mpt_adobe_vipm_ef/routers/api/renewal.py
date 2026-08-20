@@ -56,7 +56,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
 from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
     is_renewal_window_open,
-    require_unlocked_anniversary_path,
+    require_unlocked_path,
     resolve_locked_path,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
@@ -170,9 +170,10 @@ async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIRespo
     The wizard's first step reads this before it offers a path: outside the
     window — or with no active subscription to renew — there is nothing to plan,
     and the step says so instead of walking the customer into an Adobe
-    rejection. ``lockedPath`` is set once an early renewal has rolled the
-    anniversary forward, which fixes the path to ``now`` and makes the step
-    read-only.
+    rejection. ``lockedPath`` is set once a renewal is in place — ``now`` once an
+    early renewal has rolled the anniversary forward, ``anniversary`` once
+    deferred renewal preferences are staged — which fixes the path and makes the
+    step read-only.
     """
     _require_client_account(ctx)
     customer = await _load_adobe_customer(ctx, agreement_id)
@@ -335,10 +336,9 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     coterm_date = str(customer.get("cotermDate") or "")
     if net_new_lines:
         require_scheduled_creation_window(coterm_date)
-    if body.renewal_path is RenewalPath.ANNIVERSARY:
-        require_unlocked_anniversary_path(
-            coterm_date, await _load_adobe_subscriptions(ctx, agreement_id)
-        )
+    require_unlocked_path(
+        body.renewal_path, coterm_date, await _load_adobe_subscriptions(ctx, agreement_id)
+    )
 
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
     if lines:

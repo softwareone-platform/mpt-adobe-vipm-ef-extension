@@ -1,7 +1,6 @@
 import { ChangeEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
-import { Chip } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { SelectionBox } from '@softwareone-platform/sdk-react-ui-v0/selection-box';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
@@ -40,6 +39,15 @@ export function TimingStep({
   const lockedPath = pathState?.lockedPath ?? null;
   const selectedPath = lockedPath ?? path;
   const canPlan = canPlanRenewal(pathState);
+  const availablePaths = lockedPath ? [lockedPath] : (Object.keys(PATH_KEYS) as RenewalPath[]);
+  const options = canPlan ? availablePaths : [];
+  const promptKey = lockedPath
+    ? `Renewal:Timing:${PATH_KEYS[lockedPath]}:Locked:Prompt`
+    : 'Renewal:Timing:Prompt';
+  const promptValues =
+    lockedPath === 'now'
+      ? { date: formattedRenewalDate }
+      : { date: formattedRenewalDate, count: days };
 
   const learnMore = (
     <a href={RENEWAL_LEARN_MORE_URL} target="_blank" rel="noreferrer">
@@ -47,17 +55,28 @@ export function TimingStep({
     </a>
   );
 
-  const pathDescription = (option: RenewalPath) => (
-    <>
-      <RegularText as="p" size={2}>
-        {t(`Renewal:Timing:${PATH_KEYS[option]}:Summary`)}
-      </RegularText>
-      <RegularText as="p" size={2}>
-        {t(`Renewal:Timing:${PATH_KEYS[option]}:Detail`)}
-      </RegularText>
-      {learnMore}
-    </>
-  );
+  const optionKey = (option: RenewalPath) =>
+    `Renewal:Timing:${PATH_KEYS[option]}${lockedPath ? ':Locked' : ''}`;
+
+  const pathDescription = (option: RenewalPath) => {
+    const note = lockedPath ? t(`${optionKey(option)}:Note`, { defaultValue: '' }) : '';
+    return (
+      <>
+        <RegularText as="p" size={2}>
+          {t(`${optionKey(option)}:Summary`)}
+        </RegularText>
+        <RegularText as="p" size={2}>
+          {t(`${optionKey(option)}:Detail`)}
+        </RegularText>
+        {note && (
+          <RegularText as="p" size={2}>
+            {note}
+          </RegularText>
+        )}
+        {learnMore}
+      </>
+    );
+  };
 
   return (
     <div className="timing-step">
@@ -70,33 +89,30 @@ export function TimingStep({
         <WizardHighlights agreement={agreement} />
       </div>
       <RegularText as="p" size={2} className="timing-step__prompt">
-        {formattedRenewalDate && days != null ? (
-          <Trans
-            i18nKey="Renewal:Timing:Prompt"
-            values={{ date: formattedRenewalDate, count: days }}
-            components={{ b: <strong /> }}
-          />
+        {formattedRenewalDate && (lockedPath === 'now' || days != null) ? (
+          <Trans i18nKey={promptKey} values={promptValues} components={{ b: <strong /> }} />
         ) : (
           t('Renewal:Timing:PromptWithoutDate')
         )}
       </RegularText>
-      {canPlan ? (
-        <InlineNotification status="warning" isStandalone>
-          {t('Renewal:Timing:Lock notice')} {learnMore}
-        </InlineNotification>
-      ) : (
-        <InlineNotification status="error" isStandalone>
-          {pathState?.hasActiveSubscriptions === false
-            ? t('Renewal:Timing:No subscriptions')
-            : t('Renewal:Timing:Window closed', {
-                opens: pathState?.windowOpensDays,
-                closes: pathState?.windowClosesDays,
-              })}{' '}
-          {learnMore}
-        </InlineNotification>
-      )}
+      {!lockedPath &&
+        (canPlan ? (
+          <InlineNotification status="warning">
+            {t('Renewal:Timing:Lock notice')} {learnMore}
+          </InlineNotification>
+        ) : (
+          <InlineNotification status="error">
+            {pathState?.hasActiveSubscriptions === false
+              ? t('Renewal:Timing:No subscriptions')
+              : t('Renewal:Timing:Window closed', {
+                  opens: pathState?.windowOpensDays,
+                  closes: pathState?.windowClosesDays,
+                })}{' '}
+            {learnMore}
+          </InlineNotification>
+        ))}
       <div className="timing-step__options">
-        {(canPlan ? (Object.keys(PATH_KEYS) as RenewalPath[]) : []).map((option) => (
+        {options.map((option) => (
           <div className="timing-step__option" key={option}>
             <SelectionBox
               name="renewal-path"
@@ -109,11 +125,8 @@ export function TimingStep({
               title={
                 <div className="timing-step__option__title">
                   <MediumText as="span" size={2}>
-                    {t(`Renewal:Timing:${PATH_KEYS[option]}:Title`)}
+                    {t(`${optionKey(option)}:Title`)}
                   </MediumText>
-                  {lockedPath === option && (
-                    <Chip label={t('Renewal:Timing:Confirmed')} color="success" />
-                  )}
                 </div>
               }
             >

@@ -278,7 +278,7 @@ export default function App() {
   if (isEarlyPath && renewalState.status === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {renewalState.error || t('Errors:LoadRenewalState')}
         </InlineNotification>
         <Button onClick={renewalState.refresh}>

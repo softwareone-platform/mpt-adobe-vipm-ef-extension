@@ -43,35 +43,70 @@ def has_active_subscriptions(adobe_subscriptions: Payload) -> bool:
 
 
 def resolve_locked_path(coterm_date: str, adobe_subscriptions: Payload) -> RenewalPath | None:
-    """Whether an early renewal has already rolled the anniversary forward.
+    """Which renewal path a renewal already in place has established, if any.
 
-    The roll happens once, immediately on the first successful early renewal,
-    while each subscription's ``renewalDate`` holds at the original anniversary
-    until it passes. A ``cotermDate`` past that date is therefore the proof that
-    the early path is established: the wizard presents it as confirmed state,
-    and at-anniversary is no longer reachable.
+    An early renewal rolls the anniversary forward once, immediately on the
+    first successful order, while each subscription's ``renewalDate`` holds at
+    the original anniversary until it passes. A ``cotermDate`` past that date is
+    therefore the proof that the early path is established.
+
+    An at-anniversary renewal moves no date and bills nothing now: it lands as
+    deferred auto-renewal preferences, so a subscription set to lapse or to
+    renew at a quantity other than the one it holds is the proof that the
+    at-anniversary path is established.
+
+    Either way the wizard presents the established path as confirmed state and
+    the other path is no longer reachable.
     """
     coterm = _parse_date(coterm_date)
     renewal_dates = _renewal_dates(adobe_subscriptions)
-    if coterm is None or not renewal_dates:
-        return None
-    return RenewalPath.NOW if coterm > min(renewal_dates) else None
+    if coterm and renewal_dates and coterm > min(renewal_dates):
+        return RenewalPath.NOW
+    staged = any(
+        _is_staged(subscription_item)
+        for subscription_item in adobe_subscriptions.get("items") or []
+    )
+    return RenewalPath.ANNIVERSARY if staged else None
 
 
-def require_unlocked_anniversary_path(coterm_date: str, adobe_subscriptions: Payload) -> None:
-    """Reject an at-anniversary plan once an early renewal has rolled the anniversary.
+def require_unlocked_path(
+    renewal_path: RenewalPath, coterm_date: str, adobe_subscriptions: Payload
+) -> None:
+    """Reject a plan on the path a renewal already in place has closed off.
 
-    The wizard already shows the path as locked, but the submission is where it
-    has to hold: the anniversary this plan would renew at has passed to next
-    year, so there is nothing left for it to do.
+    The wizard already shows the established path as locked, but the submission
+    is where it has to hold: at the anniversary because the anniversary this
+    plan would renew at has passed to next year, and now because the renewal
+    the customer already set up for the anniversary owns the term this plan
+    would renew.
     """
-    if resolve_locked_path(coterm_date, adobe_subscriptions) is not None:
+    locked_path = resolve_locked_path(coterm_date, adobe_subscriptions)
+    if locked_path is None or locked_path is renewal_path:
+        return
+    if locked_path is RenewalPath.NOW:
         raise ValidationError(
             detail=(
                 "An early renewal has already moved the anniversary date forward, "
                 "so this renewal cannot be planned for the anniversary date."
             ),
         )
+    raise ValidationError(
+        detail=(
+            "A renewal is already set up for the anniversary date, "
+            "so this renewal cannot be placed now."
+        ),
+    )
+
+
+def _is_staged(subscription_item: Payload) -> bool:
+    if str(subscription_item.get("status") or "") != ACTIVE_SUBSCRIPTION_STATUS:
+        return False
+    auto_renewal = subscription_item.get("autoRenewal") or {}
+    if not auto_renewal.get("enabled", True):
+        return True
+    renewal_quantity = int(auto_renewal.get("renewalQuantity") or 0)
+    current_quantity = int(subscription_item.get("currentQuantity") or 0)
+    return bool(renewal_quantity) and renewal_quantity != current_quantity
 
 
 def _renewal_dates(adobe_subscriptions: Payload) -> list[dt.date]:
