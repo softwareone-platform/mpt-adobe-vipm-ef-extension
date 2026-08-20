@@ -221,7 +221,7 @@ function keepRenewalActions(additions: RenewalLine[]): string {
 function ConflictNotice({ conflict }: { conflict: RenewAndAddConflict }) {
   return (
     <div className="items-step__conflict" data-testid="items-step-conflict">
-      <InlineNotification status="error" isStandalone>
+      <InlineNotification status="error">
         <RegularText as="p" size={2}>
           {i18n.t('Renewal:Items:Conflict:Intro')}
         </RegularText>

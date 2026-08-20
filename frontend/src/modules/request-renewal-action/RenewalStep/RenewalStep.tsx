@@ -283,7 +283,7 @@ export function RenewalStep({
       </InlineNotification>
       {planError && (
         <div className="renewal-step__validation" data-testid="renewal-step-error">
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {planError}
           </InlineNotification>
         </div>
