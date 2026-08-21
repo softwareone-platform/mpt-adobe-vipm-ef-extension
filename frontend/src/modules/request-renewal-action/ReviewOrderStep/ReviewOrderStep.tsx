@@ -345,7 +345,7 @@ export function ReviewOrderStep({
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('Renewal:Review:Tabs:Items')}>
           <Tab.Content>
-            <div className="review-order-step__grid">
+            <div className="review-order-step__tab review-order-step__grid">
               <Grid {...gridProps} />
             </div>
             <RegularText as="p" size={1} color="grey-4" className="review-order-step__disclaimer">
