@@ -51,6 +51,7 @@ describe('useRenewalPlanValidation', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
       PLAN,
+      expect.objectContaining({ signal: expect.anything() }),
     );
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
@@ -66,7 +67,7 @@ describe('useRenewalPlanValidation', () => {
     });
 
     expect(isValid).toBe(true);
-    expect(mockPost.mock.calls).toEqual([
+    expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
       ['/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check', EARLY_PLAN],
       [
         '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
@@ -93,6 +94,7 @@ describe('useRenewalPlanValidation', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
       EARLY_PLAN,
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 
@@ -132,6 +134,7 @@ describe('useRenewalPlanValidation', () => {
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check',
       expect.anything(),
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 

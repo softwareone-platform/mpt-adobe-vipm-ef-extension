@@ -431,6 +431,7 @@ describe('request-midterm-upgrade-action App', () => {
         notes: '',
         externalIds: { client: '' },
       },
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 
@@ -550,6 +551,7 @@ describe('request-midterm-upgrade-action App', () => {
         notes: '',
         externalIds: { client: '' },
       },
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 
@@ -607,6 +609,7 @@ describe('request-midterm-upgrade-action App', () => {
         notes: 'Upgrade for the design team',
         externalIds: { client: '234234234' },
       },
+      expect.objectContaining({ signal: expect.anything() }),
     );
   });
 
