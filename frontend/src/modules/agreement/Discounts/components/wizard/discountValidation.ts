@@ -202,36 +202,6 @@ export function validateScope(draft: DiscountDraft): string | null {
   return validateItems(draft) ?? validateOrderTypes(draft);
 }
 
-/**
- * Presence checks that gate the Next button.
- *
- * Deliberately weaker than the validators: they only ask whether the required
- * fields carry something, so the button can be disabled without a message.
- * The validators still run on Next for the rules a blank check cannot express
- * (percentage bounds, date ordering, INTRO order types), where the user needs
- * to be told what is wrong.
- */
-export function isDefinitionComplete(draft: DiscountDraft): boolean {
-  return Boolean(
-    draft.code.trim() &&
-    draft.name.trim() &&
-    draft.category &&
-    draft.discountType &&
-    draft.value.trim(),
-  );
-}
-
-export function isValidityComplete(draft: DiscountDraft): boolean {
-  const hasPeriod = Boolean(draft.startDate && draft.endDate);
-  return hasPeriod && (!draft.reusable || Boolean(draft.discountLockEndDate));
-}
-
-export function isScopeComplete(draft: DiscountDraft): boolean {
-  return (
-    parseItemList(draft.targetItems).length > 0 && draft.applicableOrderTypes.length > 0
-  );
-}
-
 function validateCurrency(draft: DiscountDraft): string | null {
   // Percentage discounts carry no currency. For the fixed types the value row
   // needs one, so refuse to submit when the agreement did not supply it.

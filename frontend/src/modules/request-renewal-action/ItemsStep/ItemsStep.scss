@@ -11,10 +11,6 @@
     }
   }
 
-  &__highlights {
-    padding: $var-spacing-3 0 0;
-  }
-
   &__toolbar {
     display: flex;
     justify-content: flex-end;
@@ -33,10 +29,6 @@
       margin: $var-spacing-1 0;
       padding-left: $var-spacing-4;
     }
-  }
-
-  &__validating {
-    margin: 0;
   }
 
   &__disclaimer {

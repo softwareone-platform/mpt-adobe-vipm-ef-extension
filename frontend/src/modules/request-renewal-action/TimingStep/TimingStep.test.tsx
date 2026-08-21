@@ -86,13 +86,27 @@ describe('TimingStep', () => {
   });
 
   it('counts a renewal date one day out in the singular', () => {
-    const { getByText } = renderStep({ renewalDate: dateInDays(1) });
+    const { getByText } = renderStep({
+      pathState: { ...pathState, anniversaryDate: dateInDays(1) },
+    });
 
     expect(getByText(/\(1 day away\)/)).toBeTruthy();
   });
 
+  it('states the anniversary Adobe reports, not the stored agreement parameter', () => {
+    const { getByText } = renderStep({
+      renewalDate: dateInDays(30),
+      pathState: { ...pathState, anniversaryDate: dateInDays(7) },
+    });
+
+    expect(getByText(/\(7 days away\)/)).toBeTruthy();
+  });
+
   it('asks for the timing without a date when the renewal date is unknown', () => {
-    const { getByText, queryByText } = renderStep({ renewalDate: undefined });
+    const { getByText, queryByText } = renderStep({
+      renewalDate: undefined,
+      pathState: { ...pathState, anniversaryDate: '' },
+    });
 
     expect(getByText('When would you like your renewal to occur?')).toBeTruthy();
     expect(queryByText(/Your renewal date is/)).toBeNull();
@@ -122,15 +136,31 @@ describe('TimingStep', () => {
     expect(onPathChange).toHaveBeenCalledWith('now');
   });
 
-  it('marks the established path confirmed and locks both boxes', () => {
-    const { getByText, getByTestId } = renderStep({
+  it('presents an early renewal already in place as the only path', () => {
+    const { getByText, getByTestId, queryByTestId, queryByText } = renderStep({
       pathState: { ...pathState, lockedPath: 'now' },
     });
 
-    expect(getByText('Confirmed')).toBeTruthy();
+    expect(getByText('Renew now (confirmed)')).toBeTruthy();
+    expect(getByText(/Your renewal is already in place/)).toBeTruthy();
+    expect(getByText(/Your early renewal has already taken effect/)).toBeTruthy();
     expect(getByTestId('box-now').getAttribute('data-selected')).toBe('true');
-    expect(getByTestId('box-anniversary').getAttribute('data-disabled')).toBe('true');
     expect(getByTestId('box-now').getAttribute('data-disabled')).toBe('true');
+    expect(queryByTestId('box-anniversary')).toBeNull();
+    expect(queryByText(/This choice applies to the whole renewal/)).toBeNull();
+  });
+
+  it('presents a staged at-anniversary renewal as the only path', () => {
+    const { getByText, getByTestId, queryByTestId } = renderStep({
+      pathState: { ...pathState, lockedPath: 'anniversary' },
+    });
+
+    expect(getByText('Renew at your anniversary date (confirmed)')).toBeTruthy();
+    expect(getByText(/Your renewal is set up/)).toBeTruthy();
+    expect(getByText(/\(7 days away\)/)).toBeTruthy();
+    expect(getByText(/You can keep making changes/)).toBeTruthy();
+    expect(getByTestId('box-anniversary').getAttribute('data-disabled')).toBe('true');
+    expect(queryByTestId('box-now')).toBeNull();
   });
 
   it('offers no path outside the renewal window', () => {
@@ -157,7 +187,7 @@ describe('TimingStep', () => {
       pathState: { ...pathState, windowOpen: false, lockedPath: 'now' },
     });
 
-    expect(getByText('Confirmed')).toBeTruthy();
+    expect(getByText('Renew now (confirmed)')).toBeTruthy();
     expect(queryByText(/only plan your renewal within/)).toBeNull();
   });
 });

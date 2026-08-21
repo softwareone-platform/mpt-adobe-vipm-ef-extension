@@ -20,16 +20,17 @@ export interface UpgradeOrderResult {
 }
 
 export function useUpgradeOrderRequest(agreementId: string, subscriptionId: string) {
-  const { run, reset, ...state } = useGuardedRequest('Errors:OrderSubmission');
+  const { run, cancel, reset, ...state } = useGuardedRequest('Errors:OrderSubmission');
 
   const submitOrder = useCallback(
     (input: UpgradeOrderInput): Promise<UpgradeOrderResult | false> =>
-      run(async () => {
+      run(async (signal) => {
         const encodedAgreementId = encodeURIComponent(agreementId);
         const encodedSubscriptionId = encodeURIComponent(subscriptionId);
         const response = await http.post(
           `/api/v2/agreements/${encodedAgreementId}/subscriptions/${encodedSubscriptionId}/upgrade-order`,
           input,
+          { signal },
         );
         const order = (response.data as { data?: UpgradeOrderResult } | undefined)?.data;
         if (!order?.id) {
@@ -40,5 +41,5 @@ export function useUpgradeOrderRequest(agreementId: string, subscriptionId: stri
     [agreementId, subscriptionId, run],
   );
 
-  return { ...state, submitOrder, reset };
+  return { ...state, submitOrder, cancel, reset };
 }

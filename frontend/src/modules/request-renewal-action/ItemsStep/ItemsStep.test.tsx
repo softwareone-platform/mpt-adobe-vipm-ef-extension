@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 
 import { act, fireEvent, render, within } from '@testing-library/react';
 
+import type { GenericAbortSignal } from 'axios';
+
 import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
@@ -43,16 +45,20 @@ interface TestRow {
 interface GridColumn {
   name: string;
   title?: string;
+  fields?: string[];
   cell?: (row: TestRow) => ReactNode;
 }
 
 interface GridConfig {
   id: string;
   columns: GridColumn[];
+  fields: { name: string; title: string }[];
+  sort: { field: string; direction: string }[];
   paging: { page: number; pageSize: number; total: number };
 }
 
 let capturedConfig: GridConfig;
+const onGridEvent = jest.fn();
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: ({ data, config }: { data: TestRow[]; config: GridConfig }) => (
@@ -69,7 +75,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useGridInMemory: (data: TestRow[], config: GridConfig) => {
     capturedConfig = config;
-    return { data, config };
+    return { data, config, onEvent: onGridEvent };
   },
 }));
 
@@ -132,6 +138,20 @@ interface DialogProps {
   onAdd: (items: NetNewItem[]) => void;
 }
 let dialogProps: DialogProps;
+
+interface ProgressProps {
+  isOpen: boolean;
+  label: string;
+  onCancel: () => void;
+}
+let progressProps: ProgressProps;
+
+jest.mock('../../shared/components/ProgressModal/ProgressModal', () => ({
+  ProgressModal: (props: ProgressProps) => {
+    progressProps = props;
+    return props.isOpen ? <div data-testid="progress-modal">{props.label}</div> : null;
+  },
+}));
 
 jest.mock('../components/select-items-dialog/SelectItemsDialog', () => ({
   SelectItemsDialog: (props: DialogProps) => {
@@ -413,6 +433,41 @@ describe('ItemsStep', () => {
     expect(onNetNewItemsChange).toHaveBeenCalledWith([NET_NEW_ITEM, added]);
   });
 
+  it('clears the grid sort as items are added, so an addition lands at the bottom', () => {
+    const { getByTestId } = renderStep();
+
+    fireEvent.click(getByTestId('add-items'));
+    dialogProps.onAdd([NET_NEW_ITEM]);
+
+    expect(onGridEvent).toHaveBeenCalledWith({ type: 'SortChange', data: [] });
+  });
+
+  it('offers each value of a multi-value column as its own field', () => {
+    renderStep();
+
+    const fieldsByColumn = Object.fromEntries(
+      capturedConfig.columns.map((column) => [column.name, column.fields]),
+    );
+    expect(fieldsByColumn.item).toEqual(['itemName', 'itemId', 'sku']);
+    expect(fieldsByColumn.subscription).toEqual(['subscriptionName', 'subscriptionId']);
+    expect(fieldsByColumn.terms).toEqual(['terms', 'commitment']);
+    expect(capturedConfig.fields.map((field) => field.name)).toEqual([
+      'itemName',
+      'itemId',
+      'sku',
+      'subscriptionName',
+      'subscriptionId',
+      'terms',
+      'commitment',
+      'currentQuantity',
+      'renewalQuantity',
+      'unitSP',
+      'spxM',
+      'spxY',
+    ]);
+    expect(capturedConfig.sort).toEqual([]);
+  });
+
   it('keeps held and already added SKUs out of the picker', () => {
     renderStep({ netNewItems: [NET_NEW_ITEM] });
 
@@ -498,6 +553,59 @@ describe('ItemsStep', () => {
       expect(registeredOnNext).toBeDefined();
     });
 
+    it('holds the customer with the validating modal while the plan is in flight', async () => {
+      let releasePost: (() => void) | undefined;
+      mockPost.mockImplementation(
+        () => new Promise((resolve) => {
+          releasePost = () => resolve({ data: { data: {} } });
+        }),
+      );
+      const { getByTestId, queryByTestId } = renderStep();
+
+      expect(queryByTestId('progress-modal')).toBeNull();
+
+      let pending: Promise<number> | undefined;
+      await act(async () => {
+        pending = registeredOnNext!(NAVIGATION) as Promise<number>;
+      });
+
+      expect(getByTestId('progress-modal').textContent).toBe('Validating');
+
+      await act(async () => {
+        releasePost?.();
+        await pending;
+      });
+
+      expect(queryByTestId('progress-modal')).toBeNull();
+    });
+
+    it('cancels the plan validation from the modal', async () => {
+      mockPost.mockImplementation(
+        (_url: string, _body?: unknown, config?: { signal?: GenericAbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            config?.signal?.addEventListener?.('abort', () => reject(new Error('canceled')));
+          }),
+      );
+      const { getByTestId, queryByTestId } = renderStep();
+
+      let pending: Promise<number> | undefined;
+      await act(async () => {
+        pending = registeredOnNext!(NAVIGATION) as Promise<number>;
+      });
+
+      expect(getByTestId('progress-modal')).toBeTruthy();
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        progressProps.onCancel();
+        nextIndex = await pending;
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(queryByTestId('progress-modal')).toBeNull();
+      expect(queryByTestId('items-step-error')).toBeNull();
+    });
+
     it('blocks the step while a renewal quantity is invalid, without calling the backend', async () => {
       const { getByTestId } = renderStep({ quantities: { 'SUB-1': null } });
 
@@ -536,6 +644,7 @@ describe('ItemsStep', () => {
           subscriptions: PLAN_SUBSCRIPTIONS,
           netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
         },
+        expect.objectContaining({ signal: expect.anything() }),
       );
     });
 
@@ -554,7 +663,7 @@ describe('ItemsStep', () => {
         subscriptions: PLAN_SUBSCRIPTIONS,
         netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
       };
-      expect(mockPost.mock.calls).toEqual([
+      expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
         ['/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check', plan],
         [
           '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',

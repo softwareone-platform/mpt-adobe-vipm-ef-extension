@@ -402,6 +402,7 @@ describe('PromotionsStep', () => {
           netNewItems: [{ offerId: 'OFFER-3', quantity: 2 }],
           flexDiscountCodes: ['CODE-ONE'],
         },
+        expect.objectContaining({ signal: expect.anything() }),
       );
     });
 

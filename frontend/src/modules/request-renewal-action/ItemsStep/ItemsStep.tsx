@@ -21,6 +21,7 @@ import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { TextInputCell } from '../../shared/components/GridCell/TextInputCell/TextInputCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
+import { ProgressModal } from '../../shared/components/ProgressModal/ProgressModal';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import {
   RENEWAL_LEARN_MORE_URL,
@@ -221,7 +222,7 @@ function keepRenewalActions(additions: RenewalLine[]): string {
 function ConflictNotice({ conflict }: { conflict: RenewAndAddConflict }) {
   return (
     <div className="items-step__conflict" data-testid="items-step-conflict">
-      <InlineNotification status="error" isStandalone>
+      <InlineNotification status="error">
         <RegularText as="p" size={2}>
           {i18n.t('Renewal:Items:Conflict:Intro')}
         </RegularText>
@@ -255,7 +256,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['itemName'],
+      fields: ['itemName', 'itemId', 'sku'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -270,7 +271,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     {
       name: 'subscription',
       title: i18n.t('Common:Subscription'),
-      fields: ['subscriptionName'],
+      fields: ['subscriptionName', 'subscriptionId'],
       cell: (row) =>
         row.kind === 'net-new' ? (
           <ChipCell label={i18n.t('Renewal:Items:New')} color="gray" />
@@ -288,7 +289,7 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
     {
       name: 'terms',
       title: i18n.t('Common:Terms title'),
-      fields: ['terms'],
+      fields: ['terms', 'commitment'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
     },
@@ -375,9 +376,13 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'itemName', title: i18n.t('Common:Item') },
-  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'itemName', title: i18n.t('Common:Item name') },
+  { name: 'itemId', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'currentQuantity', title: i18n.t('Renewal:Grid:Current qty'), type: 'number' },
   { name: 'renewalQuantity', title: i18n.t('Renewal:Items:Renewal qty'), type: 'number' },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
@@ -385,7 +390,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'spxY', title: i18n.t('Renewal:Grid:SPxY'), type: 'number' },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'itemName', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [];
 
 export function ItemsStep({
   agreement,
@@ -403,7 +408,7 @@ export function ItemsStep({
   const [isDialogOpen, setDialogOpen] = useState(false);
   const listingId = agreement.listing?.id ?? '';
   const { registerOnNextCallback } = useStepActions();
-  const { error: planError, status: planStatus, validatePlan, reset } = useRenewalPlanValidation(
+  const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(
     agreement.id,
   );
   const [quantityError, setQuantityError] = useState('');
@@ -532,11 +537,11 @@ export function ItemsStep({
           </InlineNotification>
         </div>
       )}
-      {planStatus === 'loading' && (
-        <RegularText as="p" size={2} color="grey-4" className="items-step__validating">
-          {t('Renewal:Items:Validating')}
-        </RegularText>
-      )}
+      <ProgressModal
+        isOpen={planStatus === 'loading'}
+        label={t('Common:Validating')}
+        onCancel={cancel}
+      />
       <div className="items-step__toolbar">
         <Button
           isDisabled={!listingId}
@@ -568,7 +573,10 @@ export function ItemsStep({
         excludedSkus={excludedSkus}
         recommendedSkus={recommendedSkus}
         currency={agreement.price?.billingCurrency ?? ''}
-        onAdd={onAdd}
+        onAdd={(items) => {
+          gridProps.onEvent?.({ type: 'SortChange', data: [] });
+          onAdd(items);
+        }}
       />
     </div>
   );

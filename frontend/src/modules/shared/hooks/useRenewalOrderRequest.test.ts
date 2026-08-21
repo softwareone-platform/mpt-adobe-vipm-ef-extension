@@ -48,7 +48,11 @@ describe('useRenewalOrderRequest', () => {
       resolved = await result.current.submitOrder(ORDER_INPUT);
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1/renewal-order', ORDER_INPUT);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/renewal-order',
+      ORDER_INPUT,
+      expect.objectContaining({ signal: expect.anything() }),
+    );
     expect(resolved).toEqual(CREATED_ORDER);
     await waitFor(() => expect(result.current.status).toBe('success'));
   });

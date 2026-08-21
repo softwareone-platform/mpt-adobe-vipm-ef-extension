@@ -37,7 +37,7 @@ function getColumns(agreement?: Agreement): GridColumnDefinition<TargetSubscript
   {
     name: 'name',
     title: i18n.t('Common:Name'),
-    fields: ['name'],
+    fields: ['item.name', 'item.id', 'item.externalId'],
     cell: (item) => (
       <PopoverCell
         title={i18n.t('Common:Item')}
@@ -51,7 +51,7 @@ function getColumns(agreement?: Agreement): GridColumnDefinition<TargetSubscript
   {
     name: 'subscription',
     title: i18n.t('Common:Subscription'),
-    fields: ['subscription'],
+    fields: ['name', 'id'],
     cell: (item) => getSubscriptionCell(item, agreement),
   },
   {
@@ -94,8 +94,11 @@ const priceColumns: GridColumnDefinition<TargetSubscription>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'name', title: i18n.t('Common:Name') },
-  { name: 'subscription', title: i18n.t('Common:Subscription') },
+  { name: 'item.name', title: i18n.t('Common:Item name') },
+  { name: 'item.id', title: i18n.t('Common:Item ID') },
+  { name: 'item.externalId', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'name', title: i18n.t('Common:Subscription name') },
+  { name: 'id', title: i18n.t('Common:Subscription ID') },
   { name: 'recommended', title: i18n.t('MidtermUpgrade:Grid:Recommended') },
   { name: 'currentQuantity', title: i18n.t('MidtermUpgrade:Grid:Current Quantity') },
   { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP') },
@@ -103,7 +106,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'spxY', title: i18n.t('MidtermUpgrade:Grid:SPxY') },
 ];
 
-const sort: GridFieldSortOperation[] = [{ field: 'name', direction: 'asc' }];
+const sort: GridFieldSortOperation[] = [{ field: 'item.name', direction: 'asc' }];
 
 function isEqual(a: TargetSubscription, b: TargetSubscription): boolean {
   return a.item.id === b.item.id && a.targetBaseOfferId === b.targetBaseOfferId;

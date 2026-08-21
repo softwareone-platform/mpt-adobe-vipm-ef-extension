@@ -19,6 +19,7 @@ import type { StepNavigationProperties } from '@softwareone-platform/sdk-react-u
 import { i18n } from '../../../i18n/translations';
 import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
+import { ProgressModal } from '../../shared/components/ProgressModal/ProgressModal';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
 import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
@@ -102,7 +103,7 @@ function buildColumns(
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['itemName'],
+      fields: ['itemName', 'itemId', 'sku'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -117,7 +118,7 @@ function buildColumns(
     {
       name: 'subscription',
       title: i18n.t('Common:Subscription'),
-      fields: ['subscriptionName'],
+      fields: ['subscriptionName', 'subscriptionId'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -132,7 +133,7 @@ function buildColumns(
     {
       name: 'terms',
       title: i18n.t('Common:Terms title'),
-      fields: ['terms'],
+      fields: ['terms', 'commitment'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
     },
@@ -207,9 +208,13 @@ function buildColumns(
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'itemName', title: i18n.t('Common:Item') },
-  { name: 'subscriptionName', title: i18n.t('Common:Subscription') },
+  { name: 'itemName', title: i18n.t('Common:Item name') },
+  { name: 'itemId', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'quantity', title: i18n.t('Renewal:Grid:Current qty'), type: 'number' },
   { name: 'renew', title: i18n.t('Renewal:Grid:Renew') },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
@@ -233,7 +238,7 @@ export function RenewalStep({
   // The toggles are the only edit this step allows, so the plan is gated on the
   // 3YC floor alone: Adobe's quote is left to the Items step, where the
   // customer owns the quantities it would reject.
-  const { error: planError, validatePlan, reset } = useRenewalPlanValidation(agreement.id, {
+  const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(agreement.id, {
     quoteThroughAdobe: false,
   });
   const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
@@ -281,9 +286,14 @@ export function RenewalStep({
       <InlineNotification status="info">
         {t('Renewal:Grid:Prompt')}
       </InlineNotification>
+      <ProgressModal
+        isOpen={planStatus === 'loading'}
+        label={t('Common:Validating')}
+        onCancel={cancel}
+      />
       {planError && (
         <div className="renewal-step__validation" data-testid="renewal-step-error">
-          <InlineNotification status="error" isStandalone>
+          <InlineNotification status="error">
             {planError}
           </InlineNotification>
         </div>

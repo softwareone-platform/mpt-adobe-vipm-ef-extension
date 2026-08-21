@@ -10,6 +10,7 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { Loader } from '../shared/components/Loader/Loader';
+import { ProgressModal } from '../shared/components/ProgressModal/ProgressModal';
 import { COTERM_DATE_PARAM } from '../shared/constants';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscriptions';
@@ -26,7 +27,7 @@ import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
 import { canRequestRenewalAction } from '../utils/security';
 import { getPartialSku } from '../utils/sku';
-import { relativeScreenHeight, relativeScreenWidth } from '../utils/window';
+import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from '../utils/window';
 import { DetailsStep } from './DetailsStep';
 import { ItemsStep } from './ItemsStep';
 import { PromotionsStep } from './PromotionsStep';
@@ -63,6 +64,11 @@ export default function App() {
   const subscriptions = useAgreementSubscriptions(agreementId);
   const renewalDate = readParameter(agreement?.parameters?.fulfillment, COTERM_DATE_PARAM);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+
+  const changeStep = useCallback((index: number) => {
+    setActiveStepIndex(index);
+    scrollStepToTop();
+  }, []);
   const [renewalPath, setRenewalPath] = useState<RenewalPath>('anniversary');
   const [renewalSelections, setRenewalSelections] = useState<RenewalSelections | null>(null);
   const [renewalQuantities, setRenewalQuantities] = useState<RenewalQuantities>({});
@@ -74,6 +80,7 @@ export default function App() {
     error: submitError,
     status: submitStatus,
     submitOrder,
+    cancel: cancelSubmit,
   } = useRenewalOrderRequest(agreementId);
   const wizardHeight = relativeScreenHeight();
   const wizardWidth = relativeScreenWidth();
@@ -278,7 +285,7 @@ export default function App() {
   if (isEarlyPath && renewalState.status === 'error') {
     return (
       <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
-        <InlineNotification status="error" isStandalone>
+        <InlineNotification status="error">
           {renewalState.error || t('Errors:LoadRenewalState')}
         </InlineNotification>
         <Button onClick={renewalState.refresh}>
@@ -425,7 +432,7 @@ export default function App() {
             nextButton: step.nextButton,
           }))}
           activeStepIndex={activeStepIndex}
-          onActiveStepIndexChange={setActiveStepIndex}
+          onActiveStepIndexChange={changeStep}
           onClose={onClose}
           onSave={viewOrder}
           isToDisableSideNavigation={Boolean(order?.id)}
@@ -441,6 +448,11 @@ export default function App() {
           </Wizard.Content>
           <Wizard.Actions />
         </Wizard>
+        <ProgressModal
+          isOpen={submitStatus === 'loading'}
+          label={t('Common:Placing order')}
+          onCancel={cancelSubmit}
+        />
       </div>
     </BrowserRouter>
   );

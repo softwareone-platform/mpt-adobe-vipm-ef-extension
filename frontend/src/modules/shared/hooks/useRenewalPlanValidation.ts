@@ -39,7 +39,7 @@ export function useRenewalPlanValidation(
   agreementId: string,
   { quoteThroughAdobe = true }: RenewalPlanValidationOptions = {},
 ) {
-  const { run, reset, ...state } = useGuardedRequest('Errors:RenewalPlanValidation');
+  const { run, cancel, reset, ...state } = useGuardedRequest('Errors:RenewalPlanValidation');
 
   const validatePlan = useCallback(
     async (plan: RenewalPlanBody): Promise<boolean> => {
@@ -47,11 +47,11 @@ export function useRenewalPlanValidation(
         return true;
       }
 
-      return run(async () => {
+      return run(async (signal) => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
-        await http.post(`${baseUrl}/3yc-check`, plan);
+        await http.post(`${baseUrl}/3yc-check`, plan, { signal });
         if (quoteThroughAdobe && isRenewalPreviewRequired(plan)) {
-          await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes: [] });
+          await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes: [] }, { signal });
         }
         return true;
       });
@@ -59,5 +59,5 @@ export function useRenewalPlanValidation(
     [agreementId, quoteThroughAdobe, run],
   );
 
-  return { ...state, validatePlan, reset };
+  return { ...state, validatePlan, cancel, reset };
 }
