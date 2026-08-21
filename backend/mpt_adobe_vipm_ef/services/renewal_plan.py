@@ -29,7 +29,15 @@ _NO_CHANGE_ITEM_QUANTITY = 1
 
 @dataclass(frozen=True)
 class PlanSubscription:
-    """A requested subscription selection resolved against its MPT subscription."""
+    """A requested subscription selection resolved against its MPT subscription.
+
+    ``renewed_quantity`` is the quantity previous early-renewal orders already
+    renewed, read from the customer's live Adobe subscriptions
+    (``renewedQuantity``). It is only stamped on the early-renewal ("Renew
+    now") path, where it is the baseline ``renewal_delta`` subtracts from; at
+    the anniversary it stays at zero so every quantity keeps its plain total
+    reading.
+    """
 
     selection: RenewalSubscriptionSelection
     line_id: str
@@ -37,6 +45,22 @@ class PlanSubscription:
     adobe_subscription_id: str
     offer_id: str
     subscription: Subscription
+    renewed_quantity: int = 0
+
+
+def renewal_delta(plan: PlanSubscription) -> int:
+    """The quantity this order still has to renew for the subscription.
+
+    The wizard always sends the total quantity the customer wants renewed, but
+    on the early-renewal path part of it may already be renewed by a previous
+    RENEWAL order — Adobe reports that part as ``renewedQuantity`` and it must
+    not be ordered again. The delta is what the order actually executes: it is
+    what the PREVIEW_RENEWAL quotes and what the ``renewalPayload`` snapshot
+    carries, so fulfilment never re-renews seats. Zero means the subscription
+    needs no action and is kept as it stands in Adobe; at the anniversary
+    ``renewed_quantity`` is never stamped, so the delta is the plain total.
+    """
+    return plan.selection.renewal_quantity - plan.renewed_quantity
 
 
 @dataclass(frozen=True)
@@ -96,6 +120,45 @@ def require_renewal_changes(
         raise ValidationError(
             detail="The renewal plan has no changes to submit.",
         )
+
+
+def require_no_renewed_seat_reduction(plan_subscriptions: list[PlanSubscription]) -> None:
+    """Reject an early-renewal plan that keeps renewing but asks below the renewed seats.
+
+    An Adobe RENEWAL order can only renew further seats, and a partial return
+    of a previous early renewal is not supported — so on the "Renew now" path
+    a renewing subscription cannot ask for a total below what previous orders
+    already renewed. Removing the subscription from the renewal entirely is
+    allowed instead: the removal rides the ``renewalPayload`` (``renew`` off
+    with its ``renewedQuantity``) and fulfilment executes it as a RETURN of
+    the renewed seats. Only bites where ``renewed_quantity`` was stamped,
+    which is the now path alone.
+    """
+    for plan in plan_subscriptions:
+        if plan.selection.renew and renewal_delta(plan) < 0:
+            subscription_id = plan.selection.id
+            renewed_quantity = plan.renewed_quantity
+            raise ValidationError(
+                detail=(
+                    f"Subscription {subscription_id} cannot renew fewer seats than "
+                    f"the {renewed_quantity} already early-renewed."
+                ),
+            )
+
+
+def has_renewed_removal(plan_subscriptions: list[PlanSubscription]) -> bool:
+    """Whether the plan removes a subscription a previous early renewal covered.
+
+    Such a removal — the customer taking back an early renewal placed by
+    mistake — is a real action with nothing to quote: the RENEWAL order
+    carries no line for it and fulfilment executes it as a RETURN of the
+    renewed seats. A plan whose quotable content is empty therefore still
+    previews (as an empty quote) and still submits when it carries one. Only
+    meaningful where ``renewed_quantity`` was stamped, the now path alone.
+    """
+    return any(
+        not plan.selection.renew and plan.renewed_quantity > 0 for plan in plan_subscriptions
+    )
 
 
 async def resolve_no_change_line(ctx: APIContext, agreement: Agreement) -> Line:
@@ -171,7 +234,11 @@ def build_preview_renewal_line_items(
     """Build the Adobe PREVIEW_RENEWAL line items for the plan.
 
     A lapsing subscription has nothing to price, so only renewing ones carry a
-    line. The selected flexible discount codes ride on every line so Adobe
+    line — and each line quotes its ``renewal_delta``, the quantity this order
+    still has to renew, so on the early-renewal path a previous RENEWAL
+    order's seats are never quoted (or charged) again; a subscription whose
+    delta is zero is already fully covered and drops out of the quote
+    entirely. The selected flexible discount codes ride on every line so Adobe
     validates their eligibility per line. ``plan.offer_id`` must already carry
     the full Adobe offer id (resolved from the customer's live subscriptions)
     or Adobe rejects the line.
@@ -182,7 +249,9 @@ def build_preview_renewal_line_items(
     them. They are left out at the anniversary, where a net-new product has no
     Adobe subscription until fulfilment creates it.
     """
-    renewing = (plan for plan in plan_subscriptions if plan.selection.renew)
+    renewing = (
+        plan for plan in plan_subscriptions if plan.selection.renew and renewal_delta(plan) > 0
+    )
     line_items = [
         _preview_subscription_line(plan, line_number, flex_discount_codes)
         for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER)
@@ -199,7 +268,7 @@ def _preview_subscription_line(
         "extLineItemNumber": line_number,
         "offerId": plan.offer_id,
         "subscriptionId": plan.adobe_subscription_id,
-        "quantity": plan.selection.renewal_quantity,
+        "quantity": renewal_delta(plan),
     }
     if flex_discount_codes:
         line_item["flexDiscountCodes"] = list(flex_discount_codes)
@@ -239,11 +308,21 @@ def build_renewal_payload(
     as auto-renewal preferences at the coterm date, or place the early RENEWAL
     order now — since the resulting Marketplace order looks the same either
     way. Every selected subscription is recorded with its Adobe id, offer id,
-    renew decision and renewal quantity; the selected flexible discount codes
-    ride on each renewing entry, matching Adobe's auto-renewal preference
-    object. The net-new products carry their full offer ids (resolved from the
-    Airtable SKU mapping, see ``resolve_net_new_offer_ids``) so fulfilment can
-    create the scheduled subscriptions without re-resolving them.
+    renew decision and its ``renewal_delta`` as the quantity: on the now path
+    that is what the RENEWAL order still has to renew after previous orders
+    (zero flags an already-covered subscription fulfilment keeps active
+    without re-renewing it), and at the anniversary — where nothing is ever
+    already renewed — it is the plain total Adobe's auto-renewal preference
+    takes. Each entry also carries the ``renewedQuantity`` observed when the
+    order was placed: a removed subscription (``renew`` off) with renewed
+    seats is how the customer takes back an early renewal placed by mistake,
+    and that baseline is what tells fulfilment to execute the removal as a
+    RETURN order — and how large it is — rather than as a plain lapse.
+    The selected flexible discount codes ride on each renewing entry,
+    matching Adobe's auto-renewal preference object. The net-new products
+    carry their full offer ids (resolved from the Airtable SKU mapping, see
+    ``resolve_net_new_offer_ids``) so fulfilment can create the scheduled
+    subscriptions without re-resolving them.
     """
     return RenewalPayload.from_payload({
         "renewalPath": request.renewal_path.value,
@@ -254,7 +333,8 @@ def build_renewal_payload(
                 "subscriptionId": plan.adobe_subscription_id,
                 "offerId": plan.offer_id,
                 "renew": plan.selection.renew,
-                "renewalQuantity": plan.selection.renewal_quantity,
+                "renewalQuantity": max(renewal_delta(plan), 0),
+                "renewedQuantity": plan.renewed_quantity,
                 "flexDiscountCodes": (
                     list(request.flex_discount_codes) if plan.selection.renew else []
                 ),
