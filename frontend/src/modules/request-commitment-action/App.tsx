@@ -10,6 +10,7 @@ import { Switcher } from '@softwareone-platform/sdk-react-ui-v0/switcher';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 
+import { Loader } from '../shared/components/Loader/Loader';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useThreeYearCommitmentRequest } from '../shared/hooks/useThreeYearCommitmentRequest';
@@ -91,8 +92,56 @@ export default function App() {
   const [customConsumables, setCustomConsumables] = useState('');
 
   const isBusy = status === 'loading';
+  const isCustomerPending = adobeCustomer.status === 'idle' || adobeCustomer.status === 'loading';
+  const customerError =
+    adobeCustomer.status === 'error'
+      ? adobeCustomer.error || t('Errors:LoadAdobeCustomer')
+      : null;
 
   if (!canRequest) return null;
+
+  if (isCustomerPending) {
+    return (
+      <div className="request-commitment-modal">
+        <div className="request-commitment-modal__header">
+          <MediumText as="h2" size={4}>
+            {t('Commitment:Title')}
+          </MediumText>
+        </div>
+        <div className="request-commitment-modal__content">
+          <Loader />
+        </div>
+        <div className="request-commitment-modal__actions">
+          <Button onClick={() => close()} type="secondary">
+            {t('Common:Close')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (customerError) {
+    return (
+      <div className="request-commitment-modal">
+        <div className="request-commitment-modal__header">
+          <MediumText as="h2" size={4}>
+            {t('Commitment:Title')}
+          </MediumText>
+        </div>
+        <div className="request-commitment-modal__content">
+          <InlineNotification status="error">{customerError}</InlineNotification>
+        </div>
+        <div className="request-commitment-modal__actions">
+          <Button onClick={() => close()} type="secondary">
+            {t('Common:Close')}
+          </Button>
+          <Button onClick={adobeCustomer.refresh} type="primary">
+            {t('Common:Retry')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   function resolveValue(selection: string, customRaw: string): number | null {
     if (selection === 'custom') return toIntOrNull(customRaw);

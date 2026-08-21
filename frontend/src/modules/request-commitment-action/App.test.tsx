@@ -7,7 +7,10 @@ import type { AdobeCustomerData } from '../shared/model';
 import type { Status } from '../shared/model';
 
 const mockClose = jest.fn();
+const mockRefresh = jest.fn();
 let mockCustomerData: AdobeCustomerData | null = null;
+let mockCustomerStatus: Status = 'success';
+let mockCustomerError: string | null = null;
 let mockStatus: Status = 'idle';
 let mockError = '';
 let mockSubmit: jest.Mock;
@@ -30,12 +33,16 @@ jest.mock('../shared/hooks/useAgreementId', () => ({
 
 jest.mock('../shared/hooks/useAdobeCustomer', () => ({
   useAdobeCustomer: () => ({
-    status: 'success',
-    error: null,
+    status: mockCustomerStatus,
+    error: mockCustomerError,
     data: mockCustomerData,
     update: jest.fn(),
-    refresh: jest.fn(),
+    refresh: mockRefresh,
   }),
+}));
+
+jest.mock('../shared/components/Loader/Loader', () => ({
+  Loader: () => <div data-testid="loader" />,
 }));
 
 jest.mock('../shared/hooks/useThreeYearCommitmentRequest', () => ({
@@ -181,10 +188,46 @@ const clickSend = (utils: ReturnType<typeof setup>) =>
 describe('request-commitment-action App', () => {
   beforeEach(() => {
     mockClose.mockReset();
+    mockRefresh.mockReset();
     mockSubmit = jest.fn().mockResolvedValue({ customerId: 'P1' } as AdobeCustomerData);
     mockCustomerData = null;
+    mockCustomerStatus = 'success';
+    mockCustomerError = null;
     mockStatus = 'idle';
     mockError = '';
+  });
+
+  it.each<Status>(['idle', 'loading'])(
+    'shows the loader instead of the form while the customer read is %s',
+    (customerStatus) => {
+      mockCustomerStatus = customerStatus;
+      const utils = setup();
+
+      expect(utils.getByTestId('loader')).toBeTruthy();
+      expect(utils.queryByText('Send invitation')).toBeNull();
+      expect(mockSubmit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('offers a retry instead of the form when the customer read fails', () => {
+    mockCustomerStatus = 'error';
+    mockCustomerError = 'Failed to load Adobe customer data.';
+    const utils = setup();
+
+    expect(utils.getByText('Failed to load Adobe customer data.')).toBeTruthy();
+    expect(utils.queryByText('Send invitation')).toBeNull();
+
+    fireEvent.click(utils.getByText('Retry'));
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it('falls back to the load message when the failed read reports no message', () => {
+    mockCustomerStatus = 'error';
+    mockCustomerError = '';
+    const utils = setup();
+
+    expect(utils.getByText('Failed to load Adobe customer data.')).toBeTruthy();
+    expect(utils.queryByText('Send invitation')).toBeNull();
   });
 
   it('renders the title', () => {
