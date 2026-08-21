@@ -43,16 +43,20 @@ interface TestRow {
 interface GridColumn {
   name: string;
   title?: string;
+  fields?: string[];
   cell?: (row: TestRow) => ReactNode;
 }
 
 interface GridConfig {
   id: string;
   columns: GridColumn[];
+  fields: { name: string; title: string }[];
+  sort: { field: string; direction: string }[];
   paging: { page: number; pageSize: number; total: number };
 }
 
 let capturedConfig: GridConfig;
+const onGridEvent = jest.fn();
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   Grid: ({ data, config }: { data: TestRow[]; config: GridConfig }) => (
@@ -69,7 +73,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useGridInMemory: (data: TestRow[], config: GridConfig) => {
     capturedConfig = config;
-    return { data, config };
+    return { data, config, onEvent: onGridEvent };
   },
 }));
 
@@ -411,6 +415,41 @@ describe('ItemsStep', () => {
     dialogProps.onAdd([NET_NEW_ITEM, added]);
 
     expect(onNetNewItemsChange).toHaveBeenCalledWith([NET_NEW_ITEM, added]);
+  });
+
+  it('clears the grid sort as items are added, so an addition lands at the bottom', () => {
+    const { getByTestId } = renderStep();
+
+    fireEvent.click(getByTestId('add-items'));
+    dialogProps.onAdd([NET_NEW_ITEM]);
+
+    expect(onGridEvent).toHaveBeenCalledWith({ type: 'SortChange', data: [] });
+  });
+
+  it('offers each value of a multi-value column as its own field', () => {
+    renderStep();
+
+    const fieldsByColumn = Object.fromEntries(
+      capturedConfig.columns.map((column) => [column.name, column.fields]),
+    );
+    expect(fieldsByColumn.item).toEqual(['itemName', 'itemId', 'sku']);
+    expect(fieldsByColumn.subscription).toEqual(['subscriptionName', 'subscriptionId']);
+    expect(fieldsByColumn.terms).toEqual(['terms', 'commitment']);
+    expect(capturedConfig.fields.map((field) => field.name)).toEqual([
+      'itemName',
+      'itemId',
+      'sku',
+      'subscriptionName',
+      'subscriptionId',
+      'terms',
+      'commitment',
+      'currentQuantity',
+      'renewalQuantity',
+      'unitSP',
+      'spxM',
+      'spxY',
+    ]);
+    expect(capturedConfig.sort).toEqual([]);
   });
 
   it('keeps held and already added SKUs out of the picker', () => {

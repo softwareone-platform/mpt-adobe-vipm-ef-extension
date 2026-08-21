@@ -138,15 +138,18 @@ describe('TargetSubscriptionGrid', () => {
     render(<TargetSubscriptionGrid subscriptions={subscriptions} offerPaths={offerPaths} sourceQuantity={7} onSubscriptionsChange={onSubscriptionsChange} />);
 
     expect(capturedConfig.fields.map((field) => field.name)).toEqual([
+      'item.name',
+      'item.id',
+      'item.externalId',
       'name',
-      'subscription',
+      'id',
       'recommended',
       'currentQuantity',
       'unitSP',
       'spxM',
       'spxY',
     ]);
-    expect(capturedConfig.sort).toEqual([{ field: 'name', direction: 'asc' }]);
+    expect(capturedConfig.sort).toEqual([{ field: 'item.name', direction: 'asc' }]);
   });
 
   it('pages all rows on a single page and registers the radio plugin', () => {

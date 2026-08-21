@@ -34,8 +34,9 @@ export function TimingStep({
   pathState,
 }: TimingStepProps) {
   const { t } = useTranslation();
-  const formattedRenewalDate = formatDate(renewalDate);
-  const days = daysUntil(renewalDate);
+  const anniversaryDate = pathState?.anniversaryDate || renewalDate;
+  const formattedRenewalDate = formatDate(anniversaryDate);
+  const days = daysUntil(anniversaryDate);
   const lockedPath = pathState?.lockedPath ?? null;
   const selectedPath = lockedPath ?? path;
   const canPlan = canPlanRenewal(pathState);
