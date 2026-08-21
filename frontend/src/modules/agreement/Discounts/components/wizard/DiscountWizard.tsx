@@ -9,6 +9,10 @@ import type { StepProps } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ReactNode } from "react";
 
 import "./DiscountWizard.scss";
+import {
+  SCREEN_HEIGHT_FACTOR,
+  SCREEN_WIDTH_FACTOR,
+} from "../../../../shared/constants";
 
 /**
  * Use the full available screen (up to the Figma design size of 756×1200).
@@ -62,10 +66,9 @@ export function DiscountWizard({
     <div
       className="discount-wizard"
       style={{
-        height: relativeScreenHeight(),
-        width: relativeScreenWidth(),
-        maxHeight: '100vh',
-        maxWidth: '100vw',
+        height: relativeScreenHeight(SCREEN_HEIGHT_FACTOR),
+        width: relativeScreenWidth(SCREEN_WIDTH_FACTOR),
+        maxHeight: "100vh",
       }}
     >
       <Wizard
