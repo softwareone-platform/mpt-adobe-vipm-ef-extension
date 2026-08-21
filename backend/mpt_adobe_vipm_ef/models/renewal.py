@@ -128,17 +128,27 @@ class RenewalOrderRequest(RenewalPreviewRequest):
 
 
 class RenewalPayloadSubscription(APIBaseModel):
-    """One existing subscription's at-anniversary decision, keyed by its Adobe id.
+    """One existing subscription's renewal decision, keyed by its Adobe id.
 
     Mirrors Adobe's auto-renewal preference object (``enabled`` as ``renew``,
-    ``renewalQuantity`` and ``flexDiscountCodes``) so fulfilment can PATCH the
-    subscription without recomputing the plan.
+    ``renewalQuantity`` and ``flexDiscountCodes``) so fulfilment can act
+    without recomputing the plan. At the anniversary ``renewalQuantity`` is
+    the total quantity the auto-renewal preference takes; on the early-renewal
+    ("Renew now") path it is the delta the RENEWAL order still has to renew —
+    the wizard's total minus what previous orders already renewed — where zero
+    marks a subscription fulfilment keeps active without re-renewing it.
+    ``renewedQuantity`` is Adobe's already-renewed baseline observed when the
+    order was placed (always zero at the anniversary): on a removed
+    subscription (``renew`` off) a positive value is the customer taking back
+    an early renewal placed by mistake, which fulfilment executes as a RETURN
+    order of those seats instead of a plain lapse.
     """
 
     subscription_id: str = Field(alias="subscriptionId")
     offer_id: str = Field(alias="offerId")
     renew: bool
     renewal_quantity: int = Field(alias="renewalQuantity")
+    renewed_quantity: int = Field(default=0, alias="renewedQuantity")
     flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
 
 
