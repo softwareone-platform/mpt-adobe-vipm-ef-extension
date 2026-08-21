@@ -367,6 +367,7 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
                 "offerId": _OFFER_ID,
                 "renew": True,
                 "renewalQuantity": _CURRENT_QUANTITY,
+                "renewedQuantity": 0,
                 "flexDiscountCodes": ["CODE-1"],
             },
         ],
@@ -479,6 +480,7 @@ async def test_create_renewal_order_passes_the_renewal_payload(
                 "offerId": _OFFER_ID,
                 "renew": True,
                 "renewalQuantity": 7,
+                "renewedQuantity": 0,
                 "flexDiscountCodes": ["CODE-1"],
             },
         ],
@@ -494,6 +496,103 @@ async def test_create_renewal_order_snapshots_the_early_renewal_path(
 
     call_args, _ = create_order_mock.await_args
     assert call_args[3].to_dict()["renewalPath"] == "now"
+
+
+def _renewed_subscriptions_payload(renewed_quantity, coterm=_COTERM_IN_WINDOW):
+    """One payload for both Adobe calls: the coterm and a partially-renewed subscription."""
+    return {
+        "cotermDate": coterm,
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renewedQuantity": renewed_quantity,
+            },
+        ],
+    }
+
+
+async def test_create_renewal_order_snapshots_the_delta_on_a_repeat_early_renewal(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    """The early path can be ordered more than once, and renewed seats never re-renew.
+
+    The Marketplace line keeps the plain total (line quantities are absolute),
+    while the ``renewalPayload`` snapshot carries only what this order still
+    has to renew: the wizard's total minus Adobe's ``renewedQuantity``.
+    """
+    adobe_call.returns = _renewed_subscriptions_payload(4)
+    body = _body(quantity=12, path="now")  # noqa: WPS432
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[2] == [{"id": _LINE_ID, "quantity": 12}]
+    assert call_args[3].to_dict()["subscriptions"][0]["renewalQuantity"] == 8
+
+
+async def test_create_renewal_order_keeps_an_already_covered_subscription_in_the_snapshot(
+    fake_ctx, submit_deps, resolve_net_new_item, create_order_mock, adobe_call
+):
+    """A subscription a previous order fully renewed still rides the snapshot.
+
+    It carries ``renew`` on with a zero delta, which tells fulfilment to keep
+    it active without renewing it again; with nothing left to move, the order
+    itself is the placeholder-item Change order.
+    """
+    resolve_net_new_item.return_value = {
+        EARLY_RENEWAL_NO_CHANGE_ITEM: {
+            "id": _NO_CHANGE_ITEM_ID,
+            "name": "Early renewal (no changes)",
+            "externalId": EARLY_RENEWAL_NO_CHANGE_ITEM,
+        },
+    }
+    adobe_call.returns = _renewed_subscriptions_payload(_CURRENT_QUANTITY)
+    body = _body(quantity=_CURRENT_QUANTITY, path="now")
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
+    subscription_snapshot = call_args[3].to_dict()["subscriptions"][0]
+    assert subscription_snapshot["renew"] is True
+    assert subscription_snapshot["renewalQuantity"] == 0
+
+
+async def test_create_renewal_order_rejects_a_total_below_the_renewed_seats(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    """A RENEWAL order cannot take renewed seats back: that would be a partial return."""
+    adobe_call.returns = _renewed_subscriptions_payload(8)
+    body = _body(quantity=7, path="now")
+
+    with pytest.raises(ValidationError, match="cannot renew fewer seats"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_snapshots_the_removal_of_a_renewed_subscription(
+    fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock, adobe_call
+):
+    """Taking a renewed subscription off the renewal undoes a mistaken early renewal.
+
+    No quantity moves on the Marketplace side, so the submission is the
+    AutoRenew-flip Configuration order; the snapshot carries the removal —
+    ``renew`` off with the renewed baseline — which fulfilment executes as a
+    RETURN order of those seats.
+    """
+    adobe_call.returns = _renewed_subscriptions_payload(4)
+    body = _body(renew=False, quantity=0, path="now")
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    create_order_mock.assert_not_awaited()
+    call_args, _ = create_configuration_order_mock.await_args
+    subscription_snapshot = call_args[4].to_dict()["subscriptions"][0]
+    assert subscription_snapshot["renew"] is False
+    assert subscription_snapshot["renewalQuantity"] == 0
+    assert subscription_snapshot["renewedQuantity"] == 4
 
 
 @freeze_time(_TODAY)
@@ -1047,6 +1146,23 @@ async def test_get_renewal_path_state_locks_the_early_path_once_rolled(
     assert result.payload["lockedPath"] == "now"
 
 
+async def test_get_renewal_path_state_rejects_a_non_active_agreement(
+    fake_ctx, patch_agreement, adobe_call
+):
+    """The wizard must not open while an order is processing (agreement Updating).
+
+    A plan assembled then would read Adobe's renewed quantities before the
+    in-flight order lands on them and double-count what is left to renew.
+    """
+    patch_agreement(Agreement.from_payload(_agreement_payload(status="Updating")))
+
+    with pytest.raises(ValidationError) as exc_info:
+        await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert "The agreement is currently Updating." in exc_info.value.detail
+    assert not adobe_call.calls
+
+
 async def test_get_renewal_path_state_maps_an_adobe_failure_to_a_bad_gateway(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1178,6 +1294,87 @@ async def test_preview_renewal_plan_carries_the_early_renewal_additions(  # noqa
     net_new_sku_mapping.list_full_skus.assert_called_once_with([_NET_NEW_SKU], "COM")
 
 
+async def test_preview_renewal_plan_quotes_only_the_remaining_delta(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """A previous early renewal's seats are already priced and must not be quoted again."""
+    adobe_call.returns = _renewed_subscriptions_payload(4)
+    body = _preview_body(quantity=_CURRENT_QUANTITY, path="now")
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert call_args[3] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": _OFFER_ID,
+            "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+            "quantity": 6,
+        },
+    ]
+
+
+async def test_preview_renewal_plan_drops_an_already_covered_subscription(  # noqa: WPS211
+    fake_ctx,
+    renewal_agreement,
+    renewing_subscription,
+    resolve_net_new_item,
+    net_new_sku_mapping,
+    adobe_call,
+):
+    """A fully covered subscription has a zero delta and leaves the quote entirely.
+
+    A follow-up basket that only adds products therefore quotes as the
+    add-only order Adobe will actually take.
+    """
+    adobe_call.returns = _renewed_subscriptions_payload(_CURRENT_QUANTITY)
+    body = _preview_body(
+        quantity=_CURRENT_QUANTITY,
+        net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
+        path="now",
+    )
+
+    await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = adobe_call.calls[1]
+    assert call_args[3] == [
+        {"extLineItemNumber": 1, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
+    ]
+
+
+async def test_preview_renewal_plan_rejects_a_total_below_the_renewed_seats(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """A renewing line cannot ask below the renewed seats: a partial return is unsupported."""
+    adobe_call.returns = _renewed_subscriptions_payload(8)
+    body = _preview_body(quantity=7, path="now")
+
+    with pytest.raises(ValidationError, match="cannot renew fewer seats"):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
+    # Only the subscriptions load ran: the plan never reached the quote.
+    assert len(adobe_call.calls) == 1
+
+
+async def test_preview_renewal_plan_allows_an_empty_quote_for_a_renewed_removal(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """Removing a renewed subscription is a real action with nothing to quote.
+
+    The customer is taking back an early renewal placed by mistake, which
+    fulfilment executes as a RETURN — so the preview succeeds with an empty
+    quote instead of blocking the wizard.
+    """
+    adobe_call.returns = _renewed_subscriptions_payload(4)
+    body = _preview_body(renew=False, quantity=0, path="now")
+
+    result = await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload == {"preview": None, "eligibility": {}}
+    # Only the subscriptions load ran: there was nothing to quote.
+    assert len(adobe_call.calls) == 1
+
+
 async def test_preview_renewal_plan_leaves_the_anniversary_additions_out(
     fake_ctx, renewal_agreement, renewing_subscription, resolve_net_new_item, adobe_call
 ):
@@ -1209,8 +1406,9 @@ async def test_preview_renewal_plan_previews_an_early_add_only_basket(  # noqa: 
 
     await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    # Nothing renews, so no offer-id resolution runs: the quote is the only call.
-    call_args, _ = adobe_call.calls[0]
+    # The now path always reads the live subscriptions (a switched-off row may
+    # be the removal of a renewed one); the quote is the second call.
+    call_args, _ = adobe_call.calls[1]
     assert call_args[3] == [
         {"extLineItemNumber": 1, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
     ]

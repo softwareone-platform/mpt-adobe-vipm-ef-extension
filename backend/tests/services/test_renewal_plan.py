@@ -5,11 +5,13 @@ from requests import ConnectionError as RequestsConnectionError
 
 from mpt_adobe_vipm_ef.constants import EARLY_RENEWAL_NO_CHANGE_ITEM
 from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
-from mpt_adobe_vipm_ef.services.renewal_plan import (
+from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     NetNewLine,
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    has_renewed_removal,
+    require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_offer_ids,
@@ -59,7 +61,7 @@ def _subscription(*, subscription_id=_SUBSCRIPTION_ID, auto_renew=True):
     })
 
 
-def _plan(request, *, auto_renew=True, current_quantity=_CURRENT_QUANTITY):
+def _plan(request, *, auto_renew=True, current_quantity=_CURRENT_QUANTITY, renewed_quantity=0):
     return [
         PlanSubscription(
             selection=selection,
@@ -68,6 +70,7 @@ def _plan(request, *, auto_renew=True, current_quantity=_CURRENT_QUANTITY):
             adobe_subscription_id=_ADOBE_SUBSCRIPTION_ID,
             offer_id=selection.offer_id,
             subscription=_subscription(subscription_id=selection.id, auto_renew=auto_renew),
+            renewed_quantity=renewed_quantity,
         )
         for selection in request.subscriptions
     ]
@@ -177,6 +180,35 @@ def test_build_preview_renewal_line_items_numbers_an_add_only_basket_from_one():
     ]
 
 
+def test_build_preview_renewal_line_items_quotes_only_the_remaining_delta():
+    """A previous early renewal's seats are already priced and must not be quoted again."""
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+
+    result = build_preview_renewal_line_items(
+        _plan(request, renewed_quantity=4), request.flex_discount_codes
+    )
+
+    assert result == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": _OFFER_ID,
+            "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+            "quantity": 6,
+        },
+    ]
+
+
+def test_build_preview_renewal_line_items_drops_an_already_covered_subscription():
+    """A zero delta has nothing left to renew, so the line leaves the quote entirely."""
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+
+    result = build_preview_renewal_line_items(
+        _plan(request, renewed_quantity=_CURRENT_QUANTITY), request.flex_discount_codes
+    )
+
+    assert result == []
+
+
 def test_build_renewal_payload_snapshots_the_whole_plan():
     request = _request(
         subscriptions=[
@@ -207,6 +239,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "offerId": _OFFER_ID,
                 "renew": True,
                 "renewalQuantity": 7,
+                "renewedQuantity": 0,
                 "flexDiscountCodes": ["BLACK_FRIDAY", "CYBER_MONDAY"],
             },
             {
@@ -214,6 +247,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "offerId": _OFFER_ID,
                 "renew": False,
                 "renewalQuantity": 0,
+                "renewedQuantity": 0,
                 "flexDiscountCodes": [],
             },
         ],
@@ -249,6 +283,109 @@ def test_build_renewal_payload_snapshots_the_early_renewal_path():
     result = build_renewal_payload(_plan(request), [], request, "USD")
 
     assert result.to_dict()["renewalPath"] == "now"
+
+
+def test_build_renewal_payload_snapshots_the_delta_still_to_renew():
+    """On the now path the snapshot carries what this order still has to renew.
+
+    A previous RENEWAL order already covered part of the total, so fulfilment
+    must only execute the difference.
+    """
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+
+    result = build_renewal_payload(_plan(request, renewed_quantity=4), [], request, "USD")
+
+    assert result.subscriptions[0].renewal_quantity == 6
+
+
+def test_build_renewal_payload_keeps_a_fully_covered_subscription_with_a_zero_delta():
+    """An already-covered subscription still rides the snapshot.
+
+    Its zero delta tells fulfilment to keep it active without re-renewing it.
+    """
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+
+    result = build_renewal_payload(
+        _plan(request, renewed_quantity=_CURRENT_QUANTITY), [], request, "USD"
+    )
+
+    assert result.subscriptions[0].renewal_quantity == 0
+    assert result.subscriptions[0].renew is True
+
+
+def test_build_renewal_payload_snapshots_the_removal_of_a_renewed_subscription():
+    """Taking back a mistaken early renewal rides the snapshot as a removal.
+
+    ``renew`` off with the observed renewed baseline (and no negative
+    quantity) is what tells fulfilment to place a RETURN order for those
+    seats rather than treat the line as a plain lapse.
+    """
+    request = _request(subscriptions=[_selection(renew=False, quantity=0)], renewalPath="now")
+
+    result = build_renewal_payload(_plan(request, renewed_quantity=4), [], request, "USD")
+
+    assert result.subscriptions[0].renew is False
+    assert result.subscriptions[0].renewal_quantity == 0
+    assert result.subscriptions[0].renewed_quantity == 4
+
+
+def test_require_no_renewed_seat_reduction_accepts_a_plan_renewing_forward():
+    request = _request(
+        subscriptions=[
+            _selection(quantity=_CURRENT_QUANTITY),
+            _selection(renew=False, quantity=0, subscription_id="SUB-9999-0001"),
+        ],
+        renewalPath="now",
+    )
+
+    require_no_renewed_seat_reduction(_plan(request, renewed_quantity=0))  # act
+
+
+def test_require_no_renewed_seat_reduction_accepts_an_already_covered_subscription():
+    """A total matching what is already renewed is a zero delta, not a reduction."""
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+
+    require_no_renewed_seat_reduction(  # act
+        _plan(request, renewed_quantity=_CURRENT_QUANTITY)
+    )
+
+
+def test_require_no_renewed_seat_reduction_accepts_removing_a_renewed_subscription():
+    """Taking a renewed subscription off the renewal is a full return, which is supported."""
+    request = _request(subscriptions=[_selection(renew=False, quantity=0)], renewalPath="now")
+
+    require_no_renewed_seat_reduction(_plan(request, renewed_quantity=4))  # act
+
+
+def test_require_no_renewed_seat_reduction_rejects_a_total_below_the_renewed_seats():
+    """A renewing line cannot ask below the renewed seats: a partial return is unsupported."""
+    request = _request(subscriptions=[_selection(quantity=7)], renewalPath="now")
+
+    with pytest.raises(ValidationError, match="cannot renew fewer seats"):
+        require_no_renewed_seat_reduction(_plan(request, renewed_quantity=8))
+
+
+def test_has_renewed_removal_flags_a_switched_off_renewed_subscription():
+    request = _request(subscriptions=[_selection(renew=False, quantity=0)], renewalPath="now")
+
+    result = has_renewed_removal(_plan(request, renewed_quantity=4))
+
+    assert result is True
+
+
+def test_has_renewed_removal_ignores_lapses_and_renewing_lines():
+    """A lapse of a never-renewed subscription has nothing to return."""
+    request = _request(
+        subscriptions=[
+            _selection(quantity=_CURRENT_QUANTITY),
+            _selection(renew=False, quantity=0, subscription_id="SUB-9999-0001"),
+        ],
+        renewalPath="now",
+    )
+
+    result = has_renewed_removal(_plan(request, renewed_quantity=0))
+
+    assert result is False
 
 
 def test_require_renewal_changes_accepts_a_quantity_change():

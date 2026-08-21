@@ -52,6 +52,19 @@ frontend/                    TypeScript plug UI (esbuild)
     eligibility); on the `now` path
     the quote also carries the net-new additions, which ride the RENEWAL order
     itself, so Adobe rejects the renew-and-add basket it forbids in one order.
+    Because the `now` path can be ordered more than once, its quoted and
+    snapshotted quantities are deltas against Adobe's live `renewedQuantity` —
+    what the order still has to renew — an already-covered subscription
+    dropping out of the quote and riding the snapshot with a zero delta that
+    tells fulfilment to keep it active untouched. Removing a renewed
+    subscription from the renewal is the customer taking back an early
+    renewal placed by mistake: it rides the snapshot as `renew` off with the
+    observed `renewedQuantity` (every snapshot entry carries that baseline),
+    which fulfilment executes as a RETURN order of those seats — and since
+    such a removal has nothing to quote, a plan whose quotable content is
+    empty still previews (as an empty quote) when it carries one. A plan that
+    keeps renewing but asks for fewer seats than already renewed is rejected
+    on preview and submit alike, since a partial return is not supported.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
     a renewal order and a scheduled net-new subscription only between 30 and 3
     days before the anniversary, and only for a customer holding an active
@@ -63,7 +76,11 @@ frontend/                    TypeScript plug UI (esbuild)
     moves no date and bills nothing now. The wizard's first step presents the
     established path as confirmed state and offers no other. The submit route
     repeats that lock check and rejects a plan on the closed-off path, because
-    the wizard's gate is a display, not the boundary.
+    the wizard's gate is a display, not the boundary. `path-state` also
+    rejects a non-Active agreement, so the wizard never opens while an order
+    is still processing: a plan assembled then would read `renewedQuantity`
+    before the in-flight order lands on it and double-count what is left to
+    renew.
     `renewal-state` reports how much of each subscription is already
     early-renewed, whether its SKU can be early-renewed at all, and whether the
     Items step may offer an increase beyond the current quantity, which only a
