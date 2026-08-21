@@ -1,37 +1,15 @@
-import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text'
-import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights'
-import { Order } from '../model';
-import { Subscription } from '../../shared/model';
-import { ReactElement, useEffect, useState } from 'react';
+import { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { i18n } from '../../../i18n/translations';
+import { InlineMarkdown } from '@softwareone-platform/sdk-react-ui-v0/markdown/inline';
+import { RegularText } from '@softwareone-platform/sdk-react-ui-v0/text'
+
+import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights'
+import { useOrderTemplate } from '../../shared/hooks/useOrderTemplate';
+import { Subscription } from '../../shared/model';
+import { Order } from '../model';
 
 import './SummaryStep.scss';
-
-export async function getTemplateForOrder(_orderId?: string | null): Promise<string> {
-  if (!_orderId) {
-    return '';
-  }
-
-  return `
-    <div class="summary-template">
-      <h3 class="summary-template__title">${i18n.t('MidtermUpgrade:Summary:Title')}</h3>
-      <div class="summary-template__card">
-        <h4>${i18n.t('Common:Status')}</h4>
-        <p>${i18n.t('MidtermUpgrade:Summary:StatusBody')}</p>
-        <h4>${i18n.t('MidtermUpgrade:Summary:NextHeading')}</h4>
-        <p>${i18n.t('MidtermUpgrade:Summary:NextBody')}</p>
-        <p>${i18n.t('MidtermUpgrade:Summary:NextUpdates')}</p>
-      </div>
-      <hr class="summary-template__divider" />
-      <h4>${i18n.t('MidtermUpgrade:Summary:HelpHeading')}</h4>
-      <p>${i18n.t('MidtermUpgrade:Summary:HelpContact')}</p>
-      <p>${i18n.t('MidtermUpgrade:Summary:HelpSupport')}</p>
-      <p>${i18n.t('MidtermUpgrade:Summary:HelpClosing')}</p>
-    </div>
-  `;
-}
 
 interface SummaryStepProps {
   subscription: Subscription;
@@ -40,11 +18,7 @@ interface SummaryStepProps {
 
 export function SummaryStep({ subscription, order }: SummaryStepProps): ReactElement | null {
   const { t } = useTranslation();
-  const [template, setTemplate] = useState<string>();
-
-  useEffect(() => {
-    getTemplateForOrder(order?.id).then(setTemplate);
-  }, [order?.id]);
+  const { template } = useOrderTemplate(order?.id);
 
   if (!order) return null;
 
@@ -58,10 +32,11 @@ export function SummaryStep({ subscription, order }: SummaryStepProps): ReactEle
       <div className="summary-step__highlights">
         <WizardHighlights agreement={subscription.agreement} parties={subscription} order={order} />
       </div>
-      <div
-        className="summary-step__template"
-        dangerouslySetInnerHTML={{ __html: template ?? '' }}
-      />
+      {template && (
+        <div className="summary-step__template">
+          <InlineMarkdown value={template} />
+        </div>
+      )}
     </div>
   )
 }

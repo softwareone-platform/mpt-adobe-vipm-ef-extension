@@ -247,6 +247,7 @@
     "AgreementSync": "Agreement sync failed.",
     "LoadAgreementSubscriptions": "Failed to load the agreement subscriptions.",
     "LoadPriceListItems": "Failed to load the price list items.",
+    "LoadOrderTemplate": "Failed to load the order summary.",
     "OrderSubmission": "Order submission failed.",
     "OrderNoData": "Order response did not include the created order.",
     "GlobalCustomerNoData": "Global customer response did not include customer data.",
@@ -459,7 +460,7 @@
       "Qty": "Qty",
       "Order price": "Order price *",
       "Items price": "Items price *",
-      "No parameters": "This order has no parameters.",
+      "No parameters": "No parameters to display.",
       "Place order": "Place order",
       "Placing order": "Placing the renewal order…",
       "Tabs": {
@@ -469,16 +470,7 @@
       }
     },
     "Summary": {
-      "View order": "View order",
-      "Title": "Your renewal order is being processed",
-      "StatusBody": "Your renewal order is currently being processed. No action is required from you at this stage.",
-      "NextHeading": "What happens next",
-      "NextBody": "Your renewal takes effect on your anniversary date. If additional information is required, you'll be notified here.",
-      "NextUpdates": "Updates will be provided as your order progresses.",
-      "HelpHeading": "Need help?",
-      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
-      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
-      "HelpClosing": "We're here to help."
+      "View order": "View order"
     }
   },
   "Discounts": {
@@ -587,17 +579,6 @@
         "AtLeast": "Quantity must be at least {{quantity}}",
         "CannotExceed": "Quantity cannot exceed {{quantity}}"
       }
-    },
-    "Summary": {
-      "Title": "Your order is being processed",
-      "StatusBody": "Your order is currently being processed. No action is required from you at this stage.",
-      "NextHeading": "What happens next",
-      "NextBody": "If everything proceeds as expected, your order will complete automatically. If additional information is required, you'll be notified here.",
-      "NextUpdates": "Updates will be provided as your order progresses.",
-      "HelpHeading": "Need help?",
-      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
-      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
-      "HelpClosing": "We're here to help."
     }
   }
 }

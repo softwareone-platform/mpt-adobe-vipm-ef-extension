@@ -288,7 +288,9 @@ export function ReviewOrderStep({
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('MidtermUpgrade:Review:Tabs:Items')}>
           <Tab.Content>
-            <ItemsGrid subscriptions={subscriptions} agreement={subscription.agreement} />
+            <div className="review-order-step__tab">
+              <ItemsGrid subscriptions={subscriptions} agreement={subscription.agreement} />
+            </div>
           </Tab.Content>
         </Tab>
         <Tab id="parameters" title={t('MidtermUpgrade:Review:Tabs:Parameters')}>
