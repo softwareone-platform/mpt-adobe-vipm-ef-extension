@@ -18,7 +18,10 @@ import { i18n } from '../../../i18n/translations';
 import { useAgreementId } from '../../shared/hooks/useAgreementId';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useSettings } from "../../shared/hooks/useSettings";
-import { canManageDiscountCodes } from '../../utils/security';
+import {
+  canEditDiscountCode,
+  canManageDiscountCodes,
+} from '../../utils/security';
 
 import { TextCell } from './components/grid-cell/text-cell/TextCell';
 import { formatDate, formatOrderTypes, formatSource, formatValue } from './format';
@@ -141,6 +144,8 @@ const BASE_COLUMNS: GridColumnDefinition<Discount>[] = [
     name: "code",
     title: i18n.t("Agreement:Discounts:Code"),
     fields: ["code"],
+    initialWidth: 250,
+    isPinned: false,
     cell: (item) => (
       <GridCellSimple>
         <div className="discounts__cell">
@@ -255,15 +260,48 @@ export function Discounts() {
     context.data?.agreement?.product?.id,
   );
 
-  // The wizard is a modal plug. `discount.mode` rides on the modal context so
-  // the same plug can host the future edit flow; the plug defaults to create
-  // when it is absent.
+  // The wizard calls `close({ created }|{ updated })` on submit and
+  // `close(undefined)` on cancel/click-outside; only refresh on the former.
+  const onWizardClose = useCallback(
+    (payload?: { created?: Discount; updated?: Discount }) => {
+      if (payload?.created || payload?.updated) {
+        discounts.refresh();
+      }
+    },
+    [discounts],
+  );
+
   const onAddClosedDiscount = useCallback(() => {
     open(DISCOUNT_WIZARD_PLUG_ID, {
-      context: { ...context, discount: { mode: "create" } },
-      onClose: () => discounts.refresh(),
+      context: {
+        ...context,
+        data: { ...context.data, discount: { mode: "create" } },
+      },
+      onClose: onWizardClose,
     });
-  }, [open, context, discounts]);
+  }, [open, context, onWizardClose]);
+
+  const onEditDiscount = useCallback(
+    (item: Discount) => {
+      open(DISCOUNT_WIZARD_PLUG_ID, {
+        context: {
+          ...context,
+          data: { ...context.data, discount: { mode: "edit", id: item.id } },
+        },
+        onClose: onWizardClose,
+      });
+    },
+    [open, context, onWizardClose],
+  );
+
+  const onDiscountAction = useCallback(
+    (action: string, item: Discount) => {
+      if (action === "edit") {
+        onEditDiscount(item);
+      }
+    },
+    [onEditDiscount],
+  );
 
   const columns = useMemo<GridColumnDefinition<Discount>[]>(
     () => [
@@ -275,18 +313,20 @@ export function Discounts() {
               title: i18n.t('Agreement:Discounts:Actions'),
               fields: ['id'],
               initialWidth: 80,
-              cell: (item: Discount) => (
-                <GridCellActions
-                  item={item}
-                  actions={DISCOUNT_ACTIONS}
-                  testId={`discounts-action-${item.id}`}
-                />
-              ),
+              cell: (item: Discount) =>
+                canEditDiscountCode(accountType, item.source) ? (
+                  <GridCellActions
+                    item={item}
+                    actions={DISCOUNT_ACTIONS}
+                    onAction={onDiscountAction}
+                    testId={`discounts-action-${item.id}`}
+                  />
+                ) : null,
             } as GridColumnDefinition<Discount>,
           ]
         : []),
     ],
-    [canAddClosedDiscount],
+    [canAddClosedDiscount, accountType, onDiscountAction],
   );
 
   const gridConfig = useMemo(

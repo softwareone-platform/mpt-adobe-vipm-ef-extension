@@ -5,11 +5,18 @@ import { useTranslation } from 'react-i18next';
 
 import { DiscountWizard } from '../agreement/Discounts/components/wizard/DiscountWizard';
 import { createSteps } from '../agreement/Discounts/components/wizard/createSteps';
-import { EMPTY_DRAFT, toCreatePayload } from '../agreement/Discounts/components/wizard/discountDraft';
+import {
+  EMPTY_DRAFT,
+  toCreatePayload,
+  toDraft,
+  toUpdatePayload,
+} from '../agreement/Discounts/components/wizard/discountDraft';
 import { validateReview } from '../agreement/Discounts/components/wizard/discountValidation';
+import { editSteps } from '../agreement/Discounts/components/wizard/editSteps';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useCreateDiscountRequest } from '../shared/hooks/useCreateDiscountRequest';
+import { useDiscountById } from '../shared/hooks/useDiscountById';
 import { useSettings } from '../shared/hooks/useSettings';
 import { canManageDiscountCodes } from '../utils/security';
 import { getProduct } from '../utils/settings';
@@ -29,9 +36,20 @@ export default function App() {
   const settings = useSettings();
   const context = useMPTContext<{
     auth?: { account?: { type?: AccountType } };
-    data?: { agreement?: { product?: { id?: string }; price?: { currency?: string } } };
-    discount?: { mode?: DiscountWizardMode };
+    data?: {
+      agreement?: { product?: { id?: string }; price?: { currency?: string } };
+      discount?: { mode?: DiscountWizardMode; id?: string };
+      data?: { discount?: { mode?: DiscountWizardMode; id?: string } };
+    };
   }>();
+
+  const mode: DiscountWizardMode =
+    context.data?.data?.discount?.mode ??
+    context.data?.discount?.mode ??
+    'create';
+  const isEdit = mode === 'edit';
+  const discountId =
+    context.data?.data?.discount?.id ?? context.data?.discount?.id ?? '';
 
   const agreementId = useAgreementId();
   const agreementProductId = context.data?.agreement?.product?.id;
@@ -47,71 +65,135 @@ export default function App() {
   );
 
   const adobeCustomer = useAdobeCustomer(agreementId);
-  const { error, fieldErrors, status, submitRequest } = useCreateDiscountRequest(agreementId);
+  const existingDiscount = useDiscountById(
+    isEdit ? discountId : '',
+    agreementId,
+  );
+  const createRequest = useCreateDiscountRequest(agreementId);
+  const { error, fieldErrors, status } = isEdit
+    ? {
+        error: existingDiscount.error ?? '',
+        fieldErrors: existingDiscount.fieldErrors,
+        status: existingDiscount.status,
+      }
+    : createRequest;
 
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [draft, setDraft] = useState<DiscountDraft>(EMPTY_DRAFT);
-  const [created, setCreated] = useState<Discount | null>(null);
+  const [submittedDiscount, setSubmittedDiscount] = useState<Discount | null>(
+    null,
+  );
   const [validationError, setValidationError] = useState('');
+  const [isSeeded, setIsSeeded] = useState(false);
 
   const updateDraft = useCallback((patch: Partial<DiscountDraft>) => {
     setDraft((previous) => ({ ...previous, ...patch }));
   }, []);
 
-  // The agreement arrives with the modal context, which the portal can replace
-  // after the first render, so the currency is mirrored rather than seeded.
   useEffect(() => {
+    if (isEdit) return;
     setDraft((previous) =>
       previous.currency === agreementCurrency
         ? previous
         : { ...previous, currency: agreementCurrency },
     );
-  }, [agreementCurrency]);
+  }, [agreementCurrency, isEdit]);
 
-  const onSubmit = useCallback(async () => {
+  useEffect(() => {
+    if (!isEdit || isSeeded || !existingDiscount.data) return;
+    setDraft(toDraft(existingDiscount.data, agreementCurrency));
+    setIsSeeded(true);
+  }, [isEdit, isSeeded, existingDiscount.data, agreementCurrency]);
+
+  const onCreateSubmit = useCallback(async () => {
     const invalid = validateReview(draft);
     setValidationError(invalid ?? '');
     if (invalid) {
       return false;
     }
 
-    const discount = await submitRequest(toCreatePayload(draft));
+    const discount = await createRequest.submitRequest(toCreatePayload(draft));
     if (!discount) {
       return false;
     }
-    setCreated(discount);
+    setSubmittedDiscount(discount);
     return true;
-  }, [draft, submitRequest]);
+  }, [draft, createRequest]);
 
-  const onClose = useCallback(() => close(created ? { created } : undefined), [close, created]);
-
-  // The SDK fires onSave unconditionally on the last step and no step guard can
-  // block it, so this only reports the outcome the Review step already secured.
-  const onFinish = useCallback(
-    () => close(created ? { created } : undefined),
-    [close, created],
+  const onClose = useCallback(
+    () =>
+      close(
+        submittedDiscount
+          ? isEdit
+            ? { updated: submittedDiscount }
+            : { created: submittedDiscount }
+          : undefined,
+      ),
+    [close, submittedDiscount, isEdit],
   );
+
+  // Next button fires `onSave` (this callback) directly — `registerOnNextCallback` is bypassed
+  // by the SDK — and the PATCH must be re-run here. In create mode the Review
+  // step already submitted, so this only closes with the earlier outcome.
+  const onFinish = useCallback(async () => {
+    if (isEdit && !submittedDiscount) {
+      const invalid = validateReview(draft);
+      setValidationError(invalid ?? '');
+      if (invalid) {
+        return;
+      }
+      const discount = await existingDiscount.update(toUpdatePayload(draft));
+      if (!discount) {
+        return;
+      }
+      setSubmittedDiscount(discount);
+      close({ updated: discount });
+      return;
+    }
+    close(
+      submittedDiscount
+        ? isEdit
+          ? { updated: submittedDiscount }
+          : { created: submittedDiscount }
+        : undefined,
+    );
+  }, [close, submittedDiscount, isEdit, draft, existingDiscount]);
 
   // The modal renders nothing rather than a denial notice: the button that
   // opens it is already hidden from client accounts, so reaching this branch
   // means the caller bypassed the UI.
-  if (!canManage) return null;
+  if (settings !== undefined && !canManage) return null;
 
-  const steps = createSteps({
+  const stepInputs = {
     draft,
     updateDraft,
     customerId: adobeCustomer.data?.customerId ?? '',
-    segment: getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '',
-    onSubmit,
-    // A duplicate code comes back as `#/code`; show it alongside the summary so
-    // the user knows which step to go back to.
-    submitError: validationError || fieldErrors.code || error,
-    isSubmitting: status === 'loading',
-  });
+    segment:
+      getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '',
+  };
+
+  const steps = isEdit
+    ? editSteps({
+        ...stepInputs,
+        submitError: validationError || fieldErrors.code || error,
+        isSubmitting: status === 'loading',
+      })
+    : createSteps({
+        ...stepInputs,
+        onSubmit: onCreateSubmit,
+        // A duplicate code comes back as `#/code`; show it alongside the summary so
+        // the user knows which step to go back to.
+        submitError: validationError || fieldErrors.code || error,
+        isSubmitting: status === 'loading',
+      });
 
   return (
     <DiscountWizard
-      title={t('Agreement:Discounts:Wizard:Create:Header')}
+      title={t(
+        isEdit
+          ? 'Agreement:Discounts:Wizard:Edit:Header'
+          : 'Agreement:Discounts:Wizard:Create:Header',
+      )}
       steps={steps}
       activeStepIndex={activeStepIndex}
       onActiveStepIndexChange={setActiveStepIndex}
