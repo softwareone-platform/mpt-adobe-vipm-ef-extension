@@ -158,7 +158,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'item',
     title: i18n.t('Common:Item'),
-    fields: ['itemName'],
+    fields: ['itemName', 'itemId', 'sku'],
     cell: (row) =>
       row.kind === 'total' ? (
         <TextCell
@@ -178,7 +178,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'subscription',
     title: i18n.t('Common:Subscriptions'),
-    fields: ['subscriptionName'],
+    fields: ['subscriptionName', 'subscriptionId'],
     cell: (row) => {
       if (row.kind === 'total') return <GridCellSimple />;
       return row.kind === 'net-new' ? (
@@ -207,7 +207,7 @@ const columns: GridColumnDefinition<Row>[] = [
   {
     name: 'terms',
     title: i18n.t('Common:Terms title'),
-    fields: ['terms'],
+    fields: ['terms', 'commitment'],
     initialWidth: 140,
     cell: (row) =>
       row.kind === 'total' ? (
@@ -256,9 +256,13 @@ const columns: GridColumnDefinition<Row>[] = [
 ];
 
 const fields: GridFieldDefinition[] = [
-  { name: 'itemName', title: i18n.t('Common:Item') },
-  { name: 'subscriptionName', title: i18n.t('Common:Subscriptions') },
+  { name: 'itemName', title: i18n.t('Common:Item name') },
+  { name: 'itemId', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'subscriptionName', title: i18n.t('Common:Subscription name') },
+  { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'quantity', title: i18n.t('Renewal:Review:Qty'), type: 'number' },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
   { name: 'spxM', title: i18n.t('Renewal:Grid:SPxM'), type: 'number' },
@@ -341,7 +345,7 @@ export function ReviewOrderStep({
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('Renewal:Review:Tabs:Items')}>
           <Tab.Content>
-            <div className="review-order-step__grid">
+            <div className="review-order-step__tab review-order-step__grid">
               <Grid {...gridProps} />
             </div>
             <RegularText as="p" size={1} color="grey-4" className="review-order-step__disclaimer">

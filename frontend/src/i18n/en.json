@@ -2,6 +2,9 @@
   "Common": {
     "Terms title": "Terms",
     "Retry": "Retry",
+    "Cancel": "Cancel",
+    "Validating": "Validating",
+    "Placing order": "Placing order",
     "Close": "Close",
     "Yes": "Yes",
     "No": "No",
@@ -20,11 +23,16 @@
     "Agreement": "Agreement",
     "Order": "Order",
     "Item": "Item",
+    "Item name": "Item name",
+    "Item ID": "Item ID",
     "Subscription": "Subscription",
+    "Subscription name": "Subscription name",
+    "Subscription ID": "Subscription ID",
     "Subscriptions": "Subscriptions",
     "External ID": "External ID",
     "External Reference": "External Reference",
     "Vendor ID": "Vendor ID",
+    "Vendor additional ID": "Vendor additional ID",
     "Renewal Date": "Renewal Date",
     "Billing": "Billing",
     "Commitment": "Commitment",
@@ -265,6 +273,7 @@
     "AgreementSync": "Agreement sync failed.",
     "LoadAgreementSubscriptions": "Failed to load the agreement subscriptions.",
     "LoadPriceListItems": "Failed to load the price list items.",
+    "LoadOrderTemplate": "Failed to load the order summary.",
     "OrderSubmission": "Order submission failed.",
     "OrderNoData": "Order response did not include the created order.",
     "GlobalCustomerNoData": "Global customer response did not include customer data.",
@@ -380,16 +389,29 @@
       "Window closed": "You can only plan your renewal within {{opens}} to {{closes}} days before the renewal date. Please try again then. Meanwhile, you can still use Change, Configuration, and Termination orders to manage your subscriptions.",
       "No subscriptions": "This agreement has no active subscriptions. You cannot plan a renewal for this agreement.",
       "Learn more": "Learn more",
-      "Confirmed": "Confirmed",
       "Anniversary": {
         "Title": "Renew at your anniversary date (recommended)",
         "Summary": "Your renewal takes effect on your anniversary date. Nothing is billed until then, and your anniversary date stays the same.",
-        "Detail": "Everything you renew is priced together for the best available volume discount, including any quantity changes or new products you add. Pricing reflects the rates in effect on your anniversary date, which may be higher if prices change before then."
+        "Detail": "Everything you renew is priced together for the best available volume discount, including any quantity changes or new products you add. Pricing reflects the rates in effect on your anniversary date, which may be higher if prices change before then.",
+        "Locked": {
+          "Prompt_one": "Your renewal date is <b>{{date}}</b> ({{count}} day away). Your renewal is set up.",
+          "Prompt_other": "Your renewal date is <b>{{date}}</b> ({{count}} days away). Your renewal is set up.",
+          "Title": "Renew at your anniversary date (confirmed)",
+          "Summary": "You can carry on and place another order against this renewal.",
+          "Detail": "Anything you add or change joins the same renewal, so it stays priced together, and nothing is billed until your anniversary date.",
+          "Note": "You can keep making changes right up until it takes effect."
+        }
       },
       "Now": {
         "Title": "Renew now",
         "Summary": "Renewing now locks in today's pricing. If prices rise before your anniversary date, you avoid the increase.",
-        "Detail": "Your renewal takes effect today and is invoiced immediately, and your anniversary date moves forward. Adding products or increasing quantities is handled separately afterwards, and may not receive the same combined discount."
+        "Detail": "Your renewal takes effect today and is invoiced immediately, and your anniversary date moves forward. Adding products or increasing quantities is handled separately afterwards, and may not receive the same combined discount.",
+        "Locked": {
+          "Prompt": "Your renewal date is now <b>{{date}}</b>. Your renewal is already in place.",
+          "Title": "Renew now (confirmed)",
+          "Summary": "You can carry on and place another order on your renewed subscriptions.",
+          "Detail": "Your early renewal has already taken effect, so anything you add now is invoiced when you place it, and the renewal timing itself cannot be changed back."
+        }
       }
     },
     "Grid": {
@@ -430,7 +452,6 @@
         "Outro": "You can place whatever you remove as a separate order by using this wizard again.",
         "Learn more": "Learn more"
       },
-      "Validating": "Validating the renewal plan…",
       "Validation": {
         "Required": "Quantity is required",
         "AtLeast": "Quantity must be at least {{quantity}}",
@@ -450,7 +471,6 @@
         "Title": "No items to discount",
         "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
       },
-      "Validating": "Validating the selected discount codes…",
       "Errors": {
         "Discounts could not be loaded": "Your discount codes could not be loaded."
       }
@@ -466,7 +486,7 @@
       "Qty": "Qty",
       "Order price": "Order price *",
       "Items price": "Items price *",
-      "No parameters": "This order has no parameters.",
+      "No parameters": "No parameters to display.",
       "Place order": "Place order",
       "Placing order": "Placing the renewal order…",
       "Tabs": {
@@ -476,16 +496,7 @@
       }
     },
     "Summary": {
-      "View order": "View order",
-      "Title": "Your renewal order is being processed",
-      "StatusBody": "Your renewal order is currently being processed. No action is required from you at this stage.",
-      "NextHeading": "What happens next",
-      "NextBody": "Your renewal takes effect on your anniversary date. If additional information is required, you'll be notified here.",
-      "NextUpdates": "Updates will be provided as your order progresses.",
-      "HelpHeading": "Need help?",
-      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
-      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
-      "HelpClosing": "We're here to help."
+      "View order": "View order"
     }
   },
   "Discounts": {
@@ -594,17 +605,6 @@
         "AtLeast": "Quantity must be at least {{quantity}}",
         "CannotExceed": "Quantity cannot exceed {{quantity}}"
       }
-    },
-    "Summary": {
-      "Title": "Your order is being processed",
-      "StatusBody": "Your order is currently being processed. No action is required from you at this stage.",
-      "NextHeading": "What happens next",
-      "NextBody": "If everything proceeds as expected, your order will complete automatically. If additional information is required, you'll be notified here.",
-      "NextUpdates": "Updates will be provided as your order progresses.",
-      "HelpHeading": "Need help?",
-      "HelpContact": "If you have questions or need assistance, please contact your SoftwareOne account team.",
-      "HelpSupport": "For technical support related to the SoftwareOne Marketplace, find out how to <a href=\"https://docs.softwareone.com\" target=\"_blank\" rel=\"noreferrer\">contact support</a> in our online documentation.",
-      "HelpClosing": "We're here to help."
     }
   }
 }

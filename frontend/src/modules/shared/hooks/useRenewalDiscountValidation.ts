@@ -19,7 +19,7 @@ import { useGuardedRequest } from './useGuardedRequest';
  * surfaces on the order details page at fulfilment and no preview runs here.
  */
 export function useRenewalDiscountValidation(agreementId: string) {
-  const { run, reset, ...state } = useGuardedRequest('Errors:RenewalDiscountValidation');
+  const { run, cancel, reset, ...state } = useGuardedRequest('Errors:RenewalDiscountValidation');
 
   const validateDiscounts = useCallback(
     async (plan: RenewalPlanBody, flexDiscountCodes: string[]): Promise<boolean> => {
@@ -27,14 +27,14 @@ export function useRenewalDiscountValidation(agreementId: string) {
         return true;
       }
 
-      return run(async () => {
+      return run(async (signal) => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
-        await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes });
+        await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes }, { signal });
         return true;
       });
     },
     [agreementId, run],
   );
 
-  return { ...state, validateDiscounts, reset };
+  return { ...state, validateDiscounts, cancel, reset };
 }

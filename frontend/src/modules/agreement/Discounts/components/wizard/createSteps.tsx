@@ -1,10 +1,5 @@
 import { i18n } from "../../../../../i18n/translations";
 
-import {
-  isDefinitionComplete,
-  isScopeComplete,
-  isValidityComplete,
-} from "./discountValidation";
 import { DefinitionStep } from "./steps/definition-step/DefinitionStep";
 import { ReviewStep } from "./steps/review-step/ReviewStep";
 import { ScopeStep } from "./steps/scope-step/ScopeStep";
@@ -47,7 +42,6 @@ export function createSteps({
   return [
     {
       title: i18n.t("Agreement:Discounts:Wizard:Create:Steps:Definition"),
-      nextButton: { isDisabled: !isDefinitionComplete(draft) },
       render: () => (
         <DefinitionStep
           draft={draft}
@@ -59,7 +53,6 @@ export function createSteps({
     },
     {
       title: i18n.t("Agreement:Discounts:Wizard:Create:Steps:Validity"),
-      nextButton: { isDisabled: !isValidityComplete(draft) },
       render: () => (
         <ValidityStep
           draft={draft}
@@ -71,7 +64,6 @@ export function createSteps({
     },
     {
       title: i18n.t("Agreement:Discounts:Wizard:Create:Steps:Scope"),
-      nextButton: { isDisabled: !isScopeComplete(draft) },
       render: () => (
         <ScopeStep
           draft={draft}
@@ -100,7 +92,9 @@ export function createSteps({
     },
     {
       title: i18n.t("Agreement:Discounts:Wizard:Create:Steps:Summary"),
-      nextButton: { label: i18n.t("Agreement:Discounts:Wizard:Create:Summary:Done") },
+      nextButton: {
+        label: i18n.t("Agreement:Discounts:Wizard:Create:Summary:Done"),
+      },
       render: () => <SummaryStep draft={draft} />,
     },
   ];

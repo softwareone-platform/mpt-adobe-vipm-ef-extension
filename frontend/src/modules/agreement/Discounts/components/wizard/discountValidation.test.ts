@@ -1,9 +1,6 @@
 import { ANY_ORDER_TYPE, EMPTY_DRAFT } from "./discountDraft";
 import {
   MAX_TEXT_LENGTH,
-  isDefinitionComplete,
-  isScopeComplete,
-  isValidityComplete,
   validateDefinition,
   validateReview,
   validateScope,
@@ -361,86 +358,5 @@ describe("validateReview", () => {
     const result = validateReview(completeDraft({ discountType: "PERCENTAGE", currency: "" }));
 
     expect(result).toBeNull();
-  });
-});
-
-describe("step completeness gates", () => {
-  const FILLED: DiscountDraft = {
-    ...EMPTY_DRAFT,
-    code: "SUMMER25",
-    name: "Summer 2025",
-    category: "STANDARD",
-    discountType: "PERCENTAGE",
-    value: "20",
-    startDate: "2026-06-01T00:00:00.000Z",
-    endDate: "2026-08-31T00:00:00.000Z",
-    targetItems: "30001846CB",
-    applicableOrderTypes: ["RENEWAL"],
-  };
-
-  describe("isDefinitionComplete", () => {
-    it("accepts every required field filled", () => {
-      expect(isDefinitionComplete(FILLED)).toBe(true);
-    });
-
-    it.each([
-      ["code", { code: "" }],
-      ["whitespace-only code", { code: "  " }],
-      ["name", { name: "" }],
-      ["category", { category: "" as const }],
-      ["discount type", { discountType: "" as const }],
-      ["value", { value: "" }],
-    ])("rejects a missing %s", (_label, overrides) => {
-      expect(isDefinitionComplete({ ...FILLED, ...overrides })).toBe(false);
-    });
-
-    it("stays true for a value the validator would still reject", () => {
-      // The gate only asks for presence; the range check happens on Next.
-      expect(isDefinitionComplete({ ...FILLED, value: "999" })).toBe(true);
-    });
-  });
-
-  describe("isValidityComplete", () => {
-    it("accepts a single-use code with both dates", () => {
-      expect(isValidityComplete(FILLED)).toBe(true);
-    });
-
-    it.each([
-      ["start date", { startDate: "" }],
-      ["end date", { endDate: "" }],
-    ])("rejects a missing %s", (_label, overrides) => {
-      expect(isValidityComplete({ ...FILLED, ...overrides })).toBe(false);
-    });
-
-    it("demands a lock date once the code is reusable", () => {
-      expect(isValidityComplete({ ...FILLED, reusable: true })).toBe(false);
-      expect(
-        isValidityComplete({
-          ...FILLED,
-          reusable: true,
-          discountLockEndDate: "2026-12-31T00:00:00.000Z",
-        }),
-      ).toBe(true);
-    });
-  });
-
-  describe("isScopeComplete", () => {
-    it("accepts target items with an order type", () => {
-      expect(isScopeComplete(FILLED)).toBe(true);
-    });
-
-    it.each([
-      ["no target items", { targetItems: "" }],
-      ["only separators as target items", { targetItems: " , \n " }],
-      ["no order type", { applicableOrderTypes: [] }],
-    ])("rejects %s", (_label, overrides) => {
-      expect(isScopeComplete({ ...FILLED, ...overrides })).toBe(false);
-    });
-
-    it("stays true for a scope the validator would still reject", () => {
-      expect(
-        isScopeComplete({ ...FILLED, category: "INTRO", applicableOrderTypes: ["RENEWAL"] }),
-      ).toBe(true);
-    });
   });
 });

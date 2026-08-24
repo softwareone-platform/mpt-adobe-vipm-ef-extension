@@ -3,12 +3,17 @@ import { Wizard } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import {
   relativeScreenHeight,
   relativeScreenWidth,
+  scrollStepToTop,
 } from "../../../../utils/window";
 
 import type { StepProps } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ReactNode } from "react";
 
 import "./DiscountWizard.scss";
+import {
+  DISCOUNT_SCREEN_HEIGHT_FACTOR,
+  DISCOUNT_SCREEN_WIDTH_FACTOR,
+} from "../../../../shared/constants";
 
 /**
  * Use the full available screen (up to the Figma design size of 756×1200).
@@ -62,10 +67,9 @@ export function DiscountWizard({
     <div
       className="discount-wizard"
       style={{
-        height: relativeScreenHeight(),
-        width: relativeScreenWidth(),
-        maxHeight: '100vh',
-        maxWidth: '100vw',
+        height: relativeScreenHeight(DISCOUNT_SCREEN_HEIGHT_FACTOR),
+        width: relativeScreenWidth(DISCOUNT_SCREEN_WIDTH_FACTOR),
+        maxHeight: "100vh",
       }}
     >
       <Wizard
@@ -76,7 +80,10 @@ export function DiscountWizard({
           closeButton: step.closeButton,
         }))}
         activeStepIndex={activeStepIndex}
-        onActiveStepIndexChange={onActiveStepIndexChange}
+        onActiveStepIndexChange={(index: number) => {
+          onActiveStepIndexChange(index);
+          scrollStepToTop();
+        }}
         onClose={onClose}
         onSave={onFinish}
         // The rail is clickable in both directions by default, which would let

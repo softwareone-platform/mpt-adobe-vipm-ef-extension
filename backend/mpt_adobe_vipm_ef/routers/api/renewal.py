@@ -2,7 +2,7 @@ import asyncio
 import logging
 from dataclasses import replace
 from http import HTTPStatus
-from typing import cast
+from typing import Any, cast
 
 from mpt_api_client.exceptions import MPTHttpError
 from mpt_extension_sdk.api import (
@@ -56,7 +56,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
 from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
     is_renewal_window_open,
-    require_unlocked_anniversary_path,
+    require_unlocked_path,
     resolve_locked_path,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
@@ -65,6 +65,8 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    has_renewed_removal,
+    require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
     resolve_net_new_lines,
@@ -170,11 +172,19 @@ async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIRespo
     The wizard's first step reads this before it offers a path: outside the
     window — or with no active subscription to renew — there is nothing to plan,
     and the step says so instead of walking the customer into an Adobe
-    rejection. ``lockedPath`` is set once an early renewal has rolled the
-    anniversary forward, which fixes the path to ``now`` and makes the step
-    read-only.
+    rejection. ``lockedPath`` is set once a renewal is in place — ``now`` once an
+    early renewal has rolled the anniversary forward, ``anniversary`` once
+    deferred renewal preferences are staged — which fixes the path and makes the
+    step read-only.
+
+    A non-Active agreement is rejected here too, so the wizard never opens
+    while an order is still processing (the agreement sits in Updating): a
+    renewal planned then would read Adobe's renewed quantities before the
+    in-flight order lands on them and double-count what is left to renew.
     """
     _require_client_account(ctx)
+    agreement = await load_agreement(ctx, agreement_id)
+    require_active_agreement(agreement)
     customer = await _load_adobe_customer(ctx, agreement_id)
     subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
     coterm_date = str(customer.get("cotermDate") or "")
@@ -255,6 +265,17 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     of at fulfilment. A SKU that cannot renew at the anniversary is rejected
     here too, so no route quotes a plan the submit route would refuse.
 
+    Because there can be several renewal orders on that path, each line quotes
+    only its remaining delta — the wizard's total minus what previous RENEWAL
+    orders already renewed — and an already-covered line drops out of the
+    quote entirely, so a repeat renewal never re-prices renewed seats.
+    Removing a renewed subscription from the renewal is a valid plan with
+    nothing to quote (fulfilment executes it as a RETURN of the renewed
+    seats), so when removals are all the quotable plan holds, the preview
+    succeeds with an empty quote. A plan that keeps renewing but asks for
+    fewer seats than already renewed is rejected instead: a partial return is
+    not supported.
+
     Returns the Adobe quote under ``preview`` alongside ``eligibility``, the
     per-subscription now-path eligibility read from the quote's line statuses —
     the only place Adobe reports it.
@@ -267,12 +288,18 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     await _check_auto_renew_support(
         ctx, agreement, plan_subscriptions, body.net_new_items, body.renewal_path
     )
-    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
+    plan_subscriptions = await _resolve_adobe_plan_data(
+        ctx, agreement_id, plan_subscriptions, body.renewal_path
+    )
     net_new_lines = await _resolve_preview_net_new_lines(ctx, agreement, body)
     line_items = build_preview_renewal_line_items(
         plan_subscriptions, body.flex_discount_codes, net_new_lines
     )
     if not line_items:
+        if has_renewed_removal(plan_subscriptions):
+            # Nothing to quote, but the plan still acts: it takes back a
+            # renewed subscription, which fulfilment executes as a RETURN.
+            return APIResponse.ok(payload={"preview": None, "eligibility": {}})
         raise ValidationError(
             detail="The renewal plan has no renewing subscriptions to preview.",
         )
@@ -317,6 +344,16 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     AutoRenew decisions still becomes a Change order carrying the platform's
     ``adobe-early-renewal-no-change`` placeholder item as its single line,
     with fulfillment executing the plan from the snapshot alone.
+
+    Because the early path can be ordered more than once, its snapshot
+    quantities are deltas against Adobe's live ``renewedQuantity`` — what this
+    order still has to renew, zero keeping an already-covered subscription
+    untouched. Removing a renewed subscription from the renewal is snapshotted
+    as ``renew`` off with the observed ``renewedQuantity``, which fulfilment
+    executes as a RETURN of those seats (the customer taking back an early
+    renewal placed by mistake); a plan that keeps renewing but asks for fewer
+    seats than already renewed is rejected, since a partial return is not
+    supported.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -335,15 +372,13 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     coterm_date = str(customer.get("cotermDate") or "")
     if net_new_lines:
         require_scheduled_creation_window(coterm_date)
-    if body.renewal_path is RenewalPath.ANNIVERSARY:
-        require_unlocked_anniversary_path(
-            coterm_date, await _load_adobe_subscriptions(ctx, agreement_id)
-        )
+    plan_subscriptions = await _resolve_submission_plan(
+        ctx, agreement_id, plan_subscriptions, body.renewal_path, coterm_date
+    )
 
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
     if lines:
         currency_code = agreement.authorization.currency or ""
-        plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement_id, plan_subscriptions)
         net_new_lines = await resolve_net_new_offer_ids(
             ctx, net_new_lines, lambda: resolve_market_segment(ctx, agreement)
         )
@@ -353,7 +388,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
         order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
     else:
         configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
-        early_payload = await _early_renewal_payload(ctx, agreement, plan_subscriptions, body)
+        early_payload = _early_renewal_payload(agreement, plan_subscriptions, body)
         if configuration_subscriptions or early_payload is None:
             order = await _create_configuration_order(
                 ctx, agreement_id, configuration_subscriptions, body, early_payload
@@ -531,20 +566,75 @@ async def _load_adobe_customer(ctx: APIContext, agreement_id: str) -> dict[str, 
         raise ValidationError(detail=str(error))
 
 
-async def _resolve_renewal_offer_ids(
-    ctx: APIContext, agreement_id: str, plan_subscriptions: list[PlanSubscription]
+async def _resolve_submission_plan(
+    ctx: APIContext,
+    agreement_id: str,
+    plan_subscriptions: list[PlanSubscription],
+    renewal_path: RenewalPath,
+    coterm_date: str,
 ) -> list[PlanSubscription]:
-    """Override each renewing line's offer id with Adobe's own, before it is previewed.
+    """Check the path lock and stamp the plan for submission, off one Adobe load.
+
+    The same subscriptions load serves the path lock, the full offer ids and —
+    on the early path — the renewed quantities behind the snapshot's deltas,
+    with the plan rejected right here if it asks to take renewed seats back.
+    """
+    adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    require_unlocked_path(renewal_path, coterm_date, adobe_subscriptions)
+    plan_subscriptions = _resolve_renewal_offer_ids(plan_subscriptions, adobe_subscriptions)
+    if renewal_path is RenewalPath.NOW:
+        plan_subscriptions = _resolve_renewed_quantities(plan_subscriptions, adobe_subscriptions)
+        require_no_renewed_seat_reduction(plan_subscriptions)
+    return plan_subscriptions
+
+
+async def _resolve_adobe_plan_data(
+    ctx: APIContext,
+    agreement_id: str,
+    plan_subscriptions: list[PlanSubscription],
+    renewal_path: RenewalPath,
+) -> list[PlanSubscription]:
+    """Stamp the plan with the customer's live Adobe subscription data it needs.
+
+    Renewing lines take Adobe's full offer id (see
+    ``_resolve_renewal_offer_ids``) and, on the early-renewal path, every plan
+    row takes the quantity previous RENEWAL orders already renewed — the
+    baseline behind each quoted delta, and what marks a switched-off row as
+    the removal of a renewed subscription — with the plan rejected right here
+    if it keeps renewing but asks for fewer seats than already renewed. At the
+    anniversary only renewing lines need anything (the offer id), so a
+    lapse-only or net-new-only plan skips the Adobe call there.
+    """
+    if renewal_path is RenewalPath.NOW:
+        needs_adobe_data = bool(plan_subscriptions)
+    else:
+        needs_adobe_data = any(plan.selection.renew for plan in plan_subscriptions)
+    if not needs_adobe_data:
+        return plan_subscriptions
+    adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    plan_subscriptions = _resolve_renewal_offer_ids(plan_subscriptions, adobe_subscriptions)
+    if renewal_path is RenewalPath.NOW:
+        plan_subscriptions = _resolve_renewed_quantities(plan_subscriptions, adobe_subscriptions)
+        require_no_renewed_seat_reduction(plan_subscriptions)
+    return plan_subscriptions
+
+
+def _resolve_renewal_offer_ids(
+    plan_subscriptions: list[PlanSubscription], adobe_subscriptions: dict[str, object]
+) -> list[PlanSubscription]:
+    """Override each line's offer id with Adobe's own, before it is previewed or ordered.
 
     MPT's subscription and catalog data only ever carries the partial
     (10-char) vendor SKU on ``selection.offer_id``; Adobe's PREVIEW_RENEWAL
     (and the order it gates) needs the full offer id, which only the
-    customer's live Adobe subscriptions have. Skipped when nothing renews, so
-    a lapse-only or net-new-only plan does not pay for the extra Adobe call.
+    customer's live Adobe subscriptions
+    (``GET /v3/customers/{customer_id}/subscriptions``) have.
     """
-    if not any(plan.selection.renew for plan in plan_subscriptions):
-        return plan_subscriptions
-    offer_ids_by_subscription = await _load_adobe_subscription_offer_ids(ctx, agreement_id)
+    offer_ids_by_subscription = {
+        str(subscription_item["subscriptionId"]): str(subscription_item["offerId"])
+        for subscription_item in _adobe_subscription_items(adobe_subscriptions)
+        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
+    }
     return [
         replace(
             plan,
@@ -554,21 +644,36 @@ async def _resolve_renewal_offer_ids(
     ]
 
 
-async def _load_adobe_subscription_offer_ids(ctx: APIContext, agreement_id: str) -> dict[str, str]:
-    """Map each Adobe subscription id to its current full offer id.
+def _resolve_renewed_quantities(
+    plan_subscriptions: list[PlanSubscription], adobe_subscriptions: dict[str, object]
+) -> list[PlanSubscription]:
+    """Stamp each plan entry with the quantity previous early renewals already renewed.
 
-    ``GET /v3/customers/{customer_id}/subscriptions`` is the only source of
-    the full offer id: MPT's subscription and its catalog item both only ever
-    carry the partial vendor SKU.
+    Adobe's ``renewedQuantity`` is the cumulative quantity earlier RENEWAL
+    orders already renewed, and the early path can be ordered more than once —
+    so it is the baseline ``renewal_delta`` subtracts from wherever a quantity
+    reaches Adobe (the preview lines and the ``renewalPayload`` snapshot).
+    Adobe only returns it inside the pre-anniversary window, so an absent
+    value reads as nothing renewed yet. Never called at the anniversary, where
+    quantities keep their plain total reading.
     """
-    subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
-    raw_items = subscriptions.get("items") or []
-    subscription_items = cast(list[dict[str, str]], raw_items)
-    return {
-        subscription_item["subscriptionId"]: subscription_item["offerId"]
-        for subscription_item in subscription_items
-        if subscription_item.get("subscriptionId") and subscription_item.get("offerId")
+    renewed_by_subscription = {
+        subscription_item["subscriptionId"]: int(subscription_item.get("renewedQuantity") or 0)
+        for subscription_item in _adobe_subscription_items(adobe_subscriptions)
+        if subscription_item.get("subscriptionId")
     }
+    return [
+        replace(
+            plan,
+            renewed_quantity=renewed_by_subscription.get(plan.adobe_subscription_id, 0),
+        )
+        for plan in plan_subscriptions
+    ]
+
+
+def _adobe_subscription_items(adobe_subscriptions: dict[str, object]) -> list[dict[str, Any]]:
+    raw_items = adobe_subscriptions.get("items") or []
+    return cast(list[dict[str, Any]], raw_items)
 
 
 def _held_partial_skus(subscriptions: dict[str, object]) -> list[str]:
@@ -674,8 +779,7 @@ async def _create_change_order(
         raise UpstreamServiceError(detail=mpt_order_error_detail(error))
 
 
-async def _early_renewal_payload(
-    ctx: APIContext,
+def _early_renewal_payload(
     agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     body: RenewalOrderRequest,
@@ -686,14 +790,14 @@ async def _early_renewal_payload(
     order processes, so fulfilment needs the plan even when nothing moved a
     quantity and the submission is a Configuration order: without it the order
     would only carry the AutoRenew decisions and the ``now`` path would be
-    invisible. The renewing lines get their full Adobe offer ids here for the
-    same reason the Change path resolves them. At the anniversary the
-    configuration order is the whole plan already, so there is no snapshot to
-    attach.
+    invisible. The plan arrives already stamped with its full Adobe offer ids
+    and renewed quantities (the endpoint resolves both from one Adobe
+    subscriptions load), so the snapshot's deltas are ready to build. At the
+    anniversary the configuration order is the whole plan already, so there is
+    no snapshot to attach.
     """
     if body.renewal_path is not RenewalPath.NOW:
         return None
-    plan_subscriptions = await _resolve_renewal_offer_ids(ctx, agreement.id, plan_subscriptions)
     currency_code = agreement.authorization.currency if agreement.authorization else ""
     return build_renewal_payload(plan_subscriptions, [], body, currency_code or "")
 

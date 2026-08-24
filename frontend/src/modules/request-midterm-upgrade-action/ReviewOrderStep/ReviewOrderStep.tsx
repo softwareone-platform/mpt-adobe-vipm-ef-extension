@@ -85,7 +85,7 @@ function getColumns(
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['item'],
+      fields: ['item.name', 'item.id', 'item.externalId'],
       cell: (item) =>
         item.isSummary ? (
           <TextCell text={item.summaryTitle} secondaryContent={item.summarySubtitle} />
@@ -102,7 +102,7 @@ function getColumns(
     {
       name: 'subscription',
       title: i18n.t('Common:Subscriptions'),
-      fields: ['subscription'],
+      fields: ['name', 'id'],
       cell: (item) => {
         if (item.isSummary) return <GridCellSimple></GridCellSimple>;
         return item.id ? (
@@ -131,7 +131,7 @@ function getColumns(
     {
       name: 'terms',
       title: i18n.t('MidtermUpgrade:Grid:Terms'),
-      fields: ['terms'],
+      fields: ['terms', 'commitment'],
       cell: (item) =>
         item.isSummary ? (
           <GridCellSimple></GridCellSimple>
@@ -181,9 +181,13 @@ function getColumns(
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'item', title: i18n.t('Common:Item') },
-  { name: 'subscription', title: i18n.t('Common:Subscriptions') },
+  { name: 'item.name', title: i18n.t('Common:Item name') },
+  { name: 'item.id', title: i18n.t('Common:Item ID') },
+  { name: 'item.externalId', title: i18n.t('Common:Vendor additional ID') },
+  { name: 'name', title: i18n.t('Common:Subscription name') },
+  { name: 'id', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('MidtermUpgrade:Grid:Terms') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'delta', title: i18n.t('MidtermUpgrade:Grid:Qty') },
   { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP') },
   { name: 'spxM', title: i18n.t('MidtermUpgrade:Grid:SPxM') },
@@ -284,7 +288,9 @@ export function ReviewOrderStep({
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>
         <Tab id="items" title={t('MidtermUpgrade:Review:Tabs:Items')}>
           <Tab.Content>
-            <ItemsGrid subscriptions={subscriptions} agreement={subscription.agreement} />
+            <div className="review-order-step__tab">
+              <ItemsGrid subscriptions={subscriptions} agreement={subscription.agreement} />
+            </div>
           </Tab.Content>
         </Tab>
         <Tab id="parameters" title={t('MidtermUpgrade:Review:Tabs:Parameters')}>

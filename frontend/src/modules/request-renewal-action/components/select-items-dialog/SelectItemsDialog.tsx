@@ -140,6 +140,7 @@ function buildColumns(
   return [
     {
       name: 'select',
+      title: '',
       initialWidth: 56,
       minWidth: 56,
       isScalable: false,
@@ -156,7 +157,7 @@ function buildColumns(
     {
       name: 'item',
       title: i18n.t('Common:Item'),
-      fields: ['item'],
+      fields: ['item', 'id', 'sku'],
       cell: (row) => (
         <GridCellSimple>
           <LinkReference
@@ -187,7 +188,7 @@ function buildColumns(
     {
       name: 'terms',
       title: i18n.t('Common:Terms title'),
-      fields: ['terms'],
+      fields: ['terms', 'commitment'],
       initialWidth: 140,
       cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
     },
@@ -223,10 +224,13 @@ function buildColumns(
 }
 
 const fields: GridFieldDefinition[] = [
-  { name: 'item', title: i18n.t('Common:Item') },
+  { name: 'item', title: i18n.t('Common:Item name') },
+  { name: 'id', title: i18n.t('Common:Item ID') },
+  { name: 'sku', title: i18n.t('Common:Vendor additional ID') },
   { name: 'recommended', title: i18n.t('Renewal:Items:Recommended') },
   { name: 'billingModel', title: i18n.t('Renewal:Items:Billing model') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
+  { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'unitLP', title: i18n.t('Renewal:Items:Unit LP'), type: 'number' },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
   { name: 'spxM', title: i18n.t('Renewal:Grid:SPxM'), type: 'number' },
