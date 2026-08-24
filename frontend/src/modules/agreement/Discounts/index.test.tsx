@@ -184,7 +184,7 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
-    expect(screen.getAllByText('Edit')).toHaveLength(2);
+    expect(screen.getAllByText('Edit')).toHaveLength(1);
   });
 
   it('hides Actions and Add closed discount for client actors', async () => {
