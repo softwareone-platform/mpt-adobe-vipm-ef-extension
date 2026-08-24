@@ -32,6 +32,11 @@ frontend/                    TypeScript plug UI (esbuild)
     with their lines; the agreement payload's own lines do not carry the item
     vendor SKU. The lines expand the item's product, terms and audit trail so
     the wizard grids can show the item info card without a second call
+  - `api/order_render.py` — `GET /api/v2/orders/{order_id}/render` renders the
+    product template a placed order carries, which the wizards' summary steps
+    show instead of wording of their own. It proxies the marketplace's own
+    render endpoint on the caller's token, so the platform decides who may read
+    the order, and decodes the JSON string body that endpoint answers with
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
     accounts (non-client callers are rejected with `403`)
   - `api/renewal.py` — renewal routes; restricted to client accounts. Every
