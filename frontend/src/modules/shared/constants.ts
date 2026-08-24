@@ -2,8 +2,11 @@ import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/
 
 import type { Status } from './model';
 
-export const SCREEN_HEIGHT_FACTOR = 0.85;
-export const SCREEN_WIDTH_FACTOR = 0.65;
+export const SCREEN_HEIGHT_FACTOR = 0.8;
+export const SCREEN_WIDTH_FACTOR = 0.85;
+
+export const DISCOUNT_SCREEN_HEIGHT_FACTOR = 0.85;
+export const DISCOUNT_SCREEN_WIDTH_FACTOR = 0.65;
 export const MAX_MODAL_HEIGHT = 920;
 export const MAX_MODAL_WIDTH = 1760;
 

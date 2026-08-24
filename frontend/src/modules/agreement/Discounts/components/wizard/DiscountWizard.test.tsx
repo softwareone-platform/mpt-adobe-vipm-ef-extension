@@ -2,6 +2,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import { DiscountWizard } from "./DiscountWizard";
+import {
+  DISCOUNT_SCREEN_HEIGHT_FACTOR,
+  DISCOUNT_SCREEN_WIDTH_FACTOR,
+  SCREEN_WIDTH_FACTOR,
+} from "../../../../shared/constants";
 
 import type { DiscountWizardStep } from "./DiscountWizard";
 
@@ -20,6 +25,27 @@ const STEPS: DiscountWizardStep[] = [
   { title: "Review", render: () => <p>review body</p> },
   { title: "Summary", render: () => <p>summary body</p> },
 ];
+
+const SCREEN_KEYS = ["availWidth", "availHeight"] as const;
+const originalScreen = SCREEN_KEYS.map((key) =>
+  Object.getOwnPropertyDescriptor(window.screen, key),
+);
+
+function setScreen(availWidth: number, availHeight: number): void {
+  Object.defineProperty(window.screen, "availWidth", { value: availWidth, configurable: true });
+  Object.defineProperty(window.screen, "availHeight", { value: availHeight, configurable: true });
+}
+
+afterEach(() => {
+  SCREEN_KEYS.forEach((key, index) => {
+    const descriptor = originalScreen[index];
+    if (descriptor) {
+      Object.defineProperty(window.screen, key, descriptor);
+    } else {
+      Reflect.deleteProperty(window.screen, key);
+    }
+  });
+});
 
 function renderWizard(overrides: Partial<Parameters<typeof DiscountWizard>[0]> = {}) {
   const props = {
@@ -73,5 +99,25 @@ describe("DiscountWizard", () => {
     expect(screen.getByRole("heading", { name: "Edit discount" })).toBeInTheDocument();
     expect(screen.getByTestId("wizard-steps")).toHaveTextContent("Only step");
     expect(screen.getByText("edit body")).toBeInTheDocument();
+  });
+
+  it("sizes itself from the discount factors, not the wizard ones", () => {
+    setScreen(1000, 1000);
+
+    const { container } = render(
+      <DiscountWizard
+        title="Add closed discount"
+        steps={STEPS}
+        activeStepIndex={0}
+        onActiveStepIndexChange={jest.fn()}
+        onClose={jest.fn()}
+        onFinish={jest.fn()}
+      />,
+    );
+
+    const modal = container.querySelector(".discount-wizard") as HTMLElement;
+    expect(modal.style.width).toBe(`${Math.round(1000 * DISCOUNT_SCREEN_WIDTH_FACTOR)}px`);
+    expect(modal.style.height).toBe(`${Math.round(1000 * DISCOUNT_SCREEN_HEIGHT_FACTOR)}px`);
+    expect(DISCOUNT_SCREEN_WIDTH_FACTOR).not.toBe(SCREEN_WIDTH_FACTOR);
   });
 });

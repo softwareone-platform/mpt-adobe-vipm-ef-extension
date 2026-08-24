@@ -11,8 +11,8 @@ import type { ReactNode } from "react";
 
 import "./DiscountWizard.scss";
 import {
-  SCREEN_HEIGHT_FACTOR,
-  SCREEN_WIDTH_FACTOR,
+  DISCOUNT_SCREEN_HEIGHT_FACTOR,
+  DISCOUNT_SCREEN_WIDTH_FACTOR,
 } from "../../../../shared/constants";
 
 /**
@@ -67,8 +67,8 @@ export function DiscountWizard({
     <div
       className="discount-wizard"
       style={{
-        height: relativeScreenHeight(SCREEN_HEIGHT_FACTOR),
-        width: relativeScreenWidth(SCREEN_WIDTH_FACTOR),
+        height: relativeScreenHeight(DISCOUNT_SCREEN_HEIGHT_FACTOR),
+        width: relativeScreenWidth(DISCOUNT_SCREEN_WIDTH_FACTOR),
         maxHeight: "100vh",
       }}
     >
