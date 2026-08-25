@@ -23,9 +23,16 @@ export interface ScopeStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  submitError?: string;
 }
 
-export function ScopeStep({ draft, updateDraft, customerId, segment }: ScopeStepProps) {
+export function ScopeStep({
+  draft,
+  updateDraft,
+  customerId,
+  segment,
+  submitError = "",
+}: ScopeStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
   const [error, setError] = useState("");
@@ -46,6 +53,8 @@ export function ScopeStep({ draft, updateDraft, customerId, segment }: ScopeStep
     [updateDraft],
   );
 
+  const displayedError = error || submitError;
+
   return (
     <div className="wizard-step scope-step">
       <header className="wizard-step__header">
@@ -60,9 +69,9 @@ export function ScopeStep({ draft, updateDraft, customerId, segment }: ScopeStep
         </RegularText>
       </header>
 
-      {error && (
+      {displayedError && (
         <InlineNotification status="error">
-          {error}
+          {displayedError}
         </InlineNotification>
       )}
 

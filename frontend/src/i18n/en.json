@@ -221,6 +221,30 @@
             "Description": "The customer's closed discount has been created and can be used in future orders.",
             "Done": "View discounts"
           }
+        },
+        "Edit": {
+          "Header": "Edit closed discount",
+          "Steps": {
+            "Definition": "Definition",
+            "Validity": "Validity",
+            "Scope": "Scope",
+            "Summary": "Summary"
+          },
+          "Definition": {
+            "Title": "Definition",
+            "Description": "Enter the details of the customer's closed discount. This code will be saved for customer, {{customerId}}, and segment, {{segment}}.",
+            "Submit": "Save"
+          },
+          "Validity": {
+            "Title": "Validity",
+            "Description": "Update the validity period of the customer's closed discount.",
+            "Submit": "Save"
+          },
+          "Scope": {
+            "Title": "Scope",
+            "Description": "Update the scope of the customer's closed discount.",
+            "Submit": "Save"
+          }
         }
       }
     },
@@ -241,6 +265,8 @@
     "LoadDiscounts": "Failed to load discounts.",
     "CreateDiscount": "Failed to create the discount code.",
     "CreateDiscountNoData": "The discount code was not returned by the server.",
+    "UpdateDiscount": "Failed to update the discount code.",
+    "UpdateDiscountNoData": "The updated discount code was not returned by the server.",
     "LoadAdobeOffer": "Failed to load Adobe offer switch paths.",
     "LoadAdobeRecommendations": "Failed to load Adobe recommendations.",
     "SubscriptionSync": "Subscription sync failed.",
