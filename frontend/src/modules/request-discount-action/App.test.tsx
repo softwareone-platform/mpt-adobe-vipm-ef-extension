@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { http } from "@mpt-extension/sdk";
 import { useMPTContext } from "@mpt-extension/sdk-react";
@@ -84,8 +84,8 @@ function mockAccount(type: string) {
         product: { id: PRODUCT_ID },
         price: { currency: "USD" },
       },
+      discount: { mode: 'create' },
     },
-    discount: { mode: "create" },
   });
 }
 
@@ -176,7 +176,9 @@ describe("request-discount-action App", () => {
   it("closes the modal without saving when the wizard finishes", async () => {
     await renderApp();
 
-    act(() => capturedProps!.onFinish());
+    await act(async () => {
+      await capturedProps!.onFinish();
+    });
 
     expect(mockClose).toHaveBeenCalled();
   });
@@ -209,5 +211,98 @@ describe("request-discount-action App", () => {
     await renderApp();
 
     expect(screen.queryByTestId("wizard")).not.toBeInTheDocument();
+  });
+});
+
+describe("request-discount-action App (edit mode)", () => {
+  function mockEditAccount(type: string) {
+    mockUseMPTContext.mockReturnValue({
+      auth: { account: { type } },
+      data: {
+        agreement: {
+          id: "AGR-0000-0000-0000",
+          product: { id: PRODUCT_ID },
+          price: { currency: "USD" },
+        },
+        discount: { mode: "edit", id: "DSC-0001" },
+      },
+    });
+  }
+
+  const SAMPLE_DISCOUNT = {
+    id: "DSC-0001",
+    code: "SUMMER25",
+    name: "Summer 2025 promo",
+    description: "Half off summer skus",
+    category: "STANDARD",
+    discountType: "PERCENTAGE",
+    values: [{ currency: "USD", value: 25 }],
+    startDate: "2026-06-01T00:00:00Z",
+    endDate: "2026-08-31T23:59:59Z",
+    reusable: false,
+    targetOfferIds: ["ITEM-001"],
+    qualifyingOfferIds: ["ITEM-001"],
+    applicableOrderTypes: ["RENEWAL"],
+    supportsAnnual: false,
+    supports3yc: false,
+  };
+
+  function mockEditBackend(
+    discount: Record<string, unknown> = SAMPLE_DISCOUNT,
+  ) {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/api/v2/settings") {
+        return Promise.resolve({
+          data: { data: { products: [{ id: PRODUCT_ID, segment: "COM" }] } },
+        });
+      }
+      if (url.startsWith("/api/v2/discount-codes/")) {
+        return Promise.resolve({ data: { data: discount } });
+      }
+      return Promise.resolve({ data: { data: { customerId: "1005847693" } } });
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    capturedProps = undefined;
+    mockEditBackend();
+    mockEditAccount("Operations");
+  });
+
+  it("titles the wizard with the edit header", async () => {
+    await renderApp();
+
+    expect(
+      screen.getByRole("heading", { name: "Edit closed discount" }),
+    ).toBeInTheDocument();
+  });
+
+  it("declares only the three data-entry steps", async () => {
+    await renderApp();
+
+    // Scope is the last step: its Next button is the wizard's Save action and
+    // the PATCH is wired through the container's onFinish.
+    expect(screen.getByTestId("wizard-steps")).toHaveTextContent(
+      "DefinitionValidityScope",
+    );
+    expect(screen.getByTestId("wizard-steps")).not.toHaveTextContent("Review");
+    expect(screen.getByTestId("wizard-steps")).not.toHaveTextContent("Summary");
+  });
+
+  it("prefills the definition inputs with the fetched discount", async () => {
+    await renderApp();
+
+    await waitFor(() => expect(codeInput()).toHaveValue(SAMPLE_DISCOUNT.code));
+    expect(
+      screen.getByTestId("discount-name").querySelector("input"),
+    ).toHaveValue(SAMPLE_DISCOUNT.name);
+    expect(
+      screen.getByTestId("discount-value").querySelector("input"),
+    ).toHaveValue(SAMPLE_DISCOUNT.values[0].value);
+    expect(mockGet).toHaveBeenCalledWith(
+      "/api/v2/discount-codes/DSC-0001",
+      expect.any(Object),
+    );
   });
 });

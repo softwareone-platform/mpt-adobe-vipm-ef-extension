@@ -184,7 +184,7 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
-    expect(screen.getAllByText('Edit')).toHaveLength(2);
+    expect(screen.getAllByText('Edit')).toHaveLength(1);
   });
 
   it('hides Actions and Add closed discount for client actors', async () => {
@@ -292,7 +292,9 @@ describe('Discounts view', () => {
     expect(mockOpen).toHaveBeenCalledWith(
       'request-discount-action',
       expect.objectContaining({
-        context: expect.objectContaining({ discount: { mode: 'create' } }),
+        context: expect.objectContaining({
+          data: expect.objectContaining({ discount: { mode: 'create' } }),
+        }),
       }),
     );
   });
@@ -300,10 +302,14 @@ describe('Discounts view', () => {
   it('refreshes the grid when the wizard closes', async () => {
     await renderDiscounts();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add closed discount' }));
-    const { onClose } = mockOpen.mock.calls[0][1] as { onClose: () => Promise<void> };
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add closed discount' }),
+    );
+    const { onClose } = mockOpen.mock.calls[0][1] as {
+      onClose: (payload?: { created?: unknown; updated?: unknown }) => Promise<void>;
+    };
     await act(async () => {
-      await onClose();
+      await onClose({ created: { id: 'rec-new' } });
     });
 
     await waitFor(() => expect(discountRequests()).toHaveLength(2));
