@@ -45,7 +45,6 @@ export interface ReviewOrderStepProps {
   details: OrderDetails;
   onPlaceOrder: () => Promise<boolean>;
   errorMessage?: string;
-  isSubmitting?: boolean;
 }
 
 interface Row {
@@ -278,7 +277,6 @@ export function ReviewOrderStep({
   details,
   onPlaceOrder,
   errorMessage,
-  isSubmitting,
 }: ReviewOrderStepProps) {
   const { t } = useTranslation();
   const [tabId, setTabId] = useState('items');
@@ -333,13 +331,6 @@ export function ReviewOrderStep({
           <InlineNotification status="error">
             {errorMessage}
           </InlineNotification>
-        </div>
-      )}
-      {isSubmitting && (
-        <div data-testid="review-order-step-submitting">
-          <RegularText as="p" size={2} color="grey-4" className="review-order-step__submitting">
-            {t('Renewal:Review:Placing order')}
-          </RegularText>
         </div>
       )}
       <Tabs type="inline" selectedTabId={tabId} onTabChange={setTabId}>

@@ -222,7 +222,6 @@ interface ReviewOrderStepProps {
   details: { externalId: string; notes: string };
   onPlaceOrder: () => Promise<boolean>;
   errorMessage?: string;
-  isSubmitting?: boolean;
 }
 let reviewProps: ReviewOrderStepProps;
 
@@ -534,7 +533,6 @@ describe('request-renewal-action App', () => {
     expect(await screen.findByText('Review step')).toBeTruthy();
     expect(reviewProps.subscriptions).toEqual(SUBSCRIPTIONS);
     expect(reviewProps.details).toEqual({ externalId: '', notes: '' });
-    expect(reviewProps.isSubmitting).toBe(false);
   });
 
   it('places the renewal order with the plan, the codes and the tracker id', async () => {
