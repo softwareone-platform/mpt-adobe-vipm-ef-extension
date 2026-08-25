@@ -275,16 +275,4 @@ describe('ReviewOrderStep', () => {
     expect(queryByTestId('notification-error')).toBeNull();
   });
 
-  it('shows the submitting indicator while the order is being placed', () => {
-    const { getByTestId } = render(
-      <ReviewOrderStep
-        subscription={{ id: 'SUB-1' }}
-        order={order}
-        subscriptions={subscriptions}
-        isSubmitting
-      />,
-    );
-
-    expect(getByTestId('review-order-step-submitting')).toBeTruthy();
-  });
 });

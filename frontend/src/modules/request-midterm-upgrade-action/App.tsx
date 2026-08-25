@@ -339,7 +339,6 @@ export default function App() {
           subscriptions={reviewSubscriptions}
           onPlaceOrder={placeOrder}
           errorMessage={placeOrderValidationError || submitError}
-          isSubmitting={submitStatus === 'loading'}
         />
       ),
     },

@@ -225,7 +225,6 @@ interface ReviewOrderStepProps {
   subscriptions: TargetSubscription[];
   onPlaceOrder?: () => Promise<boolean>;
   errorMessage?: string;
-  isSubmitting?: boolean;
 }
 
 export function ReviewOrderStep({
@@ -234,7 +233,6 @@ export function ReviewOrderStep({
   subscriptions,
   onPlaceOrder,
   errorMessage,
-  isSubmitting,
 }: ReviewOrderStepProps): ReactElement | null {
   const { t } = useTranslation();
   const [tabId, setTabId] = useState('items');
@@ -268,13 +266,6 @@ export function ReviewOrderStep({
           {t('MidtermUpgrade:Steps:Review order')}
         </RegularText>
       </div>
-      {isSubmitting ? (
-        <div className="review-order-step__submitting" data-testid="review-order-step-submitting">
-          <RegularText as="p" size={2} color="grey-4">
-            {t('MidtermUpgrade:Review:Placing order')}
-          </RegularText>
-        </div>
-      ) : null}
       <div className="review-order-step__highlights">
         <WizardHighlights agreement={subscription.agreement} parties={subscription} order={order} />
       </div>
