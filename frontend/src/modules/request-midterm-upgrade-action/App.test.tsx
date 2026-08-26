@@ -180,7 +180,6 @@ interface ReviewOrderProps {
   subscriptions: unknown;
   onPlaceOrder: () => Promise<boolean>;
   errorMessage?: string;
-  isSubmitting?: boolean;
 }
 let reviewOrderProps: ReviewOrderProps;
 

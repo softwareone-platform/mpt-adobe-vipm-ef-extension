@@ -488,7 +488,6 @@
       "Items price": "Items price *",
       "No parameters": "No parameters to display.",
       "Place order": "Place order",
-      "Placing order": "Placing the renewal order…",
       "Tabs": {
         "Items": "Items",
         "Parameters": "Parameters",
@@ -576,7 +575,6 @@
     "Review": {
       "Order price": "Order price *",
       "Items price": "Items price *",
-      "Placing order": "Placing your order…",
       "No parameters": "No parameters to display.",
       "Additional ID": "Additional ID",
       "Notes": "Notes",
