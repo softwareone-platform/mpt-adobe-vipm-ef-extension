@@ -83,6 +83,8 @@
     "Discounts": {
       "Title": "Discounts",
       "Description": "The details of this customer's discount codes are below.",
+      "Loading": "Loading discounts…",
+      "LoadingDescription": "Please wait while we fetch the discount codes.",
       "Code": "Code",
       "Source": "Source",
       "SourceOpen": "Open",

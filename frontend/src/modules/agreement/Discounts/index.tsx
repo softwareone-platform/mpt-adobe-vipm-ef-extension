@@ -19,7 +19,6 @@ import { useAgreementId } from '../../shared/hooks/useAgreementId';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useSettings } from "../../shared/hooks/useSettings";
 import {
-  canEditDiscountCode,
   canManageDiscountCodes,
 } from '../../utils/security';
 
@@ -306,28 +305,26 @@ export function Discounts() {
   const columns = useMemo<GridColumnDefinition<Discount>[]>(
     () => [
       ...BASE_COLUMNS,
-      ...(canAddClosedDiscount
-        ? [
-            {
-              name: 'actions',
-              title: i18n.t('Agreement:Discounts:Actions'),
-              fields: ['id'],
-              initialWidth: 80,
-              cell: (item: Discount) =>
-                canEditDiscountCode(accountType, item.source) ? (
-                  <GridCellActions
-                    item={item}
-                    actions={DISCOUNT_ACTIONS}
-                    onAction={onDiscountAction}
-                    testId={`discounts-action-${item.id}`}
-                  />
-                ) : null,
-            } as GridColumnDefinition<Discount>,
-          ]
-        : []),
+      {
+        name: "actions",
+        title: i18n.t("Agreement:Discounts:Actions"),
+        fields: ["id"],
+        initialWidth: 80,
+        cell: (item: Discount) => (
+          <GridCellActions
+            item={item}
+            actions={DISCOUNT_ACTIONS}
+            onAction={onDiscountAction}
+            testId={`discounts-action-${item.id}`}
+          />
+        ),
+      } as GridColumnDefinition<Discount>,
     ],
-    [canAddClosedDiscount, accountType, onDiscountAction],
+    [accountType, onDiscountAction],
   );
+
+  const isLoading = discounts.status === 'idle' || discounts.status === 'loading';
+
 
   const gridConfig = useMemo(
     () => ({
@@ -339,8 +336,17 @@ export function Discounts() {
         pageSize: DEFAULT_PAGE_SIZE,
         total: discounts.data.length,
       },
+      noDataConfiguration: isLoading
+        ? {
+            testId: 'discounts__info-dialog__loading',
+            title: t('Agreement:Discounts:Loading'),
+            description: t('Agreement:Discounts:LoadingDescription'),
+            icon: { name: 'sync', color: 'var(--brand-primary)' } as const,
+            isAnimatedIcon: true,
+          }
+        : undefined,
     }),
-    [columns, fields, discounts.data.length],
+    [columns, fields, discounts.data.length, isLoading, t],
   );
 
   const gridProps = useGridInMemory<Discount>(
