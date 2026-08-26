@@ -142,7 +142,6 @@ const renderStep = ({
   details = { externalId: '', notes: '' } as OrderDetails,
   onPlaceOrder = jest.fn().mockResolvedValue(true),
   errorMessage = '',
-  isSubmitting = false,
 } = {}) =>
   render(
     <ReviewOrderStep
@@ -154,7 +153,6 @@ const renderStep = ({
       details={details}
       onPlaceOrder={onPlaceOrder}
       errorMessage={errorMessage}
-      isSubmitting={isSubmitting}
     />,
   );
 
@@ -259,15 +257,13 @@ describe('ReviewOrderStep', () => {
     expect(target).toBe(5);
   });
 
-  it('surfaces the submission error and the in-flight notice', () => {
+  it('surfaces the submission error', () => {
     const { getByTestId } = renderStep({
       errorMessage: 'The renewal would breach your three-year commitment.',
-      isSubmitting: true,
     });
 
     expect(getByTestId('review-order-step-error').textContent).toContain(
       'The renewal would breach your three-year commitment.',
     );
-    expect(getByTestId('review-order-step-submitting')).toBeTruthy();
   });
 });

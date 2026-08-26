@@ -412,7 +412,6 @@ export default function App() {
           details={orderDetails}
           onPlaceOrder={placeOrder}
           errorMessage={submitError}
-          isSubmitting={submitStatus === 'loading'}
         />
       ),
     },
