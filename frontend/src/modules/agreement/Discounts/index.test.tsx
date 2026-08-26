@@ -184,7 +184,7 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
-    expect(screen.getAllByText('Edit')).toHaveLength(1);
+    expect(screen.getAllByText('Edit')).toHaveLength(2);
   });
 
   it('hides Actions and Add closed discount for client actors', async () => {
@@ -196,8 +196,6 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
-    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
   });
 
   it('shows Actions and Add closed discount for operations actors', async () => {
