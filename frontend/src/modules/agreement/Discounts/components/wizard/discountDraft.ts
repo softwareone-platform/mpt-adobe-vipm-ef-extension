@@ -1,4 +1,4 @@
-import type { DiscountOrderType, DiscountType } from "../../../../shared/model";
+import type { Discount, DiscountOrderType, DiscountType } from "../../../../shared/model";
 
 export type DiscountCategory = "STANDARD" | "INTRO";
 
@@ -87,16 +87,14 @@ export interface DiscountCreatePayload {
 }
 
 /**
- * Serialize the draft into the `POST /api/v2/discount-codes` body.
- *
- * Three wire names differ from the draft on purpose, matching the backend
- * aliases: the amount is sent as `value`, the 3YC flag as `supports3yc`, and
- * `discountLockEndDate` is omitted entirely unless the code is reusable — the
- * server rejects the pair `reusable: false` + a lock date.
+ * Payload for `PATCH /api/v2/discount-codes/{id}`. Same shape as create minus
+ * the immutable `code`.
  */
-export function toCreatePayload(draft: DiscountDraft): DiscountCreatePayload {
-  const payload: DiscountCreatePayload = {
-    code: draft.code.trim(),
+export type DiscountUpdatePayload = Omit<DiscountCreatePayload, "code">;
+
+/** Wire mapping shared by create and update payload builders. */
+function toDiscountPayloadBody(draft: DiscountDraft): DiscountUpdatePayload {
+  const payload: DiscountUpdatePayload = {
     name: draft.name.trim(),
     category: (draft.category || "STANDARD") as DiscountCategory,
     discountType: (draft.discountType || "PERCENTAGE") as DiscountType,
@@ -118,8 +116,7 @@ export function toCreatePayload(draft: DiscountDraft): DiscountCreatePayload {
   if (description) {
     payload.description = description;
   }
-  // The server only requires a currency for non-percentage types and falls back
-  // to the agreement's authorization currency when it is absent.
+  // Server only needs currency for non-percentage types; otherwise it falls back to the authorization currency.
   if (draft.discountType !== "PERCENTAGE" && draft.currency) {
     payload.currency = draft.currency;
   }
@@ -128,4 +125,45 @@ export function toCreatePayload(draft: DiscountDraft): DiscountCreatePayload {
   }
 
   return payload;
+}
+
+/** Serialize the draft into the `POST /api/v2/discount-codes` body. */
+export function toCreatePayload(draft: DiscountDraft): DiscountCreatePayload {
+  return {
+    code: draft.code.trim(),
+    ...toDiscountPayloadBody(draft),
+  };
+}
+
+/** Serialize the draft into the `PATCH /api/v2/discount-codes/{id}` body (no `code`, it's immutable). */
+export function toUpdatePayload(draft: DiscountDraft): DiscountUpdatePayload {
+  return toDiscountPayloadBody(draft);
+}
+
+/**
+ * Initialize a draft from a current discount for the edit wizard.
+ */
+export function toDraft(discount: Discount, agreementCurrency: string): DiscountDraft {
+  const valueEntry =
+    discount.values?.find((entry) => entry.currency === agreementCurrency) ??
+    discount.values?.[0];
+  const applicable = discount.applicableOrderTypes ?? [];
+  return {
+    code: discount.code ?? "",
+    name: discount.name ?? "",
+    description: discount.description ?? "",
+    category: (discount.category as DiscountCategory | "") ?? "",
+    discountType: (discount.discountType as DiscountType | "") ?? "PERCENTAGE",
+    value: valueEntry?.value != null ? String(valueEntry.value) : "",
+    currency: valueEntry?.currency ?? agreementCurrency ?? "",
+    startDate: discount.startDate ?? "",
+    endDate: discount.endDate ?? "",
+    reusable: discount.reusable ?? false,
+    discountLockEndDate: discount.discountLockEndDate ?? "",
+    targetItems: (discount.targetOfferIds ?? []).join(", "),
+    prerequisiteItems: (discount.qualifyingOfferIds ?? []).join(", "),
+    applicableOrderTypes: applicable.length === 0 ? [ANY_ORDER_TYPE] : applicable,
+    supportsAnnual: discount.supportsAnnual ?? false,
+    supportsThreeYc: discount.supports3yc ?? false,
+  };
 }
