@@ -173,7 +173,45 @@ describe("ValidityStep", () => {
     const target = await runNext();
 
     expect(target).toBe(NAVIGATION.currentStepIndex);
-    expect(await screen.findByTestId("validation-error")).toHaveTextContent(message);
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["the end date", { startDate: END, endDate: START }, "discount-end-date"],
+    [
+      "the lock date",
+      { reusable: true, discountLockEndDate: END },
+      "discount-lock-end-date",
+    ],
+  ])("hangs the ordering message off %s", async (_label, overrides, testId) => {
+    renderStep(overrides);
+
+    await runNext();
+
+    expect(await screen.findByTestId(`${testId}__error`)).toHaveTextContent("must be");
+  });
+
+  it("clears the ordering message when the other date is the one edited", async () => {
+    renderStep({ startDate: END, endDate: START });
+    await runNext();
+    expect(await screen.findByTestId("discount-end-date__error")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("discount-start-date"), {
+      target: { value: "2026-01-01" },
+    });
+
+    expect(screen.queryByTestId("discount-end-date__error")).not.toBeInTheDocument();
+  });
+
+  it("drops the lock date message when the code stops being reusable", async () => {
+    renderStep({ reusable: true, discountLockEndDate: "" });
+    await runNext();
+    const message = "A discount lock end date is required for reusable discounts.";
+    expect(await screen.findByText(message)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("discount-reusable"));
+
+    expect(screen.queryByText(message)).not.toBeInTheDocument();
   });
 
   it("advances with a valid single-use period", async () => {

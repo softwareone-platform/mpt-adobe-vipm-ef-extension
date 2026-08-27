@@ -10,7 +10,36 @@ export const MAX_TEXT_LENGTH = 255;
 const PERCENTAGE_MIN = 1;
 const PERCENTAGE_MAX = 100;
 
-function validateCode(draft: DiscountDraft): string | null {
+export type DiscountField =
+  | "code"
+  | "name"
+  | "category"
+  | "discountType"
+  | "value"
+  | "startDate"
+  | "endDate"
+  | "discountLockEndDate"
+  | "targetItems"
+  | "prerequisiteItems"
+  | "applicableOrderTypes"
+  | "currency";
+
+export type DiscountFieldErrors = Partial<Record<DiscountField, string>>;
+
+function firstMessage(
+  errors: DiscountFieldErrors,
+  order: readonly DiscountField[],
+): string | null {
+  for (const field of order) {
+    const message = errors[field];
+    if (message) {
+      return message;
+    }
+  }
+  return null;
+}
+
+function codeError(draft: DiscountDraft): string | undefined {
   const code = draft.code.trim();
   if (!code) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:CodeRequired");
@@ -20,10 +49,10 @@ function validateCode(draft: DiscountDraft): string | null {
       max: MAX_TEXT_LENGTH,
     });
   }
-  return null;
+  return undefined;
 }
 
-function validateName(draft: DiscountDraft): string | null {
+function nameError(draft: DiscountDraft): string | undefined {
   const name = draft.name.trim();
   if (!name) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:NameRequired");
@@ -33,22 +62,22 @@ function validateName(draft: DiscountDraft): string | null {
       max: MAX_TEXT_LENGTH,
     });
   }
-  return null;
+  return undefined;
 }
 
-function validateCategory(draft: DiscountDraft): string | null {
+function categoryError(draft: DiscountDraft): string | undefined {
   return draft.category
-    ? null
+    ? undefined
     : i18n.t("Agreement:Discounts:Wizard:Validation:CategoryRequired");
 }
 
-function validateDiscountType(draft: DiscountDraft): string | null {
+function discountTypeError(draft: DiscountDraft): string | undefined {
   return draft.discountType
-    ? null
+    ? undefined
     : i18n.t("Agreement:Discounts:Wizard:Validation:DiscountTypeRequired");
 }
 
-function validateValue(draft: DiscountDraft): string | null {
+function valueError(draft: DiscountDraft): string | undefined {
   const raw = draft.value.trim();
   if (!raw) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:ValueRequired");
@@ -64,7 +93,32 @@ function validateValue(draft: DiscountDraft): string | null {
   ) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:PercentageRange");
   }
-  return null;
+  return undefined;
+}
+
+const DEFINITION_ORDER = [
+  "code",
+  "name",
+  "category",
+  "discountType",
+  "value",
+] as const satisfies readonly DiscountField[];
+
+export function validateDefinitionFields(draft: DiscountDraft): DiscountFieldErrors {
+  const errors: DiscountFieldErrors = {};
+  const assign = (field: DiscountField, message: string | undefined) => {
+    if (message) {
+      errors[field] = message;
+    }
+  };
+
+  assign("code", codeError(draft));
+  assign("name", nameError(draft));
+  assign("category", categoryError(draft));
+  assign("discountType", discountTypeError(draft));
+  assign("value", valueError(draft));
+
+  return errors;
 }
 
 /**
@@ -75,13 +129,7 @@ function validateValue(draft: DiscountDraft): string | null {
  * API would reject anyway, without waiting for a round trip.
  */
 export function validateDefinition(draft: DiscountDraft): string | null {
-  return (
-    validateCode(draft) ??
-    validateName(draft) ??
-    validateCategory(draft) ??
-    validateDiscountType(draft) ??
-    validateValue(draft)
-  );
+  return firstMessage(validateDefinitionFields(draft), DEFINITION_ORDER);
 }
 
 const CALENDAR_DAY = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/u;
@@ -116,69 +164,80 @@ function isValidDate(value: string): boolean {
   );
 }
 
-function validatePeriod(draft: DiscountDraft): string | null {
-  if (!draft.startDate) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:StartDateRequired");
-  }
-  if (!draft.endDate) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:EndDateRequired");
-  }
-  if (!isValidDate(draft.startDate) || !isValidDate(draft.endDate)) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:DateInvalid");
-  }
-  if (new Date(draft.startDate) >= new Date(draft.endDate)) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:EndDateAfterStart");
-  }
-  return null;
+function dateInvalid(): string {
+  return i18n.t("Agreement:Discounts:Wizard:Validation:DateInvalid");
 }
 
-function validateLockDate(draft: DiscountDraft): string | null {
+const VALIDITY_ORDER = [
+  "startDate",
+  "endDate",
+  "discountLockEndDate",
+] as const satisfies readonly DiscountField[];
+
+export function validateValidityFields(draft: DiscountDraft): DiscountFieldErrors {
+  const errors: DiscountFieldErrors = {};
+
+  if (!draft.startDate) {
+    errors.startDate = i18n.t("Agreement:Discounts:Wizard:Validation:StartDateRequired");
+  } else if (!isValidDate(draft.startDate)) {
+    errors.startDate = dateInvalid();
+  }
+
+  if (!draft.endDate) {
+    errors.endDate = i18n.t("Agreement:Discounts:Wizard:Validation:EndDateRequired");
+  } else if (!isValidDate(draft.endDate)) {
+    errors.endDate = dateInvalid();
+  }
+
+  if (
+    !errors.startDate &&
+    !errors.endDate &&
+    new Date(draft.startDate) >= new Date(draft.endDate)
+  ) {
+    errors.endDate = i18n.t("Agreement:Discounts:Wizard:Validation:EndDateAfterStart");
+  }
+
   // A lock date is meaningless for a single-use code. The serializer drops any
   // stale value, so a date left over from an unticked box is not an error.
-  if (!draft.reusable) {
-    return null;
+  if (draft.reusable) {
+    if (!draft.discountLockEndDate) {
+      errors.discountLockEndDate = i18n.t(
+        "Agreement:Discounts:Wizard:Validation:LockDateRequired",
+      );
+    } else if (!isValidDate(draft.discountLockEndDate)) {
+      errors.discountLockEndDate = dateInvalid();
+    } else if (
+      !errors.endDate &&
+      new Date(draft.discountLockEndDate) <= new Date(draft.endDate)
+    ) {
+      errors.discountLockEndDate = i18n.t(
+        "Agreement:Discounts:Wizard:Validation:LockDateAfterEnd",
+      );
+    }
   }
-  if (!draft.discountLockEndDate) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:LockDateRequired");
-  }
-  if (!isValidDate(draft.discountLockEndDate)) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:DateInvalid");
-  }
-  if (new Date(draft.discountLockEndDate) <= new Date(draft.endDate)) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:LockDateAfterEnd");
-  }
-  return null;
+
+  return errors;
 }
 
 /** Validate the Validity step, mirroring `_validate_dates` and `_validate_reusability`. */
 export function validateValidity(draft: DiscountDraft): string | null {
-  return validatePeriod(draft) ?? validateLockDate(draft);
+  return firstMessage(validateValidityFields(draft), VALIDITY_ORDER);
 }
 
 /** Adobe part numbers are alphanumeric; the server rejects blanks and spaces. */
 const PART_NUMBER = /^[A-Za-z0-9]+$/u;
 
-function invalidItems(raw: string): string[] {
-  return parseItemList(raw).filter((item) => !PART_NUMBER.test(item));
+function itemFormatError(raw: string): string | undefined {
+  const malformed = parseItemList(raw).filter((item) => !PART_NUMBER.test(item));
+  if (malformed.length === 0) {
+    return undefined;
+  }
+  return i18n.t("Agreement:Discounts:Wizard:Validation:ItemFormat", {
+    items: malformed.join(", "),
+  });
 }
 
-function validateItems(draft: DiscountDraft): string | null {
-  if (parseItemList(draft.targetItems).length === 0) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:TargetItemsRequired");
-  }
-  const malformed = [
-    ...invalidItems(draft.targetItems),
-    ...invalidItems(draft.prerequisiteItems),
-  ];
-  if (malformed.length > 0) {
-    return i18n.t("Agreement:Discounts:Wizard:Validation:ItemFormat", {
-      items: malformed.join(", "),
-    });
-  }
-  return null;
-}
-
-function validateOrderTypes(draft: DiscountDraft): string | null {
+function orderTypesError(draft: DiscountDraft): string | undefined {
   const selection = draft.applicableOrderTypes;
   if (selection.length === 0) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:OrderTypesRequired");
@@ -194,21 +253,76 @@ function validateOrderTypes(draft: DiscountDraft): string | null {
   ) {
     return i18n.t("Agreement:Discounts:Wizard:Validation:IntroOrderTypes");
   }
-  return null;
+  return undefined;
+}
+
+const SCOPE_ORDER = [
+  "targetItems",
+  "prerequisiteItems",
+  "applicableOrderTypes",
+] as const satisfies readonly DiscountField[];
+
+export function validateScopeFields(draft: DiscountDraft): DiscountFieldErrors {
+  const errors: DiscountFieldErrors = {};
+
+  if (parseItemList(draft.targetItems).length === 0) {
+    errors.targetItems = i18n.t(
+      "Agreement:Discounts:Wizard:Validation:TargetItemsRequired",
+    );
+  } else {
+    const malformed = itemFormatError(draft.targetItems);
+    if (malformed) {
+      errors.targetItems = malformed;
+    }
+  }
+
+  const malformedPrerequisites = itemFormatError(draft.prerequisiteItems);
+  if (malformedPrerequisites) {
+    errors.prerequisiteItems = malformedPrerequisites;
+  }
+
+  const orderTypes = orderTypesError(draft);
+  if (orderTypes) {
+    errors.applicableOrderTypes = orderTypes;
+  }
+
+  return errors;
 }
 
 /** Validate the Scope step, mirroring `_clean_offer_ids` and `_validate_category`. */
 export function validateScope(draft: DiscountDraft): string | null {
-  return validateItems(draft) ?? validateOrderTypes(draft);
+  return firstMessage(validateScopeFields(draft), SCOPE_ORDER);
 }
 
-function validateCurrency(draft: DiscountDraft): string | null {
+function currencyError(draft: DiscountDraft): string | undefined {
   // Percentage discounts carry no currency. For the fixed types the value row
   // needs one, so refuse to submit when the agreement did not supply it.
   if (draft.discountType === "PERCENTAGE" || draft.currency) {
-    return null;
+    return undefined;
   }
   return i18n.t("Agreement:Discounts:Wizard:Validation:CurrencyRequired");
+}
+
+const REVIEW_ORDER = [
+  ...DEFINITION_ORDER,
+  ...VALIDITY_ORDER,
+  ...SCOPE_ORDER,
+  "currency",
+] as const satisfies readonly DiscountField[];
+
+export function validateReviewFields(draft: DiscountDraft): DiscountFieldErrors {
+  const errors: DiscountFieldErrors = {
+    ...validateDefinitionFields(draft),
+    ...validateValidityFields(draft),
+    ...validateScopeFields(draft),
+  };
+
+  const currency = currencyError(draft);
+  if (currency) {
+    errors.currency = currency;
+  }
+
+  return errors;
 }
 
 /**
@@ -219,10 +333,5 @@ function validateCurrency(draft: DiscountDraft): string | null {
  * whole draft at once.
  */
 export function validateReview(draft: DiscountDraft): string | null {
-  return (
-    validateDefinition(draft) ??
-    validateValidity(draft) ??
-    validateScope(draft) ??
-    validateCurrency(draft)
-  );
+  return firstMessage(validateReviewFields(draft), REVIEW_ORDER);
 }

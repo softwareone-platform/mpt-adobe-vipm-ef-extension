@@ -94,15 +94,37 @@ describe("DefinitionStep", () => {
     expect(updateDraft).toHaveBeenCalledWith({ [field]: "typed" });
   });
 
-  it("blocks navigation and shows the error when the code is missing", async () => {
+  it("blocks navigation and shows the error under the code field", async () => {
     renderStep({ code: "" });
 
     const target = await runNext();
 
     expect(target).toBe(NAVIGATION.currentStepIndex);
-    expect(await screen.findByTestId("validation-error")).toHaveTextContent(
-      "A code is required.",
-    );
+    expect(await screen.findByText("A code is required.")).toBeInTheDocument();
+    expect(screen.queryByTestId("validation-error")).not.toBeInTheDocument();
+  });
+
+  it("shows a message on every offending field at once", async () => {
+    renderStep({ code: "", name: "", value: "" });
+
+    await runNext();
+
+    expect(await screen.findByText("A code is required.")).toBeInTheDocument();
+    expect(screen.getByText("A name is required.")).toBeInTheDocument();
+    expect(screen.getByText("A value is required.")).toBeInTheDocument();
+  });
+
+  it("clears only the edited field's message", async () => {
+    renderStep({ code: "", name: "" });
+    await runNext();
+    expect(await screen.findByText("A code is required.")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("discount-code").querySelector("input")!, {
+      target: { value: "SUMMER25" },
+    });
+
+    expect(screen.queryByText("A code is required.")).not.toBeInTheDocument();
+    expect(screen.getByText("A name is required.")).toBeInTheDocument();
   });
 
   it("blocks navigation when the percentage falls outside 1-100", async () => {
@@ -111,6 +133,9 @@ describe("DefinitionStep", () => {
     const target = await runNext();
 
     expect(target).toBe(NAVIGATION.currentStepIndex);
+    expect(
+      await screen.findByText("A percentage value must be between 1 and 100."),
+    ).toBeInTheDocument();
   });
 
   it("advances when the definition is complete", async () => {

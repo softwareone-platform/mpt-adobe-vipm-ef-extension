@@ -1,5 +1,8 @@
 @use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
 
+$hint-line-height: 14.4px;
+$character-counter-reserve: 120px;
+
 .wizard-step {
   display: flex;
   flex-direction: column;
@@ -32,5 +35,12 @@
     display: block;
     margin-bottom: $var-spacing-1;
     font-weight: 500;
+  }
+
+  &__field--inline-hint {
+    [class*="input-description"] + [class*="input-error"] {
+      margin-top: -$hint-line-height;
+      padding-right: $character-counter-reserve;
+    }
   }
 }

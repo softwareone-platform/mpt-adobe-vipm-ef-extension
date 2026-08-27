@@ -1,23 +1,28 @@
 @use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
 
+$label-block-height: 28px;
+$control-height: 38px;
+
 .definition-step {
   &__value-row {
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: $var-spacing-2;
   }
 
   &__discount-type {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
   }
 
   &__value {
-    flex: 0 0 160px;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   &__value-suffix {
-    padding-bottom: $var-spacing-1;
+    margin-top: $label-block-height;
+    line-height: $control-height;
     white-space: nowrap;
   }
 }
