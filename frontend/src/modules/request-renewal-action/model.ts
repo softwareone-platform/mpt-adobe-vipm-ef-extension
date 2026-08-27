@@ -156,19 +156,19 @@ export function isAddition(line: RenewalLine): boolean {
 }
 
 /**
- * Whether the line changes the renewal of existing seats.
+ * Whether the line renews existing seats.
  *
- * Only a line renewing fewer seats than the customer holds counts: an
- * unchanged line is what the guidance asks the customer to fall back to
- * ("undo the changes"), so treating it as a renewal would leave the conflict
- * unresolvable.
+ * Any existing line carried at or below the quantity the customer holds counts,
+ * unchanged ones included: it still rides the renew-mode order, which Adobe
+ * cannot combine with an addition. A line above the current quantity is the
+ * addition itself, so it is left to ``isAddition``.
  */
 export function isRenewalChange(line: RenewalLine): boolean {
   return (
     !line.isNetNew &&
     line.currentQuantity != null &&
     line.renewalQuantity != null &&
-    line.renewalQuantity < line.currentQuantity
+    line.renewalQuantity <= line.currentQuantity
   );
 }
 
@@ -260,6 +260,34 @@ export function isDiscountAvailable(discount: Discount): boolean {
 export function appliesToRenewal(discount: Discount): boolean {
   const orderTypes = discount.applicableOrderTypes;
   return !orderTypes?.length || orderTypes.includes('RENEWAL');
+}
+
+/**
+ * Whether the discount targets the line's offer.
+ *
+ * A code carries the offers it was created for as its target list, matched
+ * against the item's vendor external id. A code with no targets is unrestricted
+ * and applies to every line. The list is stored as one comma-separated string,
+ * so an entry that arrives unsplit is split here.
+ */
+export function appliesToOffer(discount: Discount, vendorExternalId: string): boolean {
+  const targets = getTargetOfferIds(discount);
+  if (!targets.length) return true;
+  const offer = vendorExternalId.trim().toUpperCase();
+  return Boolean(offer) && targets.includes(offer);
+}
+
+function getTargetOfferIds(discount: Discount): string[] {
+  return (discount.targetOfferIds ?? [])
+    .flatMap((target) => target.split(','))
+    .map((target) => target.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+/** How a code reads in the picker: its name in brackets when the code carries one. */
+export function getDiscountLabel(discount: Discount): string {
+  const name = discount.name?.trim();
+  return name ? `${discount.code} (${name})` : discount.code;
 }
 
 /** The discount code applied to each renewal line, keyed by subscription or item id. */

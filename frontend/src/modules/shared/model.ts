@@ -564,6 +564,8 @@ export interface PriceListItem {
   status?: string;
   unitLP?: number;
   unitSP?: number;
+  SPxM?: number;
+  SPxY?: number;
   item?: ProductItem;
   recommended?: boolean;
 }

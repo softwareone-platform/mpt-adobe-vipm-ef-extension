@@ -199,15 +199,15 @@ const DISCOUNTS: Discount[] = [
   },
 ];
 
-const renderStep = ({
+const renderStep = async ({
   selections = {},
   quantities = {},
   netNewItems = [] as NetNewItem[],
   discountSelections = {} as DiscountSelections,
   path = 'anniversary' as RenewalPath,
   onDiscountChange = jest.fn(),
-} = {}) =>
-  render(
+} = {}) => {
+  const result = render(
     <PromotionsStep
       agreement={AGREEMENT}
       subscriptions={SUBSCRIPTIONS}
@@ -219,6 +219,14 @@ const renderStep = ({
       onDiscountChange={onDiscountChange}
     />,
   );
+  await act(async () => {});
+  return result;
+};
+
+const codesOf = (select: HTMLSelectElement) =>
+  Array.from(select.querySelectorAll('option'))
+    .map((option) => option.value)
+    .filter(Boolean);
 
 describe('PromotionsStep', () => {
   beforeEach(() => {
@@ -228,7 +236,7 @@ describe('PromotionsStep', () => {
   });
 
   it('renders the heading, the highlights and the prompt', async () => {
-    const { getByText, getByTestId } = renderStep();
+    const { getByText, getByTestId } = await renderStep();
 
     await waitFor(() => expect(getByTestId('grid')).toBeTruthy());
     expect(getByText('Promotions')).toBeTruthy();
@@ -237,7 +245,7 @@ describe('PromotionsStep', () => {
   });
 
   it('reads the discounts a renewal can still apply', async () => {
-    const { getByTestId } = renderStep();
+    const { getByTestId } = await renderStep();
 
     await waitFor(() => expect(getByTestId('grid')).toBeTruthy());
     expect(mockGet).toHaveBeenCalledWith(
@@ -249,7 +257,7 @@ describe('PromotionsStep', () => {
   });
 
   it('lists the renewing subscriptions with their billing model, terms and prices', async () => {
-    const { findByTestId } = renderStep();
+    const { findByTestId } = await renderStep();
 
     const row = await findByTestId('row-SUB-1');
     expect(row.textContent).toContain('Item One');
@@ -260,14 +268,14 @@ describe('PromotionsStep', () => {
   });
 
   it('leaves out a subscription that is not being renewed', async () => {
-    const { findByTestId, queryByTestId } = renderStep();
+    const { findByTestId, queryByTestId } = await renderStep();
 
     await findByTestId('row-SUB-1');
     expect(queryByTestId('row-SUB-2')).toBeNull();
   });
 
   it('lists a net-new product as a new line', async () => {
-    const { findByTestId } = renderStep({ netNewItems: [NET_NEW_ITEM] });
+    const { findByTestId } = await renderStep({ netNewItems: [NET_NEW_ITEM] });
 
     const row = await findByTestId('row-ITM-3');
     expect(row.textContent).toContain('Item Three');
@@ -275,13 +283,51 @@ describe('PromotionsStep', () => {
   });
 
   it('offers the renewal codes and blocks a redeemed one', async () => {
-    const { findByTestId } = renderStep();
+    const { findByTestId } = await renderStep();
 
     const select = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    expect(codesOf(select)).toEqual(['CODE-ONE', 'CODE-TWO']);
     const options = Array.from(select.querySelectorAll('option')).filter((option) => option.value);
-    expect(options.map((option) => option.value)).toEqual(['CODE-ONE', 'CODE-TWO']);
     expect(options[1].hasAttribute('disabled')).toBe(true);
     expect(select.getAttribute('data-placeholder')).toBe('Select or type code');
+  });
+
+  it('offers a targeted code only on the lines whose item it lists', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        data: [
+          { ...DISCOUNTS[0], targetOfferIds: ['OFFER-1'] },
+          { ...DISCOUNTS[0], id: 'DSC-4', code: 'CODE-FOUR', targetOfferIds: ['OFFER-3'] },
+        ],
+      },
+    });
+
+    const { findByTestId } = await renderStep({ netNewItems: [NET_NEW_ITEM] });
+
+    const subscriptionSelect = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    const netNewSelect = (await findByTestId('discount-code-ITM-3')) as HTMLSelectElement;
+    expect(codesOf(subscriptionSelect)).toEqual(['CODE-ONE']);
+    expect(codesOf(netNewSelect)).toEqual(['CODE-FOUR']);
+  });
+
+  it('offers a code with no targets on every line', async () => {
+    mockGet.mockResolvedValue({ data: { data: [{ ...DISCOUNTS[0], targetOfferIds: [] }] } });
+
+    const { findByTestId } = await renderStep({ netNewItems: [NET_NEW_ITEM] });
+
+    const subscriptionSelect = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    const netNewSelect = (await findByTestId('discount-code-ITM-3')) as HTMLSelectElement;
+    expect(codesOf(subscriptionSelect)).toEqual(['CODE-ONE']);
+    expect(codesOf(netNewSelect)).toEqual(['CODE-ONE']);
+  });
+
+  it("reads a code's name alongside its code in the dropdown", async () => {
+    mockGet.mockResolvedValue({ data: { data: [{ ...DISCOUNTS[0], name: 'Spring promo' }] } });
+
+    const { findByTestId } = await renderStep();
+
+    const select = await findByTestId('discount-code-SUB-1');
+    expect(select.textContent).toContain('CODE-ONE (Spring promo)');
   });
 
   it('keeps a redeemed reusable code selectable', async () => {
@@ -289,17 +335,17 @@ describe('PromotionsStep', () => {
       data: { data: [{ ...DISCOUNTS[1], reusable: true }] },
     });
 
-    const { findByTestId } = renderStep();
+    const { findByTestId } = await renderStep();
 
     const select = (await findByTestId('discount-code-SUB-1')) as HTMLSelectElement;
+    expect(codesOf(select)).toEqual(['CODE-TWO']);
     const options = Array.from(select.querySelectorAll('option')).filter((option) => option.value);
-    expect(options.map((option) => option.value)).toEqual(['CODE-TWO']);
     expect(options[0].hasAttribute('disabled')).toBe(false);
   });
 
   it('stores the code picked for a line', async () => {
     const onDiscountChange = jest.fn();
-    const { findByTestId } = renderStep({ onDiscountChange });
+    const { findByTestId } = await renderStep({ onDiscountChange });
 
     fireEvent.change(await findByTestId('discount-code-SUB-1'), {
       target: { value: 'CODE-ONE' },
@@ -308,26 +354,26 @@ describe('PromotionsStep', () => {
     expect(onDiscountChange).toHaveBeenCalledWith('SUB-1', 'CODE-ONE');
   });
 
-  it('reprices the line from the applied code and keeps the undiscounted price', async () => {
-    const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'CODE-ONE' } });
+  it('keeps the list price on an applied code, since Review order carries the pricing', async () => {
+    const { findByTestId } = await renderStep({ discountSelections: { 'SUB-1': 'CODE-ONE' } });
 
     const row = await findByTestId('row-SUB-1');
-    expect(row.textContent).toContain('750.00');
     expect(row.textContent).toContain('1,000.00');
+    expect(row.textContent).not.toContain('750.00');
   });
 
-  it('sorts on the discounted totals the row shows', async () => {
-    const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'CODE-ONE' } });
+  it('sorts on the list totals the row shows', async () => {
+    const { findByTestId } = await renderStep({ discountSelections: { 'SUB-1': 'CODE-ONE' } });
 
     await findByTestId('row-SUB-1');
     const row = capturedRows.find((entry) => entry.id === 'SUB-1');
-    expect(row?.spxY).toBe(750);
-    expect(row?.spxM).toBe(62.5);
+    expect(row?.spxY).toBe(1000);
+    expect(row?.spxM).toBe(83.33333333333333);
   });
 
   it('undoes the applied code', async () => {
     const onDiscountChange = jest.fn();
-    const { findByTestId } = renderStep({
+    const { findByTestId } = await renderStep({
       discountSelections: { 'SUB-1': 'CODE-ONE' },
       onDiscountChange,
     });
@@ -338,14 +384,14 @@ describe('PromotionsStep', () => {
   });
 
   it('disables undo on a line without a code', async () => {
-    const { findByTestId } = renderStep();
+    const { findByTestId } = await renderStep();
 
     expect((await findByTestId('undo-SUB-1')).getAttribute('disabled')).not.toBeNull();
   });
 
   it('reports a failed discounts read', async () => {
     mockGet.mockRejectedValue(new Error('Discounts are down'));
-    const { findByTestId } = renderStep();
+    const { findByTestId } = await renderStep();
 
     expect((await findByTestId('promotions-step-error')).textContent).toContain(
       'Discounts are down',
@@ -356,7 +402,7 @@ describe('PromotionsStep', () => {
     const NAVIGATION = { currentStepIndex: 3, targetStepIndex: 4 };
 
     it('registers the gate on the wizard next action', async () => {
-      const { findByTestId } = renderStep();
+      const { findByTestId } = await renderStep();
 
       await findByTestId('grid');
       expect(registerOnNextCallback).toHaveBeenCalled();
@@ -364,7 +410,7 @@ describe('PromotionsStep', () => {
     });
 
     it('advances without validating the discount codes against Adobe at the anniversary', async () => {
-      const { findByTestId } = renderStep({ discountSelections: { 'SUB-1': 'code-one' } });
+      const { findByTestId } = await renderStep({ discountSelections: { 'SUB-1': 'code-one' } });
       await findByTestId('grid');
 
       let nextIndex: number | undefined;
@@ -378,7 +424,7 @@ describe('PromotionsStep', () => {
 
     it('previews the early-renewal basket with the selected codes, then advances', async () => {
       mockPost.mockResolvedValue({ data: { data: {} } });
-      const { findByTestId } = renderStep({
+      const { findByTestId } = await renderStep({
         path: 'now',
         netNewItems: [NET_NEW_ITEM],
         discountSelections: { 'SUB-1': 'code-one' },
@@ -410,7 +456,7 @@ describe('PromotionsStep', () => {
       mockPost.mockRejectedValue({
         response: { data: { detail: '3132 - Ineligible product for orderType' } },
       });
-      const { findByTestId } = renderStep({
+      const { findByTestId } = await renderStep({
         path: 'now',
         discountSelections: { 'SUB-1': 'code-one' },
       });

@@ -357,6 +357,52 @@ describe('ItemsStep', () => {
     ).toBeTruthy();
   });
 
+  it('flags a renewal quantity above the current one when renewing now', () => {
+    const { getByTestId } = renderStep({ path: 'now', quantities: { 'SUB-1': 38 } });
+
+    const notice = getByTestId('items-step-increase-error');
+    expect(notice.textContent).toContain('cannot go above the quantity you hold');
+    expect(notice.textContent).toContain(
+      'Creative Cloud All Apps — renewing 38 of a current quantity of 37',
+    );
+  });
+
+  it('leaves the increase to the conflict notice, which already names it as an addition', () => {
+    const { getByTestId, queryByTestId } = renderStep({
+      path: 'now',
+      quantities: { 'SUB-1': 38, 'SUB-2': 20 },
+      selections: { 'SUB-2': true },
+    });
+
+    expect(getByTestId('items-step-conflict')).toBeTruthy();
+    expect(queryByTestId('items-step-increase-error')).toBeNull();
+  });
+
+  it('allows the increase once every existing seat is early-renewed', () => {
+    const { queryByTestId } = renderStep({
+      path: 'now',
+      quantities: { 'SUB-1': 38 },
+      renewalStates: {
+        [ADOBE_SUBSCRIPTION_ID]: {
+          currentQuantity: 37,
+          renewedQuantity: 37,
+          state: 'fullyRenewed',
+          remainingQuantity: 0,
+          earlyRenewable: true,
+          increaseAllowed: true,
+        },
+      },
+    });
+
+    expect(queryByTestId('items-step-increase-error')).toBeNull();
+  });
+
+  it('leaves a renewal quantity above the current one alone at the anniversary', () => {
+    const { queryByTestId } = renderStep({ quantities: { 'SUB-1': 38 } });
+
+    expect(queryByTestId('items-step-increase-error')).toBeNull();
+  });
+
   it('keeps the undo action idle until the quantity changes', () => {
     const { getByTestId } = renderStep();
 
@@ -621,6 +667,19 @@ describe('ItemsStep', () => {
       );
     });
 
+    it('blocks the step while renewing now asks for more than the held quantity', async () => {
+      const { getByTestId } = renderStep({ path: 'now', quantities: { 'SUB-1': 38 } });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      expect(mockPost).not.toHaveBeenCalled();
+      expect(getByTestId('items-step-increase-error')).toBeTruthy();
+    });
+
     const PLAN_SUBSCRIPTIONS = [
       { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 37 },
       { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
@@ -650,7 +709,7 @@ describe('ItemsStep', () => {
 
     it('previews the early-renewal items against Adobe after the 3YC floor check', async () => {
       mockPost.mockResolvedValue({ data: { data: {} } });
-      renderStep({ netNewItems: [NET_NEW_ITEM], path: 'now' });
+      renderStep({ path: 'now' });
 
       let nextIndex: number | undefined;
       await act(async () => {
@@ -661,7 +720,7 @@ describe('ItemsStep', () => {
       const plan = {
         renewalPath: 'now',
         subscriptions: PLAN_SUBSCRIPTIONS,
-        netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
+        netNewItems: [],
       };
       expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
         ['/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check', plan],
@@ -676,7 +735,7 @@ describe('ItemsStep', () => {
       mockPost.mockResolvedValueOnce({ data: { data: {} } }).mockRejectedValueOnce({
         response: { data: { detail: 'Place the renewal first, then add in a new order.' } },
       });
-      const { getByTestId } = renderStep({ netNewItems: [NET_NEW_ITEM], path: 'now' });
+      const { getByTestId } = renderStep({ path: 'now' });
 
       let nextIndex: number | undefined;
       await act(async () => {

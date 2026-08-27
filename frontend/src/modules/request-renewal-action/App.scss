@@ -11,23 +11,11 @@
     justify-content: center;
   }
 
-  [class*="grid__table__empty-row"] + [class*="grid__table__empty-row"] {
+  [class*="grid__table__empty-row"] {
     display: none;
   }
 
-  [class*="grid__table-container"] {
-    table {
-      width: 100% !important;
-    }
-
-    colgroup col {
-      width: 1% !important;
-    }
-
-    th,
-    td {
-      min-width: 0 !important;
-      max-width: none !important;
-    }
+  [class*="grid__table__scroll-parent"]::before {
+    display: none;
   }
 }

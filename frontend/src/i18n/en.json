@@ -457,6 +457,10 @@
       "Validation": {
         "Required": "Quantity is required",
         "AtLeast": "Quantity must be at least {{quantity}}",
+        "NoIncrease": {
+          "Intro": "Renewing now cannot go above the quantity you hold. Adobe handles the extra quantity as an addition, which has to be placed as a separate order once this renewal has been placed.",
+          "Line": "{{item}} — renewing {{renewal}} of a current quantity of {{quantity}}"
+        },
         "FixQuantities": "Enter a valid renewal quantity for every item before continuing."
       }
     },
