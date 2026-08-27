@@ -61,16 +61,20 @@ let capturedConfig: GridConfig;
 const onGridEvent = jest.fn();
 
 jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
-  Grid: ({ data, config }: { data: TestRow[]; config: GridConfig }) => (
-    <div data-testid="grid">
-      {data.map((row) => (
-        <div key={row.id} data-testid={`row-${row.id}`}>
-          {config.columns.map((column) => (
-            <div key={column.name}>{column.cell?.(row)}</div>
-          ))}
-        </div>
-      ))}
-    </div>
+  Grid: Object.assign(
+    ({ children, data, config }: { children?: ReactNode; data: TestRow[]; config: GridConfig }) => (
+      <div data-testid="grid">
+        <div data-testid="grid__toolbar">{children}</div>
+        {data.map((row) => (
+          <div key={row.id} data-testid={`row-${row.id}`}>
+            {config.columns.map((column) => (
+              <div key={column.name}>{column.cell?.(row)}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+    ),
+    { Actions: ({ children }: { children?: ReactNode }) => <>{children}</> },
   ),
   GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useGridInMemory: (data: TestRow[], config: GridConfig) => {
