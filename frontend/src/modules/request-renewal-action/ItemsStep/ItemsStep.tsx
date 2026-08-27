@@ -565,6 +565,12 @@ export function ItemsStep({
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
+  const addItemsButton = (
+    <Button isDisabled={!listingId} onClick={() => setDialogOpen(true)} testId="add-items">
+      {t('Renewal:Items:Add items')}
+    </Button>
+  );
+
   return (
     <div className="items-step">
       <div className="items-step__header">
@@ -592,24 +598,20 @@ export function ItemsStep({
         label={t('Common:Validating')}
         onCancel={cancel}
       />
-      <div className="items-step__toolbar">
-        <Button
-          isDisabled={!listingId}
-          onClick={() => setDialogOpen(true)}
-          testId="add-items"
-        >
-          {t('Renewal:Items:Add items')}
-        </Button>
-      </div>
       {rows.length === 0 ? (
-        <NoDataCard
-          title={t('Renewal:Items:Empty:Title')}
-          description={t('Renewal:Items:Empty:Description')}
-        />
+        <>
+          <div className="items-step__toolbar">{addItemsButton}</div>
+          <NoDataCard
+            title={t('Renewal:Items:Empty:Title')}
+            description={t('Renewal:Items:Empty:Description')}
+          />
+        </>
       ) : (
         <>
           <div className="items-step__grid">
-            <Grid {...gridProps} />
+            <Grid {...gridProps}>
+              <Grid.Actions>{addItemsButton}</Grid.Actions>
+            </Grid>
           </div>
           <RegularText as="p" size={1} color="grey-4" className="items-step__disclaimer">
             {t('Renewal:Grid:Price disclaimer')}
