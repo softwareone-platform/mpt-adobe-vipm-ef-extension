@@ -73,20 +73,6 @@ export function canRequestGlobalCustomer(
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
 
-export function canEditDiscountCode(
-  accountType: AccountType | undefined,
-  source: string | null | undefined,
-): boolean {
-  if (accountType === 'Vendor') {
-    return true;
-  }
-
-  if (accountType === 'Operations') {
-    return (source ?? '').trim().toLowerCase() !== 'open';
-  }
-
-  return false;
-}
 
 /**
  * Mirrors the backend gate in `routers/api/discount_scope.py::require_editor_account`,
