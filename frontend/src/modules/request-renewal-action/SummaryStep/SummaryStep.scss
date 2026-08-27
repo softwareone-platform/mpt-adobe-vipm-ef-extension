@@ -10,4 +10,12 @@
       margin: 0;
     }
   }
+
+  &__template {
+    width: 700px;
+    max-width: 100%;
+    padding: $var-spacing-4;
+    background-color: $var-gray-1;
+    border-radius: $var-radius-m;
+  }
 }

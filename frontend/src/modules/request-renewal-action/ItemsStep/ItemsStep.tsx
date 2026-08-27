@@ -177,6 +177,43 @@ export function validateRenewalQuantity(quantity: number | null): string | undef
   return undefined;
 }
 
+function isBlockedIncrease(row: Row): boolean {
+  return (
+    !row.increaseAllowed &&
+    row.currentQuantity != null &&
+    row.renewalQuantity != null &&
+    row.renewalQuantity > row.currentQuantity
+  );
+}
+
+/** The lines renewing now cannot carry: extra seats ride their own add order. */
+function findBlockedIncreases(rows: Row[], path: RenewalPath): Row[] {
+  return path === 'now' ? rows.filter(isBlockedIncrease) : [];
+}
+
+function IncreaseNotice({ rows }: { rows: Row[] }) {
+  return (
+    <div className="items-step__validation" data-testid="items-step-increase-error">
+      <InlineNotification status="error">
+        <RegularText as="p" size={2}>
+          {i18n.t('Renewal:Items:Validation:NoIncrease:Intro')}
+        </RegularText>
+        <ul>
+          {rows.map((row) => (
+            <li key={row.id}>
+              {i18n.t('Renewal:Items:Validation:NoIncrease:Line', {
+                item: row.itemName,
+                renewal: row.renewalQuantity,
+                quantity: row.currentQuantity,
+              })}
+            </li>
+          ))}
+        </ul>
+      </InlineNotification>
+    </div>
+  );
+}
+
 interface RowHandlers {
   onRowQuantityChange: (row: Row, quantity: number | null) => void;
   onRemove: (row: Row) => void;
@@ -490,6 +527,7 @@ export function ItemsStep({
   });
 
   const conflict = findRenewAndAddConflict(toRenewalLines(gridProps.data), path);
+  const blockedIncreases = findBlockedIncreases(rows, path);
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
@@ -497,7 +535,7 @@ export function ItemsStep({
         setQuantityError(t('Renewal:Items:Validation:FixQuantities'));
         return currentStepIndex;
       }
-      if (conflict) {
+      if (conflict || blockedIncreases.length > 0) {
         return currentStepIndex;
       }
       setQuantityError('');
@@ -511,7 +549,18 @@ export function ItemsStep({
       const isValid = await validatePlan(plan);
       return isValid ? targetStepIndex : currentStepIndex;
     },
-    [rows, conflict, subscriptions, selections, quantities, netNewItems, path, validatePlan, t],
+    [
+      rows,
+      conflict,
+      blockedIncreases,
+      subscriptions,
+      selections,
+      quantities,
+      netNewItems,
+      path,
+      validatePlan,
+      t,
+    ],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
@@ -530,6 +579,7 @@ export function ItemsStep({
         {t('Renewal:Items:Prompt')}
       </InlineNotification>
       {conflict && <ConflictNotice conflict={conflict} />}
+      {!conflict && blockedIncreases.length > 0 && <IncreaseNotice rows={blockedIncreases} />}
       {(quantityError || planError) && (
         <div className="items-step__validation" data-testid="items-step-error">
           <InlineNotification status="error">

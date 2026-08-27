@@ -40,7 +40,7 @@ async def fetch_price_list_items(ctx: APIContext, price_list_id: str) -> list[di
     MPT failures propagate to the caller.
     """
     catalog = ctx.mpt_api_service.client.catalog
-    query = catalog.price_lists.items(price_list_id).filter(_for_sale_query())
+    query = catalog.price_lists.items(price_list_id).filter(_for_sale_query()).select("item.terms")
     entries: list[dict[str, Any]] = []
     async for entry in query.iterate():
         entries.append(entry.to_dict())

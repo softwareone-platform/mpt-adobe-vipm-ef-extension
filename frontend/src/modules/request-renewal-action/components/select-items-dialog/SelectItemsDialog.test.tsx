@@ -144,6 +144,8 @@ function priceListItem(
     status: 'ForSale',
     unitLP: 234,
     unitSP: 234,
+    SPxM: 19.5,
+    SPxY: 234,
     item: {
       id,
       name,
