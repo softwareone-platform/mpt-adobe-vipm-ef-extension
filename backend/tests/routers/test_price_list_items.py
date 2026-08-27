@@ -43,15 +43,20 @@ class FakeListings:
 
 
 class FakePriceListItemsQuery:
-    """Fake price list items query recording the filter and yielding preset entries."""
+    """Fake price list items query recording the filter, select and yielding preset entries."""
 
     def __init__(self, entries=None):
         self.entries = entries or []
         self.error = None
         self.filters = []
+        self.selected = []
 
     def filter(self, rql):  # noqa: WPS125
         self.filters.append(str(rql))
+        return self
+
+    def select(self, *fields):
+        self.selected.extend(fields)
         return self
 
     async def iterate(self, batch_size=100):
@@ -154,6 +159,7 @@ async def test_get_price_list_items_resolves_listing_and_price_list(
     assert fake_listings.get_calls == [_LISTING_ID]
     assert fake_price_lists.items_calls == [_PRICE_LIST_ID]
     assert "eq(status,'ForSale')" in fake_items_query.filters[0]
+    assert fake_items_query.selected == ["item.terms"]
 
 
 async def test_get_price_list_items_rejects_agreement_without_listing(

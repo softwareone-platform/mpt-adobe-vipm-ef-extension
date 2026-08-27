@@ -10,5 +10,9 @@
     align-items: center;
     justify-content: center;
   }
+
+  [class*="grid__table__empty-row"] {
+    display: none;
+  }
 }
 

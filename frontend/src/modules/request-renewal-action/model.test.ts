@@ -1,4 +1,5 @@
 import {
+  appliesToOffer,
   appliesToRenewal,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
@@ -6,6 +7,7 @@ import {
   findDiscountByCode,
   findRenewAndAddConflict,
   getDefaultRenewalQuantity,
+  getDiscountLabel,
   getHeldSkus,
   getRemainingQuantity,
   getRenewalQuantity,
@@ -239,10 +241,13 @@ describe('findRenewAndAddConflict', () => {
     expect(findRenewAndAddConflict([increase, netNew], 'now')).toBeNull();
   });
 
-  it('ignores an unchanged line, the state the guidance asks the customer to return to', () => {
+  it('counts an unchanged line as a renewal, since it still rides the renew-mode order', () => {
     const unchanged = { ...renewalLine, currentQuantity: 37, renewalQuantity: 37 };
 
-    expect(findRenewAndAddConflict([unchanged, netNew], 'now')).toBeNull();
+    expect(findRenewAndAddConflict([unchanged, netNew], 'now')).toEqual({
+      renewals: [unchanged],
+      additions: [netNew],
+    });
   });
 
   it('forbids nothing at the anniversary', () => {
@@ -341,6 +346,49 @@ describe('appliesToRenewal', () => {
 
   it('leaves out a code restricted to other order types', () => {
     expect(appliesToRenewal({ ...discount, applicableOrderTypes: ['NEW'] })).toBe(false);
+  });
+});
+
+describe('appliesToOffer', () => {
+  const discount: Discount = { id: 'DSC-1', code: 'CODE-ONE' };
+
+  it('applies a code with no targets to every line', () => {
+    expect(appliesToOffer(discount, '65322651CA02A12')).toBe(true);
+    expect(appliesToOffer({ ...discount, targetOfferIds: [] }, '65322651CA02A12')).toBe(true);
+  });
+
+  it('applies a targeted code to the offers it lists', () => {
+    const targeted = { ...discount, targetOfferIds: ['65322651CA02A12', '11083117CA01A12'] };
+
+    expect(appliesToOffer(targeted, '11083117CA01A12')).toBe(true);
+    expect(appliesToOffer(targeted, ' 11083117ca01a12 ')).toBe(true);
+  });
+
+  it('reads a target list that arrives as one comma-separated entry', () => {
+    const targeted = { ...discount, targetOfferIds: ['65322651CA02A12,11083117CA01A12'] };
+
+    expect(appliesToOffer(targeted, '11083117CA01A12')).toBe(true);
+    expect(appliesToOffer(targeted, '30001846CB')).toBe(false);
+  });
+
+  it('leaves out a targeted code on another offer', () => {
+    const targeted = { ...discount, targetOfferIds: ['65322651CA02A12'] };
+
+    expect(appliesToOffer(targeted, '11083117CA01A12')).toBe(false);
+    expect(appliesToOffer(targeted, '')).toBe(false);
+  });
+});
+
+describe('getDiscountLabel', () => {
+  it('reads the code alone when it carries no name', () => {
+    expect(getDiscountLabel({ id: 'DSC-1', code: 'CODE-ONE' })).toBe('CODE-ONE');
+    expect(getDiscountLabel({ id: 'DSC-1', code: 'CODE-ONE', name: '  ' })).toBe('CODE-ONE');
+  });
+
+  it('reads the name in brackets after the code', () => {
+    expect(getDiscountLabel({ id: 'DSC-1', code: 'CODE-ONE', name: 'Spring promo' })).toBe(
+      'CODE-ONE (Spring promo)',
+    );
   });
 });
 
