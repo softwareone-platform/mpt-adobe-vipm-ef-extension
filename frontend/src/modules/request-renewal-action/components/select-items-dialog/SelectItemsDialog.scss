@@ -5,24 +5,12 @@
   flex-direction: column;
   gap: $var-spacing-3;
 
-  [class*="grid__table-container"] {
-    table {
-      width: 100% !important;
-    }
+  [class*="grid__table__empty-row"] {
+    display: none;
+  }
 
-    colgroup col {
-      width: 1% !important;
-    }
-
-    colgroup col:first-child {
-      width: 0.6% !important;
-    }
-
-    th,
-    td {
-      min-width: 0 !important;
-      max-width: none !important;
-    }
+  [class*="grid__table__scroll-parent"]::before {
+    display: none;
   }
 
   &__grid {

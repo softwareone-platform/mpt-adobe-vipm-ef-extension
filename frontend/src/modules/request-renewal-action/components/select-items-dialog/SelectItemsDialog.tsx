@@ -67,20 +67,6 @@ interface Row {
   priceListItem: PriceListItem;
 }
 
-/**
- * The per-period breakdown of a yearly-expressed unit selling price for one
- * license. One-time entries never reach this (the picker excludes them).
- */
-function priceBreakdown(unitSP: number | null, period?: string | null): {
-  spxM: number | null;
-  spxY: number | null;
-} {
-  if (unitSP == null) return { spxM: null, spxY: null };
-  if (period === '1m') return { spxM: unitSP, spxY: unitSP * 12 };
-  if (period === '1y') return { spxM: unitSP / 12, spxY: unitSP };
-  return { spxM: null, spxY: null };
-}
-
 function toRows(priceListItems: PriceListItem[], excludedSkus: Set<string>): Row[] {
   const rows: Row[] = [];
   for (const priceListItem of priceListItems) {
@@ -102,7 +88,8 @@ function toRows(priceListItems: PriceListItem[], excludedSkus: Set<string>): Row
       commitment: TERM_COMMITMENT_LABELS[item.terms?.commitment ?? ''] ?? '',
       unitLP: priceListItem.unitLP ?? null,
       unitSP,
-      ...priceBreakdown(unitSP, item.terms?.period),
+      spxM: priceListItem.SPxM ?? null,
+      spxY: priceListItem.SPxY ?? null,
       recommended: priceListItem.recommended === true,
       priceListItem,
     });

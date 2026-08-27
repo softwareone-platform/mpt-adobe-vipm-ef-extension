@@ -5,10 +5,6 @@
   flex-direction: column;
   gap: $var-spacing-3;
 
-  [class*="grid__table-container"] colgroup col:first-child {
-    width: 0.4% !important;
-  }
-
   &__header {
     h2 {
       margin: 0;

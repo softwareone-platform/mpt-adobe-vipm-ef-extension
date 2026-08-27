@@ -34,11 +34,11 @@ import { useRenewalDiscountValidation } from '../../shared/hooks/useRenewalDisco
 import type { Agreement, Discount, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
-import { getDiscountedUnitPrice } from '../../utils/discount';
 import {
+  appliesToOffer,
   appliesToRenewal,
   buildRenewalPlanRequest,
-  findDiscountByCode,
+  getDiscountLabel,
   getRenewalQuantity,
   getRenewalRowIds,
   getSelectedDiscountCodes,
@@ -88,23 +88,11 @@ function totalPrice(unitSP: number | null, quantity: number | null, months: numb
   return unitSP == null || !quantity ? null : (unitSP * quantity) / months;
 }
 
-/** The unit price the line renews at: discounted when its code carries a value. */
-function renewalUnitPrice(
-  unitSP: number | null,
-  code: string,
-  discounts: Discount[],
-): number | null {
-  if (!code || unitSP == null) return unitSP;
-  const discount = findDiscountByCode(code, discounts);
-  return discount ? (getDiscountedUnitPrice(unitSP, discount) ?? unitSP) : unitSP;
-}
-
 function toSubscriptionRows(
   subscriptions: Subscription[],
   selections: RenewalSelections,
   quantities: RenewalQuantities,
   discountSelections: DiscountSelections,
-  discounts: Discount[],
 ): Row[] {
   return subscriptions
     .filter((subscription) => isRenewing(subscription, selections))
@@ -112,7 +100,7 @@ function toSubscriptionRows(
       const line = subscription.lines?.[0];
       const code = discountSelections[subscription.id] ?? '';
       const quantity = getRenewalQuantity(subscription, quantities);
-      const unitSP = renewalUnitPrice(line?.price?.unitSP ?? null, code, discounts);
+      const unitSP = line?.price?.unitSP ?? null;
       return {
         id: subscription.id,
         kind: 'subscription' as const,
@@ -133,14 +121,10 @@ function toSubscriptionRows(
     });
 }
 
-function toNetNewRows(
-  netNewItems: NetNewItem[],
-  discountSelections: DiscountSelections,
-  discounts: Discount[],
-): Row[] {
+function toNetNewRows(netNewItems: NetNewItem[], discountSelections: DiscountSelections): Row[] {
   return netNewItems.map((item) => {
     const code = discountSelections[item.itemId] ?? '';
-    const unitSP = renewalUnitPrice(item.unitSP, code, discounts);
+    const unitSP = item.unitSP;
     return {
       id: item.itemId,
       kind: 'net-new' as const,
@@ -161,16 +145,15 @@ function toNetNewRows(
   });
 }
 
-/** The unit price the row renews at once its code is applied, when the code carries a value. */
-function discountedUnitPrice(row: Row, discounts: Discount[]): number | null {
-  if (!row.code || row.unitSP == null) return null;
-  const discount = findDiscountByCode(row.code, discounts);
-  return discount ? getDiscountedUnitPrice(row.unitSP, discount) : null;
+interface DiscountOption {
+  label: string;
+  value: string;
+  isDisabled?: boolean;
 }
 
 interface CellContext {
   discounts: Discount[];
-  options: { label: string; value: string; isDisabled?: boolean }[];
+  getOptions: (vendorExternalId: string) => DiscountOption[];
   onDiscountChange: (rowId: string, code: string) => void;
 }
 
@@ -179,7 +162,7 @@ interface CellContext {
 // constant and the per-render values reach the cells through this context.
 const CellContext = createContext<CellContext>({
   discounts: [],
-  options: [],
+  getOptions: () => [],
   onDiscountChange: () => {},
 });
 
@@ -189,36 +172,19 @@ interface PriceCellProps {
 }
 
 function PriceCell({ row, price }: PriceCellProps) {
-  const { discounts } = useContext(CellContext);
   if (row.quantity == null) {
     return <TextCell text="—" />;
   }
-  const listPrice = price(row.unitSP, row.quantity);
-  const discountedUnit = discountedUnitPrice(row, discounts);
-  if (discountedUnit == null) {
-    return <TextCell text={listPrice || '—'} />;
-  }
-  return (
-    <GridCellSimple>
-      <div className="promotions-step__price">
-        <RegularText as="p" size={2}>
-          {price(discountedUnit, row.quantity)}
-        </RegularText>
-        <RegularText as="p" size={1} color="grey-4" className="promotions-step__price-struck">
-          {listPrice}
-        </RegularText>
-      </div>
-    </GridCellSimple>
-  );
+  return <TextCell text={price(row.unitSP, row.quantity) || '—'} />;
 }
 
 function DiscountCodeCell({ row }: { row: Row }) {
-  const { options, onDiscountChange } = useContext(CellContext);
+  const { getOptions, onDiscountChange } = useContext(CellContext);
   return (
     <GridCellSimple>
       <Select
         value={row.code}
-        options={options}
+        options={getOptions(row.sku)}
         cssPosition="fixed"
         placeholder={i18n.t('Renewal:Promotions:Select or type code')}
         onChange={(code: string) => onDiscountChange(row.id, code)}
@@ -378,33 +344,34 @@ export function PromotionsStep({
 
   const rows = useMemo(
     () => [
-      ...toSubscriptionRows(
-        subscriptions,
-        selections,
-        quantities,
-        discountSelections,
-        renewalDiscounts,
-      ),
-      ...toNetNewRows(netNewItems, discountSelections, renewalDiscounts),
+      ...toSubscriptionRows(subscriptions, selections, quantities, discountSelections),
+      ...toNetNewRows(netNewItems, discountSelections),
     ],
-    [subscriptions, selections, quantities, netNewItems, discountSelections, renewalDiscounts],
+    [subscriptions, selections, quantities, netNewItems, discountSelections],
   );
 
-  const options = useMemo(
-    () =>
-      renewalDiscounts.map((discount) => ({
-        label: isDiscountAvailable(discount)
-          ? discount.code
-          : t('Renewal:Promotions:Redeemed code', { code: discount.code }),
-        value: normalizeDiscountCode(discount.code),
-        isDisabled: !isDiscountAvailable(discount),
-      })),
-    [renewalDiscounts, t],
-  );
+  const getOptions = useMemo(() => {
+    const byOffer = new Map<string, DiscountOption[]>();
+    return (vendorExternalId: string) => {
+      const cached = byOffer.get(vendorExternalId);
+      if (cached) return cached;
+      const options = renewalDiscounts
+        .filter((discount) => appliesToOffer(discount, vendorExternalId))
+        .map((discount) => ({
+          label: isDiscountAvailable(discount)
+            ? getDiscountLabel(discount)
+            : t('Renewal:Promotions:Redeemed code', { code: getDiscountLabel(discount) }),
+          value: normalizeDiscountCode(discount.code),
+          isDisabled: !isDiscountAvailable(discount),
+        }));
+      byOffer.set(vendorExternalId, options);
+      return options;
+    };
+  }, [renewalDiscounts, t]);
 
   const cellContext = useMemo(
-    () => ({ discounts: renewalDiscounts, options, onDiscountChange }),
-    [renewalDiscounts, options, onDiscountChange],
+    () => ({ discounts: renewalDiscounts, getOptions, onDiscountChange }),
+    [renewalDiscounts, getOptions, onDiscountChange],
   );
 
   // Any discount edit invalidates the previous validation outcome.
