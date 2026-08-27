@@ -5,8 +5,10 @@ import type { Status } from './model';
 export const SCREEN_HEIGHT_FACTOR = 0.8;
 export const SCREEN_WIDTH_FACTOR = 0.87;
 
-export const DISCOUNT_SCREEN_HEIGHT_FACTOR = 0.85;
-export const DISCOUNT_SCREEN_WIDTH_FACTOR = 0.65;
+export const DISCOUNT_MODAL_HEIGHT = 756;
+export const DISCOUNT_MODAL_WIDTH = 1200;
+export const DISCOUNT_SCREEN_WIDTH_FACTOR = 0.9;
+
 export const MAX_MODAL_HEIGHT = 920;
 export const MAX_MODAL_WIDTH = 1760;
 

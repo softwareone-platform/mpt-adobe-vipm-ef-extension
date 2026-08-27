@@ -25,10 +25,6 @@ export interface CreateStepsInput {
  * Kept apart from `DiscountWizard` so the edit flow can supply its own set —
  * its Definition step differs, because `DiscountCodeUpdateRequest` has no
  * `code` field and the code cannot be changed after creation.
- *
- * Each step keeps its primary button disabled until its required fields carry
- * a value, so the last step's action — which the SDK fires unconditionally —
- * can only ever be reached with a discount already created.
  */
 export function createSteps({
   draft,

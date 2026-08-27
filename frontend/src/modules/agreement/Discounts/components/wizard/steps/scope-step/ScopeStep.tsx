@@ -3,11 +3,12 @@ import { Input } from "@softwareone-platform/sdk-react-ui-v0/input";
 import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { OrderTypesDropdown } from "../../components/order-types-dropdown/OrderTypesDropdown";
-import { validateScope } from "../../discountValidation";
+import { validateScopeFields } from "../../discountValidation";
+import { useFieldErrors } from "../../useFieldErrors";
 
 import type { StepNavigationProperties } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ChangeEvent } from "react";
@@ -35,25 +36,25 @@ export function ScopeStep({
 }: ScopeStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
-  const [error, setError] = useState("");
+  const { errors, setErrors, editField } = useFieldErrors(updateDraft);
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
-      const validationError = validateScope(draft);
-      setError(validationError ?? "");
-      return validationError ? currentStepIndex : targetStepIndex;
+      const fieldErrors = validateScopeFields(draft);
+      setErrors(fieldErrors);
+      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
     },
-    [draft],
+    [draft, setErrors],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
   const onOrderTypesChange = useCallback(
-    (applicableOrderTypes: OrderTypeSelection[]) => updateDraft({ applicableOrderTypes }),
-    [updateDraft],
+    (applicableOrderTypes: OrderTypeSelection[]) => editField({ applicableOrderTypes }),
+    [editField],
   );
 
-  const displayedError = error || submitError;
+  const displayedError = errors.applicableOrderTypes || submitError;
 
   return (
     <div className="wizard-step scope-step">
@@ -61,7 +62,7 @@ export function ScopeStep({
         <MediumText as="h3" size={3} className="wizard-step__title">
           {t("Agreement:Discounts:Wizard:Create:Scope:Title")}
         </MediumText>
-        <RegularText as="p" size={2} color="grey-5">
+        <RegularText as="p" size={2} color="grey-4">
           {t("Agreement:Discounts:Wizard:Create:Scope:Description", {
             customerId,
             segment,
@@ -79,32 +80,36 @@ export function ScopeStep({
         <Input
           characterLimit={ITEMS_CHARACTER_LIMIT}
           description={t("Agreement:Discounts:Wizard:Fields:TargetItemsDescription")}
+          errorMessage={errors.targetItems}
           htmlInputType="text"
           label={t("Agreement:Discounts:Wizard:Fields:TargetItems")}
           name="targetItems"
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            updateDraft({ targetItems: event.target.value })
+            editField({ targetItems: event.target.value })
           }
           placeholder={t("Agreement:Discounts:Wizard:Fields:TargetItemsPlaceholder")}
           testId="discount-target-items"
           type="textarea"
           value={draft.targetItems}
+          variant="auto"
         />
 
         <Input
           characterLimit={ITEMS_CHARACTER_LIMIT}
           description={t("Agreement:Discounts:Wizard:Fields:PrerequisiteItemsDescription")}
+          errorMessage={errors.prerequisiteItems}
           htmlInputType="text"
           label={t("Agreement:Discounts:Wizard:Fields:PrerequisiteItems")}
           labelType="optional"
           name="prerequisiteItems"
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            updateDraft({ prerequisiteItems: event.target.value })
+            editField({ prerequisiteItems: event.target.value })
           }
           placeholder={t("Agreement:Discounts:Wizard:Fields:PrerequisiteItemsPlaceholder")}
           testId="discount-prerequisite-items"
           type="textarea"
           value={draft.prerequisiteItems}
+          variant="auto"
         />
 
         <fieldset className="scope-step__terms">

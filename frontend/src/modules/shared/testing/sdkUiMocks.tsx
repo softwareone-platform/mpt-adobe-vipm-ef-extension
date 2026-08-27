@@ -52,25 +52,33 @@ export function createButtonMock() {
 export function createDatePickerMock() {
   return {
     DatePicker: ({
+      errorMessage,
       isDisabled,
       onChange,
       placeholder,
       testId,
       value,
+      variant,
     }: {
+      errorMessage?: string;
       isDisabled?: boolean;
       onChange?: (value: string) => void;
       placeholder?: string;
       testId?: string;
       value?: string;
+      variant?: string;
     }) => (
-      <input
-        data-testid={testId}
-        disabled={isDisabled}
-        onChange={(event) => onChange?.(event.target.value)}
-        placeholder={placeholder}
-        value={value ?? ''}
-      />
+      <>
+        <input
+          aria-invalid={variant === 'error'}
+          data-testid={testId}
+          disabled={isDisabled}
+          onChange={(event) => onChange?.(event.target.value)}
+          placeholder={placeholder}
+          value={value ?? ''}
+        />
+        {errorMessage ? <span data-testid={`${testId}__error`}>{errorMessage}</span> : null}
+      </>
     ),
   };
 }

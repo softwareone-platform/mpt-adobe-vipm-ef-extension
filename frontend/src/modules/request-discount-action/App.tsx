@@ -164,12 +164,18 @@ export default function App() {
   // means the caller bypassed the UI.
   if (settings !== undefined && !canManage) return null;
 
+  const segmentCode =
+    getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '';
+
   const stepInputs = {
     draft,
     updateDraft,
     customerId: adobeCustomer.data?.customerId ?? '',
-    segment:
-      getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '',
+    segment: segmentCode
+      ? t(`Agreement:Discounts:Wizard:Segments:${segmentCode}`, {
+          defaultValue: segmentCode,
+        })
+      : '',
   };
 
   const steps = isEdit

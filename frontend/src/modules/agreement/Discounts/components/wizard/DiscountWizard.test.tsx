@@ -3,8 +3,10 @@ import "@testing-library/jest-dom";
 
 import { DiscountWizard } from "./DiscountWizard";
 import {
-  DISCOUNT_SCREEN_HEIGHT_FACTOR,
+  DISCOUNT_MODAL_HEIGHT,
+  DISCOUNT_MODAL_WIDTH,
   DISCOUNT_SCREEN_WIDTH_FACTOR,
+  SCREEN_HEIGHT_FACTOR,
   SCREEN_WIDTH_FACTOR,
 } from "../../../../shared/constants";
 
@@ -101,23 +103,50 @@ describe("DiscountWizard", () => {
     expect(screen.getByText("edit body")).toBeInTheDocument();
   });
 
-  it("sizes itself from the discount factors, not the wizard ones", () => {
-    setScreen(1000, 1000);
+  function renderAndMeasure(): HTMLElement {
+    renderWizard();
+    return document.querySelector(".discount-wizard") as HTMLElement;
+  }
 
-    const { container } = render(
-      <DiscountWizard
-        title="Add closed discount"
-        steps={STEPS}
-        activeStepIndex={0}
-        onActiveStepIndexChange={jest.fn()}
-        onClose={jest.fn()}
-        onFinish={jest.fn()}
-      />,
+  it("asks for the design size once the screen can fit it", () => {
+    setScreen(1920, 1080);
+
+    const modal = renderAndMeasure();
+
+    expect(modal.style.width).toBe(`${DISCOUNT_MODAL_WIDTH}px`);
+    expect(modal.style.height).toBe(`${DISCOUNT_MODAL_HEIGHT}px`);
+  });
+
+  it("still reaches the design width on a laptop screen", () => {
+    setScreen(1366, 1080);
+
+    const modal = renderAndMeasure();
+
+    expect(modal.style.width).toBe(`${DISCOUNT_MODAL_WIDTH}px`);
+  });
+
+  it("falls back to a share of the screen when the design does not fit", () => {
+    setScreen(1000, 700);
+
+    const modal = renderAndMeasure();
+
+    expect(modal.style.width).toBe(
+      `${Math.round(1000 * DISCOUNT_SCREEN_WIDTH_FACTOR)}px`,
     );
+    expect(modal.style.height).toBe(`${Math.round(700 * SCREEN_HEIGHT_FACTOR)}px`);
+  });
 
-    const modal = container.querySelector(".discount-wizard") as HTMLElement;
-    expect(modal.style.width).toBe(`${Math.round(1000 * DISCOUNT_SCREEN_WIDTH_FACTOR)}px`);
-    expect(modal.style.height).toBe(`${Math.round(1000 * DISCOUNT_SCREEN_HEIGHT_FACTOR)}px`);
+  it("keeps its own factor for the width so the midterm wizard is unaffected", () => {
     expect(DISCOUNT_SCREEN_WIDTH_FACTOR).not.toBe(SCREEN_WIDTH_FACTOR);
+  });
+
+  it("never asks for a larger share of the screen height than the shared factor", () => {
+    setScreen(1000, 700);
+
+    const modal = renderAndMeasure();
+
+    expect(parseInt(modal.style.height, 10)).toBeLessThanOrEqual(
+      Math.round(700 * SCREEN_HEIGHT_FACTOR),
+    );
   });
 });
