@@ -685,8 +685,20 @@ describe('ItemsStep', () => {
     });
 
     const PLAN_SUBSCRIPTIONS = [
-      { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 37 },
-      { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
+      {
+        id: 'SUB-1',
+        offerId: '65322587CA01A12',
+        renew: true,
+        renewalQuantity: 37,
+        flexDiscountCodes: [],
+      },
+      {
+        id: 'SUB-2',
+        offerId: '65322588CA01A12',
+        renew: false,
+        renewalQuantity: 0,
+        flexDiscountCodes: [],
+      },
     ];
 
     it('checks the 3YC floor with the whole plan and does not preview against Adobe, then advances', async () => {
@@ -705,7 +717,7 @@ describe('ItemsStep', () => {
         {
           renewalPath: 'anniversary',
           subscriptions: PLAN_SUBSCRIPTIONS,
-          netNewItems: [{ offerId: '65304578CA', quantity: 5 }],
+          netNewItems: [{ offerId: '65304578CA', quantity: 5, flexDiscountCodes: [] }],
         },
         expect.objectContaining({ signal: expect.anything() }),
       );
@@ -728,10 +740,7 @@ describe('ItemsStep', () => {
       };
       expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
         ['/api/v2/agreements/AGR-1111-1111/renewal-order/3yc-check', plan],
-        [
-          '/api/v2/agreements/AGR-1111-1111/renewal-order/preview',
-          { ...plan, flexDiscountCodes: [] },
-        ],
+        ['/api/v2/agreements/AGR-1111-1111/renewal-order/preview', plan],
       ]);
     });
 

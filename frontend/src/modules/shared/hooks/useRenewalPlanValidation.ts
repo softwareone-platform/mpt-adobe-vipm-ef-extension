@@ -51,7 +51,10 @@ export function useRenewalPlanValidation(
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
         await http.post(`${baseUrl}/3yc-check`, plan, { signal });
         if (quoteThroughAdobe && isRenewalPreviewRequired(plan)) {
-          await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes: [] }, { signal });
+          // The plan is built without discount selections on these steps, so
+          // this quote carries no code; the codes are validated by
+          // useRenewalDiscountValidation once the Promotions step picks them.
+          await http.post(`${baseUrl}/preview`, plan, { signal });
         }
         return true;
       });
