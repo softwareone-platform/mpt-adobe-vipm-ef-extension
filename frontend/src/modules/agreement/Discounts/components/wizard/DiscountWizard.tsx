@@ -9,12 +9,12 @@ import {
 import type { StepProps } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ReactNode } from "react";
 
-import "./DiscountWizard.scss";
 import {
   DISCOUNT_MODAL_HEIGHT,
   DISCOUNT_MODAL_WIDTH,
   DISCOUNT_SCREEN_WIDTH_FACTOR,
 } from "../../../../shared/constants";
+import "./DiscountWizard.scss";
 
 
 /** A wizard step: the SDK's own props plus the body to render for it. */
@@ -38,6 +38,7 @@ export interface DiscountWizardProps {
    * precondition has to be re-checked inside this callback.
    */
   onFinish: () => void;
+  isToDisableSideNavigation?: boolean;
 }
 
 /**
@@ -55,6 +56,7 @@ export function DiscountWizard({
   onActiveStepIndexChange,
   onClose,
   onFinish,
+  isToDisableSideNavigation = true,
 }: DiscountWizardProps) {
   return (
     <div
@@ -83,7 +85,7 @@ export function DiscountWizard({
         onSave={onFinish}
         // The rail is clickable in both directions by default, which would let
         // the user skip past unvalidated steps.
-        isToDisableSideNavigation
+        isToDisableSideNavigation={isToDisableSideNavigation}
       >
         {/* Plain string only: Wizard.Header drops the title styling otherwise.
             No close icon — the design closes from the footer Close button. */}
