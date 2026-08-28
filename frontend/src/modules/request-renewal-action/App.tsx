@@ -40,8 +40,6 @@ import {
   buildRenewalPlanRequest,
   canRenewAtAnniversary,
   getHeldSkus,
-  getRenewalRowIds,
-  getSelectedDiscountCodes,
   isEarlyRenewable,
   type DiscountSelections,
   type NetNewItem,
@@ -148,13 +146,10 @@ export default function App() {
       renewalQuantities,
       netNewItems,
       renewalPath,
+      discountSelections,
     );
     const placed = await submitOrder({
       ...plan,
-      flexDiscountCodes: getSelectedDiscountCodes(
-        discountSelections,
-        getRenewalRowIds(pathSubscriptions, renewalSelections ?? {}, netNewItems),
-      ),
       recommendationTrackerId: recommendations.data?.xRecommendationTrackerId ?? '',
       notes: orderDetails.notes,
       externalIds: { client: orderDetails.externalId },

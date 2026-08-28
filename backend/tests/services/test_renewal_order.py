@@ -32,12 +32,13 @@ def _request(subscriptions=None, net_new_items=None, **extra):
     })
 
 
-def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID):
+def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID, codes=None):
     return {
         "id": subscription_id,
         "offerId": _OFFER_ID,
         "renew": renew,
         "renewalQuantity": quantity,
+        "flexDiscountCodes": [] if codes is None else codes,
     }
 
 
@@ -201,8 +202,7 @@ def orders_service(mocker):
 async def test_create_renewal_change_order_creates_in_processing_status(mocker, orders_service):
     client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
     request = _request(
-        subscriptions=[_selection()],
-        flexDiscountCodes=["BLACK_FRIDAY"],
+        subscriptions=[_selection(codes=["BLACK_FRIDAY"])],
         recommendationTrackerId="TRACKER-1",
     )
     renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")

@@ -106,12 +106,17 @@ def _body(  # noqa: WPS211
     path="anniversary",
 ):
     default_subscriptions = [
-        {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": renew, "renewalQuantity": quantity},
+        {
+            "id": _SUBSCRIPTION_ID,
+            "offerId": _OFFER_ID,
+            "renew": renew,
+            "renewalQuantity": quantity,
+            "flexDiscountCodes": codes or [],
+        },
     ]
     return RenewalOrderRequest.model_validate({
         "subscriptions": default_subscriptions if subscriptions is None else subscriptions,
         "netNewItems": net_new or [],
-        "flexDiscountCodes": codes or [],
         "recommendationTrackerId": tracker_id,
         "notes": notes,
         "externalIds": {"client": client_external_id},
@@ -138,10 +143,10 @@ def _preview_body(*, renew=True, quantity=7, codes=None, net_new=None, path="ann
                 "offerId": _OFFER_ID,
                 "renew": renew,
                 "renewalQuantity": quantity,
+                "flexDiscountCodes": codes or [],
             },
         ],
         "netNewItems": net_new or [],
-        "flexDiscountCodes": codes or [],
         "renewalPath": path,
     })
 
@@ -606,13 +611,17 @@ async def test_create_renewal_order_snapshots_the_net_new_offers_in_the_payload(
     subscription to read it from.
     """
     adobe_call.returns = {"cotermDate": _COTERM_IN_WINDOW}
-    body = _body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}])
+    body = _body(
+        net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5, "flexDiscountCodes": ["CODE-NET-NEW"]}],
+    )
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
     call_args, _ = create_order_mock.await_args
     payload = call_args[3].to_dict()
-    assert payload["netNewItems"] == [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}]
+    assert payload["netNewItems"] == [
+        {"offerId": _NET_NEW_OFFER_ID, "quantity": 5, "flexDiscountCodes": ["CODE-NET-NEW"]},
+    ]
     net_new_sku_mapping.list_full_skus.assert_called_once_with([_NET_NEW_SKU], "COM")
 
 
@@ -1232,7 +1241,6 @@ async def test_preview_renewal_plan_resolves_the_full_offer_id_from_adobe(
         "subscriptions": [
             {"id": _SUBSCRIPTION_ID, "offerId": _SKU, "renew": True, "renewalQuantity": 7},
         ],
-        "flexDiscountCodes": [],
     })
 
     await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)  # act

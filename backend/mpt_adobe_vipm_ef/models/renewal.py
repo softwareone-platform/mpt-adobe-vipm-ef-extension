@@ -40,12 +40,16 @@ class RenewalSubscriptionSelection(BaseSchema):
     ``renew`` maps to the standing ``autoRenewal.enabled`` preference: ON renews
     the subscription at the coterm date, OFF lets it lapse. ``renewalQuantity``
     is the quantity to renew and is only meaningful while renewing.
+    ``flexDiscountCodes`` are the flexible discount codes the customer applied
+    to this subscription's line on the Promotions step — codes are picked per
+    line, so they ride the selection they belong to rather than the plan.
     """
 
     id: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     offer_id: str = Field(alias="offerId", min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     renew: bool
     renewal_quantity: int = Field(default=0, ge=0, alias="renewalQuantity")
+    flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
 
     @model_validator(mode="after")
     def _require_a_renewal_quantity_when_renewing(self) -> Self:
@@ -58,10 +62,15 @@ class RenewalSubscriptionSelection(BaseSchema):
 
 
 class NetNewItemSelection(BaseSchema):
-    """A product the customer does not currently hold, scheduled to activate at the anniversary."""
+    """A product the customer does not currently hold, scheduled to activate at the anniversary.
+
+    ``flexDiscountCodes`` are the flexible discount codes the customer applied
+    to this product's line on the Promotions step.
+    """
 
     offer_id: str = Field(alias="offerId", min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     quantity: int = Field(gt=0)
+    flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
 
 
 class RenewalPlanRequest(BaseSchema):
@@ -107,9 +116,12 @@ class SkuAutoRenewSupportRequest(BaseSchema):
 
 
 class RenewalPreviewRequest(RenewalPlanRequest):
-    """Body schema for the renewal preview (pricing and discount codes) endpoint."""
+    """Body schema for the renewal preview (pricing and discount codes) endpoint.
 
-    flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
+    The flexible discount codes ride each subscription and net-new selection
+    (they are picked per line in the wizard), so the preview body is the plan
+    itself.
+    """
 
 
 class RenewalOrderRequest(RenewalPreviewRequest):
@@ -153,10 +165,15 @@ class RenewalPayloadSubscription(APIBaseModel):
 
 
 class RenewalPayloadNetNewItem(APIBaseModel):
-    """A net-new product to create as an Adobe scheduled subscription at fulfilment."""
+    """A net-new product to create as an Adobe scheduled subscription at fulfilment.
+
+    ``flexDiscountCodes`` are the codes the customer applied to this line in
+    the wizard, carried so fulfilment applies them when it orders the product.
+    """
 
     offer_id: str = Field(alias="offerId")
     quantity: int
+    flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
 
 
 class RenewalPayload(APIBaseModel):

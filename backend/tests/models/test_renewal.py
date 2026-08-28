@@ -13,15 +13,37 @@ def test_renewal_order_request_maps_aliases():
             {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": True, "renewalQuantity": 7},
         ],
         "netNewItems": [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
-        "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
         "recommendationTrackerId": "TRACKER-1",
     })
 
     assert result.subscriptions[0].offer_id == _OFFER_ID
     assert result.subscriptions[0].renewal_quantity == 7
     assert result.net_new_items[0].offer_id == _NET_NEW_OFFER_ID
-    assert result.flex_discount_codes == ["ABCD-XV54-HG34-78YT"]
     assert result.recommendation_tracker_id == "TRACKER-1"
+
+
+def test_renewal_order_request_maps_the_line_discount_codes():
+    result = RenewalOrderRequest.model_validate({
+        "subscriptions": [
+            {
+                "id": _SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": 7,
+                "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
+            },
+        ],
+        "netNewItems": [
+            {
+                "offerId": _NET_NEW_OFFER_ID,
+                "quantity": 5,
+                "flexDiscountCodes": ["EFGH-XV54-HG34-78YT"],
+            },
+        ],
+    })
+
+    assert result.subscriptions[0].flex_discount_codes == ["ABCD-XV54-HG34-78YT"]
+    assert result.net_new_items[0].flex_discount_codes == ["EFGH-XV54-HG34-78YT"]
 
 
 def test_renewal_order_request_defaults_to_an_empty_plan():
@@ -29,8 +51,19 @@ def test_renewal_order_request_defaults_to_an_empty_plan():
 
     assert not result.subscriptions
     assert not result.net_new_items
-    assert not result.flex_discount_codes
     assert not result.recommendation_tracker_id
+
+
+def test_renewal_order_request_defaults_the_line_discount_codes():
+    result = RenewalOrderRequest.model_validate({
+        "subscriptions": [
+            {"id": _SUBSCRIPTION_ID, "offerId": _OFFER_ID, "renew": True, "renewalQuantity": 7},
+        ],
+        "netNewItems": [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
+    })
+
+    assert result.subscriptions[0].flex_discount_codes == []
+    assert result.net_new_items[0].flex_discount_codes == []
 
 
 def test_renewal_order_request_rejects_negative_renewal_quantity():

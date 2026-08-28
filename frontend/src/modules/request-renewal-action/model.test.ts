@@ -11,9 +11,7 @@ import {
   getHeldSkus,
   getRemainingQuantity,
   getRenewalQuantity,
-  getRenewalRowIds,
   getRenewalState,
-  getSelectedDiscountCodes,
   isDiscountAvailable,
   isEarlyRenewable,
   isIncreaseAllowed,
@@ -122,11 +120,55 @@ describe('buildRenewalPlanRequest', () => {
     expect(plan).toEqual({
       renewalPath: 'anniversary',
       subscriptions: [
-        { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 53 },
-        { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
+        {
+          id: 'SUB-1',
+          offerId: '65322587CA01A12',
+          renew: true,
+          renewalQuantity: 53,
+          flexDiscountCodes: [],
+        },
+        {
+          id: 'SUB-2',
+          offerId: '65322588CA01A12',
+          renew: false,
+          renewalQuantity: 0,
+          flexDiscountCodes: [],
+        },
       ],
       netNewItems: [],
     });
+  });
+
+  it('stamps each line with its own discount code', () => {
+    const plan = buildRenewalPlanRequest(
+      subscriptions,
+      {},
+      {},
+      [
+        {
+          itemId: 'ITM-9',
+          itemName: 'Premiere Pro',
+          sku: '65304578CA01A12',
+          unitSP: 234,
+          quantity: 5,
+          recommended: false,
+        },
+      ],
+      'anniversary',
+      { 'SUB-1': ' code-one ', 'ITM-9': 'CODE-NET-NEW' },
+    );
+
+    expect(plan.subscriptions[0].flexDiscountCodes).toEqual(['CODE-ONE']);
+    expect(plan.subscriptions[1].flexDiscountCodes).toEqual([]);
+    expect(plan.netNewItems[0].flexDiscountCodes).toEqual(['CODE-NET-NEW']);
+  });
+
+  it('keeps a code off a lapsing subscription', () => {
+    const plan = buildRenewalPlanRequest(subscriptions, { 'SUB-1': false }, {}, [], 'anniversary', {
+      'SUB-1': 'CODE-ONE',
+    });
+
+    expect(plan.subscriptions[0].flexDiscountCodes).toEqual([]);
   });
 
   it('carries the early-renewal path the customer picked on the first step', () => {
@@ -153,7 +195,9 @@ describe('buildRenewalPlanRequest', () => {
       'anniversary',
     );
 
-    expect(plan.netNewItems).toEqual([{ offerId: '65304578CA01A12', quantity: 5 }]);
+    expect(plan.netNewItems).toEqual([
+      { offerId: '65304578CA01A12', quantity: 5, flexDiscountCodes: [] },
+    ]);
   });
 
   it('skips a subscription without a vendor SKU', () => {
@@ -389,56 +433,6 @@ describe('getDiscountLabel', () => {
     expect(getDiscountLabel({ id: 'DSC-1', code: 'CODE-ONE', name: 'Spring promo' })).toBe(
       'CODE-ONE (Spring promo)',
     );
-  });
-});
-
-describe('getRenewalRowIds', () => {
-  const subscriptions: Subscription[] = [
-    { id: 'SUB-1', autoRenew: true },
-    { id: 'SUB-2', autoRenew: false },
-  ];
-
-  it('carries the renewing subscriptions and the net-new products', () => {
-    expect(
-      getRenewalRowIds(subscriptions, {}, [
-        {
-          itemId: 'ITM-9',
-          itemName: 'Item',
-          sku: 'OFFER-9',
-          unitSP: 10,
-          quantity: 1,
-          recommended: false,
-        },
-      ]),
-    ).toEqual(['SUB-1', 'ITM-9']);
-  });
-});
-
-describe('getSelectedDiscountCodes', () => {
-  it('lists each applied code once, skipping the lines without one', () => {
-    expect(
-      getSelectedDiscountCodes({ 'SUB-1': 'CODE-ONE', 'SUB-2': '', 'ITM-1': 'CODE-ONE' }, [
-        'SUB-1',
-        'SUB-2',
-        'ITM-1',
-      ]),
-    ).toEqual(['CODE-ONE']);
-  });
-
-  it('has nothing to send when no line carries a code', () => {
-    expect(getSelectedDiscountCodes({}, [])).toEqual([]);
-  });
-
-  it('sends one entry for the same code written differently', () => {
-    expect(
-      getSelectedDiscountCodes({ 'SUB-1': ' code-one ', 'SUB-2': 'CODE-ONE' }, ['SUB-1', 'SUB-2']),
-    ).toEqual(['CODE-ONE']);
-  });
-
-  it('drops the code of a line the renewal no longer carries', () => {
-    expect(
-      getSelectedDiscountCodes({ 'SUB-1': 'CODE-ONE', 'SUB-2': 'CODE-TWO' }, ['SUB-1']),
-    ).toEqual(['CODE-ONE']);
   });
 });
 

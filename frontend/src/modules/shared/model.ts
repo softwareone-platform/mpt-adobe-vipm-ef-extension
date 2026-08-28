@@ -354,18 +354,25 @@ export interface Order {
   notes?: string | null;
 }
 
-/** One existing subscription's renewal decision as the renewal endpoints expect it. */
+/**
+ * One existing subscription's renewal decision as the renewal endpoints expect it.
+ *
+ * ``flexDiscountCodes`` are the codes the customer applied to this line on the
+ * Promotions step: codes are picked per line, so each selection carries its own.
+ */
 export interface RenewalPlanSubscriptionSelection {
   id: string;
   offerId: string;
   renew: boolean;
   renewalQuantity: number;
+  flexDiscountCodes?: string[];
 }
 
 /** A net-new product selection as the renewal endpoints expect it. */
 export interface RenewalPlanNetNewItemSelection {
   offerId: string;
   quantity: number;
+  flexDiscountCodes?: string[];
 }
 
 /**
@@ -458,7 +465,6 @@ export function isRenewalPreviewRequired(plan: RenewalPlanBody): boolean {
 
 /** The renewal order body: the plan plus everything only the submission carries. */
 export interface RenewalOrderInput extends RenewalPlanBody {
-  flexDiscountCodes: string[];
   recommendationTrackerId?: string;
   notes?: string;
   externalIds?: { client?: string };

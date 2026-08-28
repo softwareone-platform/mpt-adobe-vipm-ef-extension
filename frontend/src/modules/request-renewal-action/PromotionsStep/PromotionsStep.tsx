@@ -40,8 +40,6 @@ import {
   buildRenewalPlanRequest,
   getDiscountLabel,
   getRenewalQuantity,
-  getRenewalRowIds,
-  getSelectedDiscountCodes,
   isDiscountAvailable,
   isRenewing,
   normalizeDiscountCode,
@@ -387,12 +385,9 @@ export function PromotionsStep({
         quantities,
         netNewItems,
         path,
-      );
-      const flexDiscountCodes = getSelectedDiscountCodes(
         discountSelections,
-        getRenewalRowIds(subscriptions, selections, netNewItems),
       );
-      const isValid = await validateDiscounts(plan, flexDiscountCodes);
+      const isValid = await validateDiscounts(plan);
       return isValid ? targetStepIndex : currentStepIndex;
     },
     [
