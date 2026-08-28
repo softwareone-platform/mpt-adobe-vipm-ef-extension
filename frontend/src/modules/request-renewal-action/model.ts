@@ -293,40 +293,19 @@ export function getDiscountLabel(discount: Discount): string {
 /** The discount code applied to each renewal line, keyed by subscription or item id. */
 export type DiscountSelections = Record<string, string>;
 
-/** The ids of the lines the renewal carries: the renewing subscriptions and the net-new products. */
-export function getRenewalRowIds(
-  subscriptions: Subscription[],
-  selections: RenewalSelections,
-  netNewItems: NetNewItem[],
-): string[] {
-  return [
-    ...subscriptions
-      .filter((subscription) => isRenewing(subscription, selections))
-      .map((subscription) => subscription.id),
-    ...netNewItems.map((item) => item.itemId),
-  ];
-}
-
 /**
- * The codes the renewal carries, as the order's flat ``flexDiscountCodes`` list.
+ * The line's discount codes as its plan selection carries them.
  *
  * A code stays in the wizard state after its line leaves the plan — the
- * customer switched Renew off or removed the net-new product — so only the
- * codes still sitting on a carried line are sent.
+ * customer switched Renew off or removed the net-new product — so codes are
+ * read per carried line, never from the state as a whole.
  */
-export function getSelectedDiscountCodes(
-  selections: DiscountSelections,
-  rowIds: string[],
+function getLineDiscountCodes(
+  discountSelections: DiscountSelections | undefined,
+  rowId: string,
 ): string[] {
-  const carried = new Set(rowIds);
-  return Array.from(
-    new Set(
-      Object.entries(selections)
-        .filter(([rowId]) => carried.has(rowId))
-        .map(([, code]) => normalizeDiscountCode(code))
-        .filter(Boolean),
-    ),
-  );
+  const code = normalizeDiscountCode(discountSelections?.[rowId] ?? '');
+  return code ? [code] : [];
 }
 
 export function findDiscountByCode(code: string, discounts: Discount[]): Discount | undefined {
@@ -343,6 +322,11 @@ export function findDiscountByCode(code: string, discounts: Discount[]): Discoun
  * and is snapshotted on the order for fulfilment. Quantities are expected to
  * have passed the Items step validation; a pending (``null``) quantity is sent
  * as 0, which the backend rejects.
+ *
+ * ``discountSelections`` stamps each line with the code the customer applied
+ * to it on the Promotions step, so a code only ever reaches the line it was
+ * picked for; the steps before Promotions build the plan without it. A
+ * lapsing subscription never carries a code — there is no line to apply it to.
  */
 export function buildRenewalPlanRequest(
   subscriptions: Subscription[],
@@ -350,6 +334,7 @@ export function buildRenewalPlanRequest(
   quantities: RenewalQuantities,
   netNewItems: NetNewItem[],
   renewalPath: RenewalPath,
+  discountSelections?: DiscountSelections,
 ): RenewalPlanBody {
   return {
     renewalPath,
@@ -363,12 +348,14 @@ export function buildRenewalPlanRequest(
           offerId,
           renew,
           renewalQuantity: renew ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0,
+          flexDiscountCodes: renew ? getLineDiscountCodes(discountSelections, subscription.id) : [],
         },
       ];
     }),
     netNewItems: netNewItems.map((item) => ({
       offerId: item.sku,
       quantity: item.quantity ?? 0,
+      flexDiscountCodes: getLineDiscountCodes(discountSelections, item.itemId),
     })),
   };
 }

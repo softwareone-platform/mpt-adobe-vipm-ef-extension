@@ -249,10 +249,10 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
 ) -> APIResponse:
     """Quote the renewal plan through an Adobe ``PREVIEW_RENEWAL`` order.
 
-    The at-anniversary wizard calls this on the discount codes step: the
-    selected flexible discount codes ride on every renewing line, so Adobe
-    validates their eligibility and returns the renewal pricing the wizard
-    shows as the estimate. Net-new products have no Adobe subscription to
+    The at-anniversary wizard calls this on the discount codes step: each
+    renewing line rides the flexible discount codes the customer applied to
+    it, so Adobe validates each code against its own line and returns the
+    renewal pricing the wizard shows as the estimate. Net-new products have no Adobe subscription to
     preview yet on that path and are priced only at fulfilment.
 
     The early-renewal ("Renew now") wizard calls it on every step that shapes
@@ -292,9 +292,7 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
         ctx, agreement_id, plan_subscriptions, body.renewal_path
     )
     net_new_lines = await _resolve_preview_net_new_lines(ctx, agreement, body)
-    line_items = build_preview_renewal_line_items(
-        plan_subscriptions, body.flex_discount_codes, net_new_lines
-    )
+    line_items = build_preview_renewal_line_items(plan_subscriptions, net_new_lines)
     if not line_items:
         if has_renewed_removal(plan_subscriptions):
             # Nothing to quote, but the plan still acts: it takes back a

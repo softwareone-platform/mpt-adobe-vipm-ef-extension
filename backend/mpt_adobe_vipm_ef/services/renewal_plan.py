@@ -228,7 +228,6 @@ async def resolve_net_new_offer_ids(
 
 def build_preview_renewal_line_items(
     plan_subscriptions: list[PlanSubscription],
-    flex_discount_codes: list[str],
     net_new_lines: list[NetNewLine] | None = None,
 ) -> list[Line]:
     """Build the Adobe PREVIEW_RENEWAL line items for the plan.
@@ -238,10 +237,11 @@ def build_preview_renewal_line_items(
     still has to renew, so on the early-renewal path a previous RENEWAL
     order's seats are never quoted (or charged) again; a subscription whose
     delta is zero is already fully covered and drops out of the quote
-    entirely. The selected flexible discount codes ride on every line so Adobe
-    validates their eligibility per line. ``plan.offer_id`` must already carry
-    the full Adobe offer id (resolved from the customer's live subscriptions)
-    or Adobe rejects the line.
+    entirely. Each line rides only its own flexible discount codes — the ones
+    the customer applied to that line in the wizard — so Adobe validates each
+    code's eligibility against the line it was picked for and nothing else.
+    ``plan.offer_id`` must already carry the full Adobe offer id (resolved
+    from the customer's live subscriptions) or Adobe rejects the line.
 
     ``net_new_lines`` are the early-renewal additions, which ride the RENEWAL
     order itself as an offer id with no subscription id — Adobe only sees (and
@@ -253,31 +253,27 @@ def build_preview_renewal_line_items(
         plan for plan in plan_subscriptions if plan.selection.renew and renewal_delta(plan) > 0
     )
     line_items = [
-        _preview_subscription_line(plan, line_number, flex_discount_codes)
+        _preview_subscription_line(plan, line_number)
         for line_number, plan in enumerate(renewing, start=_FIRST_LINE_NUMBER)
     ]
     return line_items + _preview_net_new_lines(
-        net_new_lines or [], len(line_items) + _FIRST_LINE_NUMBER, flex_discount_codes
+        net_new_lines or [], len(line_items) + _FIRST_LINE_NUMBER
     )
 
 
-def _preview_subscription_line(
-    plan: PlanSubscription, line_number: int, flex_discount_codes: list[str]
-) -> Line:
+def _preview_subscription_line(plan: PlanSubscription, line_number: int) -> Line:
     line_item: Line = {
         "extLineItemNumber": line_number,
         "offerId": plan.offer_id,
         "subscriptionId": plan.adobe_subscription_id,
         "quantity": renewal_delta(plan),
     }
-    if flex_discount_codes:
-        line_item["flexDiscountCodes"] = list(flex_discount_codes)
+    if plan.selection.flex_discount_codes:
+        line_item["flexDiscountCodes"] = list(plan.selection.flex_discount_codes)
     return line_item
 
 
-def _preview_net_new_lines(
-    net_new_lines: list[NetNewLine], first_line_number: int, flex_discount_codes: list[str]
-) -> list[Line]:
+def _preview_net_new_lines(net_new_lines: list[NetNewLine], first_line_number: int) -> list[Line]:
     """Build the lines for the products the customer does not hold yet.
 
     Adobe identifies each by offer id alone: there is no subscription to renew,
@@ -289,7 +285,11 @@ def _preview_net_new_lines(
             "extLineItemNumber": line_number,
             "offerId": net_new.offer_id,
             "quantity": net_new.selection.quantity,
-            **({"flexDiscountCodes": list(flex_discount_codes)} if flex_discount_codes else {}),
+            **(
+                {"flexDiscountCodes": list(net_new.selection.flex_discount_codes)}
+                if net_new.selection.flex_discount_codes
+                else {}
+            ),
         }
         for line_number, net_new in enumerate(net_new_lines, start=first_line_number)
     ]
@@ -318,11 +318,13 @@ def build_renewal_payload(
     seats is how the customer takes back an early renewal placed by mistake,
     and that baseline is what tells fulfilment to execute the removal as a
     RETURN order — and how large it is — rather than as a plain lapse.
-    The selected flexible discount codes ride on each renewing entry,
-    matching Adobe's auto-renewal preference object. The net-new products
-    carry their full offer ids (resolved from the Airtable SKU mapping, see
-    ``resolve_net_new_offer_ids``) so fulfilment can create the scheduled
-    subscriptions without re-resolving them.
+    Each renewing entry rides only the flexible discount codes the customer
+    applied to that line, matching Adobe's auto-renewal preference object; a
+    net-new entry carries its own codes the same way, so fulfilment applies
+    each code to the line it was picked for and nothing else. The net-new
+    products carry their full offer ids (resolved from the Airtable SKU
+    mapping, see ``resolve_net_new_offer_ids``) so fulfilment can create the
+    scheduled subscriptions without re-resolving them.
     """
     return RenewalPayload.from_payload({
         "renewalPath": request.renewal_path.value,
@@ -336,7 +338,7 @@ def build_renewal_payload(
                 "renewalQuantity": max(renewal_delta(plan), 0),
                 "renewedQuantity": plan.renewed_quantity,
                 "flexDiscountCodes": (
-                    list(request.flex_discount_codes) if plan.selection.renew else []
+                    list(plan.selection.flex_discount_codes) if plan.selection.renew else []
                 ),
             }
             for plan in plan_subscriptions
@@ -345,6 +347,7 @@ def build_renewal_payload(
             {
                 "offerId": net_new.offer_id,
                 "quantity": net_new.selection.quantity,
+                "flexDiscountCodes": list(net_new.selection.flex_discount_codes),
             }
             for net_new in net_new_lines
         ],

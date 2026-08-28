@@ -28,21 +28,21 @@ _CURRENT_QUANTITY = 10
 _MARKET_SEGMENT = "COM"
 
 
-def _request(subscriptions=None, net_new_items=None, codes=None, **extra):  # noqa: WPS432
+def _request(subscriptions=None, net_new_items=None, **extra):  # noqa: WPS432
     return RenewalOrderRequest.model_validate({
         "subscriptions": [] if subscriptions is None else subscriptions,
         "netNewItems": [] if net_new_items is None else net_new_items,
-        "flexDiscountCodes": [] if codes is None else codes,
         **extra,
     })
 
 
-def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID):  # noqa: WPS432
+def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID, codes=None):  # noqa: WPS432
     return {
         "id": subscription_id,
         "offerId": _OFFER_ID,
         "renew": renew,
         "renewalQuantity": quantity,
+        "flexDiscountCodes": [] if codes is None else codes,
     }
 
 
@@ -94,9 +94,9 @@ def test_require_renewal_selections_accepts_a_net_new_only_plan():
 
 
 def test_build_preview_renewal_line_items_carries_the_selection_and_codes():
-    request = _request(subscriptions=[_selection()], codes=["ABCD-XV54-HG34-78YT"])
+    request = _request(subscriptions=[_selection(codes=["ABCD-XV54-HG34-78YT"])])
 
-    result = build_preview_renewal_line_items(_plan(request), request.flex_discount_codes)
+    result = build_preview_renewal_line_items(_plan(request))
 
     assert result == [
         {
@@ -109,10 +109,25 @@ def test_build_preview_renewal_line_items_carries_the_selection_and_codes():
     ]
 
 
+def test_build_preview_renewal_line_items_scopes_each_code_to_its_own_line():
+    """A code picked for one line must never ride the other lines of the quote."""
+    request = _request(
+        subscriptions=[
+            _selection(codes=["CODE-FIRST"]),
+            _selection(subscription_id="SUB-9999-0001", codes=["CODE-SECOND"]),
+        ],
+    )
+
+    result = build_preview_renewal_line_items(_plan(request))
+
+    assert result[0]["flexDiscountCodes"] == ["CODE-FIRST"]
+    assert result[1]["flexDiscountCodes"] == ["CODE-SECOND"]
+
+
 def test_build_preview_renewal_line_items_omits_codes_when_none_selected():
     request = _request(subscriptions=[_selection()])
 
-    result = build_preview_renewal_line_items(_plan(request), request.flex_discount_codes)
+    result = build_preview_renewal_line_items(_plan(request))
 
     assert "flexDiscountCodes" not in result[0]
 
@@ -120,7 +135,7 @@ def test_build_preview_renewal_line_items_omits_codes_when_none_selected():
 def test_build_preview_renewal_line_items_skips_lapsing_subscriptions():
     request = _request(subscriptions=[_selection(renew=False, quantity=0)])
 
-    result = build_preview_renewal_line_items(_plan(request), request.flex_discount_codes)
+    result = build_preview_renewal_line_items(_plan(request))
 
     assert result == []
 
@@ -133,8 +148,13 @@ def test_build_preview_renewal_line_items_carries_the_early_renewal_additions():
     """
     request = _request(
         subscriptions=[_selection()],
-        net_new_items=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
-        codes=["ABCD-XV54-HG34-78YT"],
+        net_new_items=[
+            {
+                "offerId": _NET_NEW_SKU,
+                "quantity": 5,
+                "flexDiscountCodes": ["ABCD-XV54-HG34-78YT"],
+            },
+        ],
         renewalPath="now",
     )
     net_new_lines = [
@@ -145,10 +165,9 @@ def test_build_preview_renewal_line_items_carries_the_early_renewal_additions():
         ),
     ]
 
-    result = build_preview_renewal_line_items(
-        _plan(request), request.flex_discount_codes, net_new_lines
-    )
+    result = build_preview_renewal_line_items(_plan(request), net_new_lines)
 
+    assert "flexDiscountCodes" not in result[0]
     assert result[1] == {
         "extLineItemNumber": 2,
         "offerId": _NET_NEW_OFFER_ID,
@@ -171,9 +190,7 @@ def test_build_preview_renewal_line_items_numbers_an_add_only_basket_from_one():
         ),
     ]
 
-    result = build_preview_renewal_line_items(
-        _plan(request), request.flex_discount_codes, net_new_lines
-    )
+    result = build_preview_renewal_line_items(_plan(request), net_new_lines)
 
     assert result == [
         {"extLineItemNumber": 1, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
@@ -184,9 +201,7 @@ def test_build_preview_renewal_line_items_quotes_only_the_remaining_delta():
     """A previous early renewal's seats are already priced and must not be quoted again."""
     request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
 
-    result = build_preview_renewal_line_items(
-        _plan(request, renewed_quantity=4), request.flex_discount_codes
-    )
+    result = build_preview_renewal_line_items(_plan(request, renewed_quantity=4))
 
     assert result == [
         {
@@ -202,9 +217,7 @@ def test_build_preview_renewal_line_items_drops_an_already_covered_subscription(
     """A zero delta has nothing left to renew, so the line leaves the quote entirely."""
     request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
 
-    result = build_preview_renewal_line_items(
-        _plan(request, renewed_quantity=_CURRENT_QUANTITY), request.flex_discount_codes
-    )
+    result = build_preview_renewal_line_items(_plan(request, renewed_quantity=_CURRENT_QUANTITY))
 
     assert result == []
 
@@ -212,11 +225,12 @@ def test_build_preview_renewal_line_items_drops_an_already_covered_subscription(
 def test_build_renewal_payload_snapshots_the_whole_plan():
     request = _request(
         subscriptions=[
-            _selection(),
+            _selection(codes=["BLACK_FRIDAY"]),
             _selection(renew=False, quantity=0, subscription_id="SUB-9999-0001"),
         ],
-        net_new_items=[{"offerId": _NET_NEW_SKU, "quantity": 5}],
-        codes=["BLACK_FRIDAY", "CYBER_MONDAY"],
+        net_new_items=[
+            {"offerId": _NET_NEW_SKU, "quantity": 5, "flexDiscountCodes": ["CYBER_MONDAY"]},
+        ],
         recommendationTrackerId="TRACKER-1",
     )
     net_new_lines = [
@@ -240,7 +254,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "renew": True,
                 "renewalQuantity": 7,
                 "renewedQuantity": 0,
-                "flexDiscountCodes": ["BLACK_FRIDAY", "CYBER_MONDAY"],
+                "flexDiscountCodes": ["BLACK_FRIDAY"],
             },
             {
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
@@ -251,14 +265,19 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "flexDiscountCodes": [],
             },
         ],
-        "netNewItems": [{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
+        "netNewItems": [
+            {
+                "offerId": _NET_NEW_OFFER_ID,
+                "quantity": 5,
+                "flexDiscountCodes": ["CYBER_MONDAY"],
+            },
+        ],
     }
 
 
 def test_build_renewal_payload_keeps_codes_off_lapsing_subscriptions():
     request = _request(
-        subscriptions=[_selection(renew=False, quantity=0)],
-        codes=["BLACK_FRIDAY"],
+        subscriptions=[_selection(renew=False, quantity=0, codes=["BLACK_FRIDAY"])],
     )
 
     result = build_renewal_payload(_plan(request), [], request, "USD")

@@ -11,25 +11,26 @@ import { useGuardedRequest } from './useGuardedRequest';
  * Promotions step, on the early-renewal path only.
  *
  * Runs the same Adobe ``PREVIEW_RENEWAL`` quote as the Items step gate
- * (``useRenewalPlanValidation``), this time with the customer's chosen
- * flexible discount codes attached to every line, so a code Adobe rejects —
- * unknown, expired, already redeemed or ineligible for the offer — fails in
- * the wizard instead of on a placed order. Early renewal orders now, so the
- * rejection has to happen now; at the anniversary the equivalent rejection
- * surfaces on the order details page at fulfilment and no preview runs here.
+ * (``useRenewalPlanValidation``), this time over a plan whose lines carry the
+ * flexible discount codes the customer applied to each of them, so a code
+ * Adobe rejects — unknown, expired, already redeemed or ineligible for the
+ * offer — fails in the wizard instead of on a placed order. Early renewal
+ * orders now, so the rejection has to happen now; at the anniversary the
+ * equivalent rejection surfaces on the order details page at fulfilment and
+ * no preview runs here.
  */
 export function useRenewalDiscountValidation(agreementId: string) {
   const { run, cancel, reset, ...state } = useGuardedRequest('Errors:RenewalDiscountValidation');
 
   const validateDiscounts = useCallback(
-    async (plan: RenewalPlanBody, flexDiscountCodes: string[]): Promise<boolean> => {
+    async (plan: RenewalPlanBody): Promise<boolean> => {
       if (!isRenewalPreviewRequired(plan)) {
         return true;
       }
 
       return run(async (signal) => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
-        await http.post(`${baseUrl}/preview`, { ...plan, flexDiscountCodes }, { signal });
+        await http.post(`${baseUrl}/preview`, plan, { signal });
         return true;
       });
     },

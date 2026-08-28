@@ -69,10 +69,7 @@ describe('useRenewalPlanValidation', () => {
     expect(isValid).toBe(true);
     expect(mockPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
       ['/api/v2/agreements/AGR-1234-5678/renewal-order/3yc-check', EARLY_PLAN],
-      [
-        '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
-        { ...EARLY_PLAN, flexDiscountCodes: [] },
-      ],
+      ['/api/v2/agreements/AGR-1234-5678/renewal-order/preview', EARLY_PLAN],
     ]);
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
