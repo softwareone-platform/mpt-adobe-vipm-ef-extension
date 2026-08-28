@@ -1,12 +1,12 @@
 import { Checkbox } from "@softwareone-platform/sdk-react-ui-v0/checkbox";
 import { DatePicker } from "@softwareone-platform/sdk-react-ui-v0/date-picker";
-import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
-import { validateValidity } from "../../discountValidation";
+import { validateValidityFields } from "../../discountValidation";
+import { useFieldErrors } from "../../useFieldErrors";
 
 import type { StepNavigationProperties } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ChangeEvent } from "react";
@@ -30,15 +30,15 @@ export function ValidityStep({
 }: ValidityStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
-  const [error, setError] = useState("");
+  const { errors, setErrors, editField } = useFieldErrors(updateDraft);
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
-      const validationError = validateValidity(draft);
-      setError(validationError ?? "");
-      return validationError ? currentStepIndex : targetStepIndex;
+      const fieldErrors = validateValidityFields(draft);
+      setErrors(fieldErrors);
+      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
     },
-    [draft],
+    [draft, setErrors],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
@@ -49,19 +49,13 @@ export function ValidityStep({
         <MediumText as="h3" size={3} className="wizard-step__title">
           {t("Agreement:Discounts:Wizard:Create:Validity:Title")}
         </MediumText>
-        <RegularText as="p" size={2} color="grey-5">
+        <RegularText as="p" size={2} color="grey-4">
           {t("Agreement:Discounts:Wizard:Create:Validity:Description", {
             customerId,
             segment,
           })}
         </RegularText>
       </header>
-
-      {error && (
-        <InlineNotification status="error">
-          {error}
-        </InlineNotification>
-      )}
 
       <div className="wizard-step__fields">
         <fieldset className="validity-step__period">
@@ -70,21 +64,25 @@ export function ValidityStep({
           </legend>
           <div className="validity-step__period-inputs">
             <DatePicker<string>
+              errorMessage={errors.startDate}
               name="startDate"
-              onChange={(startDate: string) => updateDraft({ startDate })}
+              onChange={(startDate: string) => editField({ startDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               testId="discount-start-date"
               value={draft.startDate}
+              variant={errors.startDate ? "error" : "default"}
             />
             <DatePicker<string>
+              errorMessage={errors.endDate}
               // Chaining the bounds makes the ordering rules hard to break in
               // the UI; validateValidity stays the authority.
               minDate={draft.startDate || undefined}
               name="endDate"
-              onChange={(endDate: string) => updateDraft({ endDate })}
+              onChange={(endDate: string) => editField({ endDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               testId="discount-end-date"
               value={draft.endDate}
+              variant={errors.endDate ? "error" : "default"}
             />
           </div>
         </fieldset>
@@ -99,7 +97,7 @@ export function ValidityStep({
               label={t("Agreement:Discounts:Wizard:Fields:ReusableYes")}
               name="reusable"
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                updateDraft({ reusable: event.target.checked })
+                editField({ reusable: event.target.checked })
               }
               testId="discount-reusable"
             />
@@ -110,14 +108,16 @@ export function ValidityStep({
               {t("Agreement:Discounts:Wizard:Fields:DiscountLockEndDate")}
             </RegularText>
             <DatePicker<string>
+              errorMessage={errors.discountLockEndDate}
               // Kept mounted but inert when the code is single-use, so the row
               // does not reflow. Any value left here is dropped on serialization.
               isDisabled={!draft.reusable}
               minDate={draft.endDate || undefined}
               name="discountLockEndDate"
-              onChange={(discountLockEndDate: string) => updateDraft({ discountLockEndDate })}
+              onChange={(discountLockEndDate: string) => editField({ discountLockEndDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               testId="discount-lock-end-date"
+              variant={errors.discountLockEndDate ? "error" : "default"}
               value={draft.discountLockEndDate}
             />
           </div>

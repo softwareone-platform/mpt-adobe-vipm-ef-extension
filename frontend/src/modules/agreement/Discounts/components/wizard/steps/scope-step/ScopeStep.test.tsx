@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 
 import { ANY_ORDER_TYPE, EMPTY_DRAFT } from "../../discountDraft";
 import { ScopeStep } from "./ScopeStep";
@@ -194,6 +194,35 @@ describe("ScopeStep", () => {
       { targetItems: "30001846-CB" },
       "Adobe part numbers without spaces",
     ],
+  ])("blocks navigation on %s, under the field", async (_label, overrides, message) => {
+    renderStep(overrides);
+
+    const target = await runNext();
+
+    expect(target).toBe(NAVIGATION.currentStepIndex);
+    expect(
+      await within(screen.getByTestId("discount-target-items")).findByText(
+        new RegExp(message, "u"),
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("validation-error")).not.toBeInTheDocument();
+  });
+
+  it("keeps a malformed prerequisite off the target field", async () => {
+    const message = "Items must be Adobe part numbers without spaces: bad id.";
+    renderStep({ prerequisiteItems: "30013112CB, bad id" });
+
+    await runNext();
+
+    expect(
+      await within(screen.getByTestId("discount-prerequisite-items")).findByText(message),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("discount-target-items")).queryByText(message),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
     [
       "no order type",
       { applicableOrderTypes: [] },
@@ -204,7 +233,7 @@ describe("ScopeStep", () => {
       { category: "INTRO" as const, applicableOrderTypes: ["RENEWAL" as const] },
       "Intro discounts apply to Add seats orders only.",
     ],
-  ])("blocks navigation on %s", async (_label, overrides, message) => {
+  ])("blocks navigation on %s, in the banner", async (_label, overrides, message) => {
     renderStep(overrides);
 
     const target = await runNext();

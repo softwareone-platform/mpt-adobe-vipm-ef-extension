@@ -64,11 +64,11 @@ const mockGet = jest.mocked(http.get);
 const mockPost = jest.mocked(http.post);
 const mockUseMPTContext = jest.mocked(useMPTContext);
 
-function mockBackend() {
+function mockBackend(segment = "COM") {
   mockGet.mockImplementation((url: string) => {
     if (url === "/api/v2/settings") {
       return Promise.resolve({
-        data: { data: { products: [{ id: PRODUCT_ID, segment: "COM" }] } },
+        data: { data: { products: [{ id: PRODUCT_ID, segment }] } },
       });
     }
     return Promise.resolve({ data: { data: { customerId: "1005847693" } } });
@@ -144,7 +144,17 @@ describe("request-discount-action App", () => {
     await renderApp();
 
     expect(
-      screen.getByText(/customer, 1005847693, and segment, COM/u),
+      screen.getByText(/customer, 1005847693, and segment, Commercial/u),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the raw code for a segment with no display name", async () => {
+    mockBackend("XYZ");
+
+    await renderApp();
+
+    expect(
+      screen.getByText(/customer, 1005847693, and segment, XYZ/u),
     ).toBeInTheDocument();
   });
 

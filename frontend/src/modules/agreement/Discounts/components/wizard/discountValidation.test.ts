@@ -118,7 +118,7 @@ describe("validateValidity", () => {
   ])("rejects a non-exact calendar date for %s", (_label, value) => {
     const result = validateValidity(periodWith({ startDate: value, endDate: "2026-08-31" }));
 
-    expect(result).toBe("The dates must be real calendar dates.");
+    expect(result).toBe("Enter a real calendar date.");
   });
 
   it.each([
@@ -151,7 +151,7 @@ describe("validateValidity", () => {
   ])("rejects %s", (_label, overrides) => {
     const result = validateValidity(periodWith(overrides));
 
-    expect(result).toBe("The dates must be real calendar dates.");
+    expect(result).toBe("Enter a real calendar date.");
   });
 
   it("rejects an impossible lock date", () => {
@@ -159,7 +159,7 @@ describe("validateValidity", () => {
       periodWith({ reusable: true, discountLockEndDate: "2026-11-31" }),
     );
 
-    expect(result).toBe("The dates must be real calendar dates.");
+    expect(result).toBe("Enter a real calendar date.");
   });
 
   it("requires a lock date once the code is reusable", () => {
