@@ -1,13 +1,13 @@
 import { Input } from "@softwareone-platform/sdk-react-ui-v0/input";
-import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { Select } from "@softwareone-platform/sdk-react-ui-v0/select";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { i18n } from "../../../../../../../i18n/translations";
-import { MAX_TEXT_LENGTH, validateDefinition } from "../../discountValidation";
+import { MAX_TEXT_LENGTH, validateDefinitionFields } from "../../discountValidation";
+import { useFieldErrors } from "../../useFieldErrors";
 
 import type { StepNavigationProperties } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import type { ChangeEvent } from "react";
@@ -54,17 +54,17 @@ export function DefinitionStep({
 }: DefinitionStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
-  const [error, setError] = useState("");
+  const { errors, setErrors, editField } = useFieldErrors(updateDraft);
 
   // Validation runs on Next rather than on change: returning currentStepIndex
   // keeps the wizard on this step, targetStepIndex lets it advance.
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
-      const validationError = validateDefinition(draft);
-      setError(validationError ?? "");
-      return validationError ? currentStepIndex : targetStepIndex;
+      const fieldErrors = validateDefinitionFields(draft);
+      setErrors(fieldErrors);
+      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
     },
-    [draft],
+    [draft, setErrors],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
@@ -75,7 +75,7 @@ export function DefinitionStep({
         <MediumText as="h3" size={3} className="wizard-step__title">
           {t("Agreement:Discounts:Wizard:Create:Definition:Title")}
         </MediumText>
-        <RegularText as="p" size={2} color="grey-5">
+        <RegularText as="p" size={2} color="grey-4">
           {t("Agreement:Discounts:Wizard:Create:Definition:Description", {
             customerId,
             segment,
@@ -83,35 +83,35 @@ export function DefinitionStep({
         </RegularText>
       </header>
 
-      {error && (
-        <InlineNotification status="error">
-          {error}
-        </InlineNotification>
-      )}
-
       <div className="wizard-step__fields">
         <Input
           characterLimit={MAX_TEXT_LENGTH}
+          className="wizard-step__field--inline-hint"
+          errorMessage={errors.code}
           label={t("Agreement:Discounts:Wizard:Fields:Code")}
           name="code"
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            updateDraft({ code: event.target.value })
+            editField({ code: event.target.value })
           }
           placeholder={t("Agreement:Discounts:Wizard:Fields:CodePlaceholder")}
           testId="discount-code"
           value={draft.code}
+          variant="auto"
         />
 
         <Input
           characterLimit={MAX_TEXT_LENGTH}
+          className="wizard-step__field--inline-hint"
+          errorMessage={errors.name}
           label={t("Agreement:Discounts:Wizard:Fields:Name")}
           name="name"
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
-            updateDraft({ name: event.target.value })
+            editField({ name: event.target.value })
           }
           placeholder={t("Agreement:Discounts:Wizard:Fields:NamePlaceholder")}
           testId="discount-name"
           value={draft.name}
+          variant="auto"
         />
 
         <Input
@@ -130,8 +130,9 @@ export function DefinitionStep({
 
         <Select
           controlLabel={t("Agreement:Discounts:Wizard:Fields:Category")}
+          errorMessage={errors.category}
           name="category"
-          onChange={(value: string) => updateDraft({ category: value as DiscountCategory })}
+          onChange={(value: string) => editField({ category: value as DiscountCategory })}
           options={CATEGORY_OPTIONS}
           placeholder={t("Agreement:Discounts:Wizard:Fields:CategoryPlaceholder")}
           testId="discount-category"
@@ -142,8 +143,9 @@ export function DefinitionStep({
           <Select
             className="definition-step__discount-type"
             controlLabel={t("Agreement:Discounts:Wizard:Fields:DiscountType")}
+            errorMessage={errors.discountType}
             name="discountType"
-            onChange={(value: string) => updateDraft({ discountType: value as DiscountType })}
+            onChange={(value: string) => editField({ discountType: value as DiscountType })}
             options={DISCOUNT_TYPE_OPTIONS}
             testId="discount-type"
             value={draft.discountType}
@@ -151,17 +153,20 @@ export function DefinitionStep({
 
           <Input
             className="definition-step__value"
+            errorMessage={errors.value}
             htmlInputType="number"
             label={t("Agreement:Discounts:Wizard:Fields:Value")}
             min="0"
             name="value"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
-              updateDraft({ value: event.target.value })
+              editField({ value: event.target.value })
             }
             placeholder={t("Agreement:Discounts:Wizard:Fields:ValuePlaceholder")}
             rightContent={draft.discountType === "PERCENTAGE" ? "%" : draft.currency}
             testId="discount-value"
+            type="right-label"
             value={draft.value}
+            variant="auto"
           />
 
           {draft.discountType === "PERCENTAGE" && (

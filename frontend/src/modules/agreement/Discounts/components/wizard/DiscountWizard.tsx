@@ -11,18 +11,11 @@ import type { ReactNode } from "react";
 
 import "./DiscountWizard.scss";
 import {
-  DISCOUNT_SCREEN_HEIGHT_FACTOR,
+  DISCOUNT_MODAL_HEIGHT,
+  DISCOUNT_MODAL_WIDTH,
   DISCOUNT_SCREEN_WIDTH_FACTOR,
 } from "../../../../shared/constants";
 
-/**
- * Use the full available screen (up to the Figma design size of 756×1200).
- *
- * Previous factors (0.8 / 0.75) left unused space on large screens and clipped
- * content on small ones. Using the default factors from `window.ts`
- * (`MAX_MODAL_HEIGHT / 1000` and `MAX_MODAL_WIDTH / 1600`) already caps at the
- * Figma maximums while scaling proportionally on smaller screens.
- */
 
 /** A wizard step: the SDK's own props plus the body to render for it. */
 export interface DiscountWizardStep extends StepProps {
@@ -67,9 +60,11 @@ export function DiscountWizard({
     <div
       className="discount-wizard"
       style={{
-        height: relativeScreenHeight(DISCOUNT_SCREEN_HEIGHT_FACTOR),
-        width: relativeScreenWidth(DISCOUNT_SCREEN_WIDTH_FACTOR),
-        maxHeight: "100vh",
+        height: Math.min(relativeScreenHeight(), DISCOUNT_MODAL_HEIGHT),
+        width: Math.min(
+          relativeScreenWidth(DISCOUNT_SCREEN_WIDTH_FACTOR),
+          DISCOUNT_MODAL_WIDTH,
+        ),
       }}
     >
       <Wizard

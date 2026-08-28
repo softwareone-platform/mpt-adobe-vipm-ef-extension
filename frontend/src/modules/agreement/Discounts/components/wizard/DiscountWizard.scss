@@ -3,12 +3,6 @@
 .discount-wizard {
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 1200px !important;
-  min-height: 0;
-  margin: 0 auto;
-  overflow: hidden;
 
   [class*="wizard__step__index"] {
     height: 32px;

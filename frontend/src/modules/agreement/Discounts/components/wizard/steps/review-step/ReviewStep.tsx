@@ -46,7 +46,7 @@ export function ReviewStep({
         <MediumText as="h3" size={3} className="wizard-step__title">
           {t("Agreement:Discounts:Wizard:Create:Review:Title")}
         </MediumText>
-        <RegularText as="p" size={2} color="grey-5">
+        <RegularText as="p" size={2} color="grey-4">
           {t("Agreement:Discounts:Wizard:Create:Review:Description", {
             customerId,
             segment,
