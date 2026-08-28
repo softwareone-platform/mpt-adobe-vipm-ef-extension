@@ -13,6 +13,7 @@ import {
 } from '../agreement/Discounts/components/wizard/discountDraft';
 import { validateReview } from '../agreement/Discounts/components/wizard/discountValidation';
 import { editSteps } from '../agreement/Discounts/components/wizard/editSteps';
+import { Loader } from '../shared/components/Loader/Loader';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useCreateDiscountRequest } from '../shared/hooks/useCreateDiscountRequest';
@@ -166,6 +167,13 @@ export default function App() {
 
   const segmentCode =
     getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '';
+  if (isEdit && !isSeeded) {
+    return (
+      <div className="loader">
+        <Loader />
+      </div>
+    );
+  }
 
   const stepInputs = {
     draft,
@@ -205,6 +213,7 @@ export default function App() {
       onActiveStepIndexChange={setActiveStepIndex}
       onClose={onClose}
       onFinish={onFinish}
+      isToDisableSideNavigation={!isEdit}
     />
   );
 }

@@ -293,7 +293,7 @@ export function Discounts() {
     [open, context, onWizardClose],
   );
 
-  const onDiscountAction = useCallback(
+  const onEditDiscountAction = useCallback(
     (action: string, item: Discount) => {
       if (action === "edit") {
         onEditDiscount(item);
@@ -314,13 +314,13 @@ export function Discounts() {
           <GridCellActions
             item={item}
             actions={DISCOUNT_ACTIONS}
-            onAction={onDiscountAction}
+            onAction={onEditDiscountAction}
             testId={`discounts-action-${item.id}`}
           />
         ),
       } as GridColumnDefinition<Discount>,
     ],
-    [accountType, onDiscountAction],
+    [accountType, onEditDiscountAction],
   );
 
   const isLoading = discounts.status === 'idle' || discounts.status === 'loading';
