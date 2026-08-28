@@ -16,7 +16,13 @@ const mockPost = jest.mocked(http.post);
 const PLAN: RenewalPlanBody = {
   renewalPath: 'now',
   subscriptions: [
-    { id: 'SUB-1', offerId: '65322587CA01A12', renew: true, renewalQuantity: 53 },
+    {
+      id: 'SUB-1',
+      offerId: '65322587CA01A12',
+      renew: true,
+      renewalQuantity: 53,
+      flexDiscountCodes: ['CODE-ONE'],
+    },
     { id: 'SUB-2', offerId: '65322588CA01A12', renew: false, renewalQuantity: 0 },
   ],
   netNewItems: [],
@@ -34,20 +40,20 @@ describe('useRenewalDiscountValidation', () => {
     expect(result.current.error).toBe('');
   });
 
-  it('previews the early-renewal plan with the selected discount codes', async () => {
+  it('previews the early-renewal plan with each line carrying its own codes', async () => {
     mockPost.mockResolvedValue({ data: { data: {} } });
 
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 
     let isValid: boolean | undefined;
     await act(async () => {
-      isValid = await result.current.validateDiscounts(PLAN, ['CODE-ONE']);
+      isValid = await result.current.validateDiscounts(PLAN);
     });
 
     expect(isValid).toBe(true);
     expect(mockPost).toHaveBeenCalledWith(
       '/api/v2/agreements/AGR-1234-5678/renewal-order/preview',
-      { ...PLAN, flexDiscountCodes: ['CODE-ONE'] },
+      PLAN,
       expect.objectContaining({ signal: expect.anything() }),
     );
     await waitFor(() => expect(result.current.status).toBe('success'));
@@ -58,10 +64,7 @@ describe('useRenewalDiscountValidation', () => {
 
     let isValid: boolean | undefined;
     await act(async () => {
-      isValid = await result.current.validateDiscounts(
-        { ...PLAN, renewalPath: 'anniversary' },
-        ['CODE-ONE'],
-      );
+      isValid = await result.current.validateDiscounts({ ...PLAN, renewalPath: 'anniversary' });
     });
 
     expect(isValid).toBe(true);
@@ -74,16 +77,13 @@ describe('useRenewalDiscountValidation', () => {
 
     let isValid: boolean | undefined;
     await act(async () => {
-      isValid = await result.current.validateDiscounts(
-        {
-          renewalPath: 'now',
-          subscriptions: [
-            { id: 'SUB-1', offerId: '65322587CA01A12', renew: false, renewalQuantity: 0 },
-          ],
-          netNewItems: [],
-        },
-        ['CODE-ONE'],
-      );
+      isValid = await result.current.validateDiscounts({
+        renewalPath: 'now',
+        subscriptions: [
+          { id: 'SUB-1', offerId: '65322587CA01A12', renew: false, renewalQuantity: 0 },
+        ],
+        netNewItems: [],
+      });
     });
 
     expect(isValid).toBe(true);
@@ -96,14 +96,11 @@ describe('useRenewalDiscountValidation', () => {
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 
     await act(async () => {
-      await result.current.validateDiscounts(
-        {
-          renewalPath: 'now',
-          subscriptions: [],
-          netNewItems: [{ offerId: '65304578CA01A12', quantity: 5 }],
-        },
-        [],
-      );
+      await result.current.validateDiscounts({
+        renewalPath: 'now',
+        subscriptions: [],
+        netNewItems: [{ offerId: '65304578CA01A12', quantity: 5 }],
+      });
     });
 
     expect(mockPost).toHaveBeenCalledTimes(1);
@@ -118,7 +115,7 @@ describe('useRenewalDiscountValidation', () => {
 
     let isValid: boolean | undefined;
     await act(async () => {
-      isValid = await result.current.validateDiscounts(PLAN, ['BAD-CODE']);
+      isValid = await result.current.validateDiscounts(PLAN);
     });
 
     expect(isValid).toBe(false);
@@ -132,7 +129,7 @@ describe('useRenewalDiscountValidation', () => {
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 
     await act(async () => {
-      await result.current.validateDiscounts(PLAN, ['CODE-ONE']);
+      await result.current.validateDiscounts(PLAN);
     });
 
     await waitFor(() =>
@@ -152,13 +149,13 @@ describe('useRenewalDiscountValidation', () => {
 
     let first!: Promise<boolean>;
     act(() => {
-      first = result.current.validateDiscounts(PLAN, ['CODE-ONE']);
+      first = result.current.validateDiscounts(PLAN);
     });
     await waitFor(() => expect(result.current.status).toBe('loading'));
 
     let second: boolean | undefined;
     await act(async () => {
-      second = await result.current.validateDiscounts(PLAN, ['CODE-ONE']);
+      second = await result.current.validateDiscounts(PLAN);
     });
     expect(second).toBe(false);
 
@@ -175,7 +172,7 @@ describe('useRenewalDiscountValidation', () => {
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 
     await act(async () => {
-      await result.current.validateDiscounts(PLAN, ['CODE-ONE']);
+      await result.current.validateDiscounts(PLAN);
     });
     await waitFor(() => expect(result.current.status).toBe('error'));
 

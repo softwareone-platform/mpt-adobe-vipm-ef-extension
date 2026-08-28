@@ -442,11 +442,22 @@ describe('PromotionsStep', () => {
         {
           renewalPath: 'now',
           subscriptions: [
-            { id: 'SUB-1', offerId: 'OFFER-1', renew: true, renewalQuantity: 10 },
-            { id: 'SUB-2', offerId: 'OFFER-2', renew: false, renewalQuantity: 0 },
+            {
+              id: 'SUB-1',
+              offerId: 'OFFER-1',
+              renew: true,
+              renewalQuantity: 10,
+              flexDiscountCodes: ['CODE-ONE'],
+            },
+            {
+              id: 'SUB-2',
+              offerId: 'OFFER-2',
+              renew: false,
+              renewalQuantity: 0,
+              flexDiscountCodes: [],
+            },
           ],
-          netNewItems: [{ offerId: 'OFFER-3', quantity: 2 }],
-          flexDiscountCodes: ['CODE-ONE'],
+          netNewItems: [{ offerId: 'OFFER-3', quantity: 2, flexDiscountCodes: [] }],
         },
         expect.objectContaining({ signal: expect.anything() }),
       );

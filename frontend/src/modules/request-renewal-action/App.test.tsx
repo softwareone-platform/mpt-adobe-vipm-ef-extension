@@ -574,11 +574,22 @@ describe('request-renewal-action App', () => {
     expect(mockPost).toHaveBeenCalledWith('/api/v2/agreements/AGR-1/renewal-order', {
       renewalPath: 'anniversary',
       subscriptions: [
-        { id: 'SUB-1', offerId: '65322587CA', renew: true, renewalQuantity: 37 },
-        { id: 'SUB-2', offerId: '65322588CA', renew: false, renewalQuantity: 0 },
+        {
+          id: 'SUB-1',
+          offerId: '65322587CA',
+          renew: true,
+          renewalQuantity: 37,
+          flexDiscountCodes: [],
+        },
+        {
+          id: 'SUB-2',
+          offerId: '65322588CA',
+          renew: false,
+          renewalQuantity: 0,
+          flexDiscountCodes: [],
+        },
       ],
       netNewItems: [],
-      flexDiscountCodes: [],
       recommendationTrackerId: 'TRACKER-1',
       notes: '',
       externalIds: { client: '' },
