@@ -116,3 +116,11 @@
 [class*='inline-notification-card__not-standalone'] {
   box-sizing: border-box;
 }
+
+form[class*='wizard'] {
+  margin-bottom: 0;
+}
+
+#root {
+  padding-bottom: 0;
+}
