@@ -1,18 +1,9 @@
 @use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
 
-/* The portal grows the modal to fit the plug, so the box the plug states is the
-   modal size. Fill the viewport the portal gives us instead of guessing one
-   from window.screen, and cap it: past this the wizard only gains white space,
-   and on an ultrawide or a very tall display it would otherwise span the lot. */
 .request-midterm-upgrade__wizard {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-  /* Floors, so a host that sizes itself from this box cannot collapse it. */
-  min-height: 560px;
-  min-width: 960px;
 
   [class*="wizard__step__index"] {
     height: 32px;
