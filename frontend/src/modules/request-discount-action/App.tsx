@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,6 @@ import {
 } from '../agreement/Discounts/components/wizard/discountDraft';
 import { validateReview } from '../agreement/Discounts/components/wizard/discountValidation';
 import { editSteps } from '../agreement/Discounts/components/wizard/editSteps';
-import { Loader } from '../shared/components/Loader/Loader';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useCreateDiscountRequest } from '../shared/hooks/useCreateDiscountRequest';
@@ -133,32 +132,40 @@ export default function App() {
     [close, submittedDiscount, isEdit],
   );
 
+  // Every edit step's Save runs this, so it has to be re-entrant: the SDK also
+  // fires the wizard's `onSave` on the last step, which would otherwise PATCH a
+  // second time. Always returns -1 so the wizard stays on the current step.
+  const isSaving = useRef(false);
+  const onEditSave = useCallback(async () => {
+    if (isSaving.current) {
+      return -1;
+    }
+    const invalid = validateReview(draft);
+    setValidationError(invalid ?? '');
+    if (invalid) {
+      return -1;
+    }
+    isSaving.current = true;
+    const discount = await existingDiscount.update(toUpdatePayload(draft));
+    if (!discount) {
+      isSaving.current = false;
+      return -1;
+    }
+    setSubmittedDiscount(discount);
+    close({ updated: discount });
+    return -1;
+  }, [close, draft, existingDiscount]);
+
   // Next button fires `onSave` (this callback) directly — `registerOnNextCallback` is bypassed
-  // by the SDK — and the PATCH must be re-run here. In create mode the Review
-  // step already submitted, so this only closes with the earlier outcome.
+  // by the SDK. In create mode the Review step already submitted, so this only
+  // closes with the earlier outcome.
   const onFinish = useCallback(async () => {
-    if (isEdit && !submittedDiscount) {
-      const invalid = validateReview(draft);
-      setValidationError(invalid ?? '');
-      if (invalid) {
-        return;
-      }
-      const discount = await existingDiscount.update(toUpdatePayload(draft));
-      if (!discount) {
-        return;
-      }
-      setSubmittedDiscount(discount);
-      close({ updated: discount });
+    if (isEdit) {
+      await onEditSave();
       return;
     }
-    close(
-      submittedDiscount
-        ? isEdit
-          ? { updated: submittedDiscount }
-          : { created: submittedDiscount }
-        : undefined,
-    );
-  }, [close, submittedDiscount, isEdit, draft, existingDiscount]);
+    close(submittedDiscount ? { created: submittedDiscount } : undefined);
+  }, [close, submittedDiscount, isEdit, onEditSave]);
 
   // The modal renders nothing rather than a denial notice: the button that
   // opens it is already hidden from client accounts, so reaching this branch
@@ -167,12 +174,10 @@ export default function App() {
 
   const segmentCode =
     getProduct(settings?.products, agreementProductId ?? '')?.segment ?? '';
+  // Nothing is drawn while the edit wizard seeds: a spinner here only flashes
+  // an animation over the modal for the moment the fetch takes.
   if (isEdit && !isSeeded) {
-    return (
-      <div className="loader">
-        <Loader />
-      </div>
-    );
+    return null;
   }
 
   const stepInputs = {
@@ -189,6 +194,7 @@ export default function App() {
   const steps = isEdit
     ? editSteps({
         ...stepInputs,
+        onSave: onEditSave,
         submitError: validationError || fieldErrors.code || error,
         isSubmitting: status === 'loading',
       })

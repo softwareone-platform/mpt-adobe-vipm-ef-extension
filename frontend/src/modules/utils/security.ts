@@ -86,3 +86,15 @@ export function canManageDiscountCodes(
 ): boolean {
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
+
+export function canEditDiscountCode(
+  source: string | null | undefined,
+  accountType: AccountType | undefined,
+  products: ProductSegment[] | undefined,
+  agreementProductId: string | undefined,
+): boolean {
+  return (
+    canManageDiscountCodes(accountType, products, agreementProductId) &&
+    (accountType === 'Vendor' || source?.toUpperCase() === 'CLOSED')
+  );
+}

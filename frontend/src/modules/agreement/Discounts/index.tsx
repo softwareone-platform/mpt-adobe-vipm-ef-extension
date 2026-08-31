@@ -19,6 +19,7 @@ import { useAgreementId } from '../../shared/hooks/useAgreementId';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useSettings } from "../../shared/hooks/useSettings";
 import {
+  canEditDiscountCode,
   canManageDiscountCodes,
 } from '../../utils/security';
 
@@ -253,21 +254,29 @@ export function Discounts() {
   const discounts = useAllDiscounts(agreementId);
   const fields = useGridFields(accountType);
 
-  const canAddClosedDiscount = canManageDiscountCodes(
-    context.auth?.account?.type,
-    settings?.products,
-    context.data?.agreement?.product?.id,
+  const agreementProductId = context.data?.agreement?.product?.id;
+  const products = settings?.products;
+  const canAddClosedDiscount = canManageDiscountCodes(accountType, products, agreementProductId);
+
+  const canEditDiscount = useCallback(
+    (item: Discount) =>
+      canEditDiscountCode(item.source, accountType, products, agreementProductId),
+    [accountType, products, agreementProductId],
   );
 
   // The wizard calls `close({ created }|{ updated })` on submit and
   // `close(undefined)` on cancel/click-outside; only refresh on the former.
+  // Depend on `refresh`, not the whole hook result: that object is rebuilt on
+  // every render, and it reaches `columns` and the grid config from here, so
+  // the grid re-renders in a loop that never lets the page settle.
+  const refreshDiscounts = discounts.refresh;
   const onWizardClose = useCallback(
     (payload?: { created?: Discount; updated?: Discount }) => {
       if (payload?.created || payload?.updated) {
-        discounts.refresh();
+        refreshDiscounts();
       }
     },
-    [discounts],
+    [refreshDiscounts],
   );
 
   const onAddClosedDiscount = useCallback(() => {
@@ -310,17 +319,20 @@ export function Discounts() {
         title: i18n.t("Agreement:Discounts:Actions"),
         fields: ["id"],
         initialWidth: 80,
-        cell: (item: Discount) => (
-          <GridCellActions
-            item={item}
-            actions={DISCOUNT_ACTIONS}
-            onAction={onEditDiscountAction}
-            testId={`discounts-action-${item.id}`}
-          />
-        ),
+        cell: (item: Discount) =>
+          canEditDiscount(item) ? (
+            <GridCellActions
+              item={item}
+              actions={DISCOUNT_ACTIONS}
+              onAction={onEditDiscountAction}
+              testId={`discounts-action-${item.id}`}
+            />
+          ) : (
+            <GridCellSimple />
+          ),
       } as GridColumnDefinition<Discount>,
     ],
-    [accountType, onEditDiscountAction],
+    [canEditDiscount, onEditDiscountAction],
   );
 
   const isLoading = discounts.status === 'idle' || discounts.status === 'loading';

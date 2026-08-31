@@ -184,6 +184,24 @@ describe('Discounts view', () => {
     expect(screen.getByText('2026-02-01 - 2026-10-29')).toBeInTheDocument();
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
+    // The default actor is Operations, which curates only the closed row.
+    expect(screen.getAllByText('Edit')).toHaveLength(1);
+  });
+
+  it('offers operations no action on open codes', async () => {
+    mockBackend(DISCOUNTS.filter((discount) => discount.source === 'Open'));
+
+    await renderDiscounts();
+
+    expect(screen.getByText('DISCOUNT-CODE-1')).toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+  });
+
+  it('offers vendors an action on open codes as well as closed ones', async () => {
+    mockAccount('Vendor');
+
+    await renderDiscounts();
+
     expect(screen.getAllByText('Edit')).toHaveLength(2);
   });
 
