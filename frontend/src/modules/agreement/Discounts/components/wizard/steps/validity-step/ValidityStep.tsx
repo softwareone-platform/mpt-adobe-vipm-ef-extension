@@ -20,6 +20,8 @@ export interface ValidityStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /** Edit mode only: saves and closes instead of advancing. */
+  onSave?: () => Promise<number>;
 }
 
 export function ValidityStep({
@@ -27,6 +29,7 @@ export function ValidityStep({
   updateDraft,
   customerId,
   segment,
+  onSave,
 }: ValidityStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
@@ -36,9 +39,12 @@ export function ValidityStep({
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
       const fieldErrors = validateValidityFields(draft);
       setErrors(fieldErrors);
-      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
+      if (Object.keys(fieldErrors).length > 0) {
+        return currentStepIndex;
+      }
+      return onSave ? onSave() : targetStepIndex;
     },
-    [draft, setErrors],
+    [draft, setErrors, onSave],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);

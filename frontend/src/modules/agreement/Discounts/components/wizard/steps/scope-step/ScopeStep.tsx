@@ -25,6 +25,8 @@ export interface ScopeStepProps {
   customerId: string;
   segment: string;
   submitError?: string;
+  /** Edit mode only: saves and closes instead of advancing. */
+  onSave?: () => Promise<number>;
 }
 
 export function ScopeStep({
@@ -33,6 +35,7 @@ export function ScopeStep({
   customerId,
   segment,
   submitError = "",
+  onSave,
 }: ScopeStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
@@ -42,9 +45,12 @@ export function ScopeStep({
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
       const fieldErrors = validateScopeFields(draft);
       setErrors(fieldErrors);
-      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
+      if (Object.keys(fieldErrors).length > 0) {
+        return currentStepIndex;
+      }
+      return onSave ? onSave() : targetStepIndex;
     },
-    [draft, setErrors],
+    [draft, setErrors, onSave],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);

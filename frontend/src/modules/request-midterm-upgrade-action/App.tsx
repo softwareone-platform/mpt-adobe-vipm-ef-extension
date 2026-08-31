@@ -20,7 +20,7 @@ import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { Loader } from '../shared/components/Loader/Loader';
-import { scrollStepToTop } from '../utils/window';
+import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from '../utils/window';
 import { ProgressModal } from '../shared/components/ProgressModal/ProgressModal';
 import { getPortalOrigin } from '../utils/link';
 import { getMonthlyPrice, getYearlyPrice } from '../utils/price';
@@ -38,14 +38,7 @@ import type {
 
 import './App.scss';
 import { AdobeOfferSwitchPath, AgreementSplitAllocation, getRecommendedOfferIds } from '../shared/model';
-import {
-  MAX_MODAL_HEIGHT,
-  MAX_MODAL_WIDTH,
-  TERM_COMMITMENT_LABELS,
-  TERM_PERIOD_LABELS,
-} from '../shared/constants';
-
-const WIZARD_BOX = { maxHeight: MAX_MODAL_HEIGHT, maxWidth: MAX_MODAL_WIDTH };
+import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../shared/constants';
 
 const initialOrder: Order = {
   id: null,
@@ -94,6 +87,7 @@ export default function App() {
     status: submitStatus,
     cancel: cancelSubmit,
   } = useUpgradeOrderRequest(subscription?.agreement?.id ?? '', subscriptionId);
+  const wizardBox = { height: relativeScreenHeight(), width: relativeScreenWidth() };
 
   // Quantity edits rebuild the rows, so read the selected row fresh from the list.
   const currentSelectedTarget = selectedTarget
@@ -250,7 +244,7 @@ export default function App() {
 
   if (status === 'error' || (status === 'success' && !subscription)) {
     return (
-      <div className="request-midterm-upgrade__wizard" style={WIZARD_BOX}>
+      <div className="request-midterm-upgrade__wizard" style={wizardBox}>
         <InlineNotification status="error">
           {error || t('MidtermUpgrade:Errors:Subscription could not be loaded')}
         </InlineNotification>
@@ -263,7 +257,7 @@ export default function App() {
 
   if (settingsStatus === 'error') {
     return (
-      <div className="request-midterm-upgrade__wizard" style={WIZARD_BOX}>
+      <div className="request-midterm-upgrade__wizard" style={wizardBox}>
         <InlineNotification status="error">
           {t('MidtermUpgrade:Errors:Settings could not be loaded')}
         </InlineNotification>
@@ -276,7 +270,7 @@ export default function App() {
 
   if (!subscription || settingsStatus === 'loading') {
     return (
-      <div className="request-midterm-upgrade__wizard" style={WIZARD_BOX}>
+      <div className="request-midterm-upgrade__wizard" style={wizardBox}>
         <Loader />
       </div>
     );
@@ -284,7 +278,7 @@ export default function App() {
 
   if (!canRequestMidtermUpgradeAction(accountType, settings?.products, subscription.product?.id)) {
     return (
-      <div className="request-midterm-upgrade__wizard" style={WIZARD_BOX}>
+      <div className="request-midterm-upgrade__wizard" style={wizardBox}>
         <AccountRestrictedNotice
           title={t('MidtermUpgrade:Restricted:Title')}
           message={t('MidtermUpgrade:Restricted:Message')}
@@ -356,7 +350,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="request-midterm-upgrade__wizard" style={WIZARD_BOX}>
+      <div className="request-midterm-upgrade__wizard" style={wizardBox}>
         <Wizard
           stepsProps={wizardSteps.map((step) => ({ title: step.title, nextButton: step.nextButton }))}
           activeStepIndex={activeStepIndex}
