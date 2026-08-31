@@ -44,6 +44,18 @@ export interface DefinitionStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /**
+   * Edit mode only: saves and closes instead of advancing. It has to run from
+   * here rather than the step's `nextButton.onAction`, which the SDK ignores
+   * whenever a step has registered its own next callback.
+   */
+  onSave?: () => Promise<number>;
+  /**
+   * The code identifies the row and the API refuses to change it on update.
+   * Disabled rather than read-only: only the disabled state carries the design
+   * system's grey, so a read-only field looks editable.
+   */
+  isCodeLocked?: boolean;
 }
 
 export function DefinitionStep({
@@ -51,6 +63,8 @@ export function DefinitionStep({
   updateDraft,
   customerId,
   segment,
+  onSave,
+  isCodeLocked = false,
 }: DefinitionStepProps) {
   const { t } = useTranslation();
   const { registerOnNextCallback } = useStepActions();
@@ -62,9 +76,12 @@ export function DefinitionStep({
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
       const fieldErrors = validateDefinitionFields(draft);
       setErrors(fieldErrors);
-      return Object.keys(fieldErrors).length > 0 ? currentStepIndex : targetStepIndex;
+      if (Object.keys(fieldErrors).length > 0) {
+        return currentStepIndex;
+      }
+      return onSave ? onSave() : targetStepIndex;
     },
-    [draft, setErrors],
+    [draft, setErrors, onSave],
   );
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
@@ -97,6 +114,7 @@ export function DefinitionStep({
           testId="discount-code"
           value={draft.code}
           variant="auto"
+          isDisabled={isCodeLocked}
         />
 
         <Input

@@ -22,7 +22,7 @@ jest.mock(
 jest.mock(
   "@mpt-extension/sdk",
   () => ({
-    http: { get: jest.fn(), post: jest.fn() },
+    http: { get: jest.fn(), post: jest.fn(), put: jest.fn() },
   }),
   { virtual: true },
 );
@@ -62,6 +62,7 @@ jest.mock("../agreement/Discounts/components/wizard/DiscountWizard", () => ({
 const PRODUCT_ID = "PRD-1111-1111";
 const mockGet = jest.mocked(http.get);
 const mockPost = jest.mocked(http.post);
+const mockPut = jest.mocked(http.put);
 const mockUseMPTContext = jest.mocked(useMPTContext);
 
 function mockBackend(segment = "COM") {
@@ -298,6 +299,47 @@ describe("request-discount-action App (edit mode)", () => {
     );
     expect(screen.getByTestId("wizard-steps")).not.toHaveTextContent("Review");
     expect(screen.getByTestId("wizard-steps")).not.toHaveTextContent("Summary");
+  });
+
+  it("saves and closes from the first step instead of advancing", async () => {
+    // Part numbers are alphanumeric, so the shared fixture's "ITEM-001" would
+    // fail scope validation before the PATCH is reached.
+    const valid = {
+      ...SAMPLE_DISCOUNT,
+      targetOfferIds: ["65322651CA02A12"],
+      qualifyingOfferIds: ["65322651CA02A12"],
+    };
+    mockEditBackend(valid);
+    mockPut.mockResolvedValue({ data: { data: valid } });
+    await renderApp();
+    await waitFor(() => expect(codeInput()).toHaveValue(SAMPLE_DISCOUNT.code));
+
+    let target: number | undefined;
+    await act(async () => {
+      target = (await capturedProps!.steps[0].nextButton!.onAction!({
+        currentStepIndex: 0,
+        targetStepIndex: 1,
+        steps: [],
+      })) as number;
+    });
+
+    expect(mockPut).toHaveBeenCalledWith(
+      "/api/v2/discount-codes/DSC-0001",
+      expect.any(Object),
+      expect.any(Object),
+    );
+    // -1 keeps the wizard where it is rather than stepping to Validity.
+    expect(target).toBe(-1);
+    expect(mockClose).toHaveBeenCalledWith(
+      expect.objectContaining({ updated: expect.any(Object) }),
+    );
+  });
+
+  it("locks the code, which the API refuses to change on update", async () => {
+    await renderApp();
+
+    await waitFor(() => expect(codeInput()).toHaveValue(SAMPLE_DISCOUNT.code));
+    expect(codeInput()).toBeDisabled();
   });
 
   it("prefills the definition inputs with the fetched discount", async () => {

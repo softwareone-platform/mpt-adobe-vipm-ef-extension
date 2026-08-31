@@ -14,11 +14,16 @@ export interface EditStepsInput {
   segment: string;
   submitError: string;
   isSubmitting: boolean;
+  /** Saves the draft and closes. Returns -1 so the wizard stays where it is. */
+  onSave: () => Promise<number>;
 }
 
 /**
  * Build the steps for the edit-discount wizard.
  *
+ * Every step's primary button saves and closes. The SDK only calls the
+ * wizard's `onSave` on the last step, so without `onAction` here the button
+ * would read "Save" and behave like "Next" on the first two.
  */
 export function editSteps({
   draft,
@@ -27,12 +32,20 @@ export function editSteps({
   segment,
   submitError,
   isSubmitting,
+  onSave,
 }: EditStepsInput): DiscountWizardStep[] {
+  const saveButton = {
+    onAction: onSave,
+    isBusy: isSubmitting,
+    isDisabled: isSubmitting,
+  };
+
   return [
     {
       title: i18n.t("Agreement:Discounts:Wizard:Edit:Steps:Definition"),
       nextButton: {
         label: i18n.t("Agreement:Discounts:Wizard:Edit:Definition:Submit"),
+        ...saveButton,
       },
       backButton: { isHidden: true },
       render: () => (
@@ -41,6 +54,8 @@ export function editSteps({
           updateDraft={updateDraft}
           customerId={customerId}
           segment={segment}
+          onSave={onSave}
+          isCodeLocked
         />
       ),
     },
@@ -48,6 +63,7 @@ export function editSteps({
       title: i18n.t("Agreement:Discounts:Wizard:Edit:Steps:Validity"),
       nextButton: {
         label: i18n.t("Agreement:Discounts:Wizard:Edit:Validity:Submit"),
+        ...saveButton,
       },
       backButton: { isHidden: true },
       render: () => (
@@ -56,6 +72,7 @@ export function editSteps({
           updateDraft={updateDraft}
           customerId={customerId}
           segment={segment}
+          onSave={onSave}
         />
       ),
     },
@@ -63,8 +80,7 @@ export function editSteps({
       title: i18n.t("Agreement:Discounts:Wizard:Edit:Steps:Scope"),
       nextButton: {
         label: i18n.t("Agreement:Discounts:Wizard:Edit:Scope:Submit"),
-        isBusy: isSubmitting,
-        isDisabled: isSubmitting,
+        ...saveButton,
       },
       backButton: { isHidden: true },
       render: () => (
@@ -74,6 +90,7 @@ export function editSteps({
           customerId={customerId}
           segment={segment}
           submitError={submitError}
+          onSave={onSave}
         />
       ),
     },
