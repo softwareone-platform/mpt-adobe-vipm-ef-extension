@@ -11,7 +11,7 @@ import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
 import { Loader } from '../shared/components/Loader/Loader';
 import { ProgressModal } from '../shared/components/ProgressModal/ProgressModal';
-import { COTERM_DATE_PARAM } from '../shared/constants';
+import { COTERM_DATE_PARAM, MAX_MODAL_HEIGHT, MAX_MODAL_WIDTH } from '../shared/constants';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscriptions';
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
@@ -27,7 +27,7 @@ import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
 import { canRequestRenewalAction } from '../utils/security';
 import { getPartialSku } from '../utils/sku';
-import { relativeScreenHeight, relativeScreenWidth, scrollStepToTop } from '../utils/window';
+import { scrollStepToTop } from '../utils/window';
 import { DetailsStep } from './DetailsStep';
 import { ItemsStep } from './ItemsStep';
 import { PromotionsStep } from './PromotionsStep';
@@ -50,6 +50,8 @@ import {
 } from './model';
 
 import './App.scss';
+
+const WIZARD_BOX = { maxHeight: MAX_MODAL_HEIGHT, maxWidth: MAX_MODAL_WIDTH };
 
 export default function App() {
   const { t } = useTranslation();
@@ -80,8 +82,6 @@ export default function App() {
     submitOrder,
     cancel: cancelSubmit,
   } = useRenewalOrderRequest(agreementId);
-  const wizardHeight = relativeScreenHeight();
-  const wizardWidth = relativeScreenWidth();
 
   // Adobe recommends against the customer's whole estate; the tracker id on
   // the response is replayed when the renewal order is submitted.
@@ -206,7 +206,7 @@ export default function App() {
 
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {error || t('Renewal:Errors:Agreement could not be loaded')}
         </InlineNotification>
@@ -219,7 +219,7 @@ export default function App() {
 
   if (settingsStatus === 'error') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {t('Renewal:Errors:Settings could not be loaded')}
         </InlineNotification>
@@ -232,7 +232,7 @@ export default function App() {
 
   if (!agreement || settingsStatus === 'loading') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <Loader />
       </div>
     );
@@ -240,7 +240,7 @@ export default function App() {
 
   if (!canRequestRenewalAction(accountType, settings?.products, agreement.product?.id)) {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <AccountRestrictedNotice
           title={t('Renewal:Restricted:Title')}
           message={t('Renewal:Restricted:Message')}
@@ -251,7 +251,7 @@ export default function App() {
 
   if (subscriptions.status === 'error') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {subscriptions.error || t('Renewal:Errors:Subscriptions could not be loaded')}
         </InlineNotification>
@@ -266,7 +266,7 @@ export default function App() {
 
   if (!isEarlyPath && autoRenewSupport.status === 'error') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {autoRenewSupport.error || t('Errors:LoadAutoRenewSupport')}
         </InlineNotification>
@@ -279,7 +279,7 @@ export default function App() {
 
   if (isEarlyPath && renewalState.status === 'error') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {renewalState.error || t('Errors:LoadRenewalState')}
         </InlineNotification>
@@ -292,7 +292,7 @@ export default function App() {
 
   if (pathState.status === 'error') {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <InlineNotification status="error">
           {pathState.error || t('Errors:LoadRenewalPathState')}
         </InlineNotification>
@@ -315,7 +315,7 @@ export default function App() {
     pathState.status !== 'success'
   ) {
     return (
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <Loader />
       </div>
     );
@@ -419,7 +419,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="request-renewal__wizard" style={{ height: wizardHeight, width: wizardWidth }}>
+      <div className="request-renewal__wizard" style={WIZARD_BOX}>
         <Wizard
           stepsProps={wizardSteps.map((step) => ({
             title: step.title,

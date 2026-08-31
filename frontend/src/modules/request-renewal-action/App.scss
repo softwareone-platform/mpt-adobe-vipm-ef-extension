@@ -1,8 +1,13 @@
 @use "@softwareone-platform/sdk-react-ui-v0/design-tokens" as *;
 
 .request-renewal__wizard {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  min-height: 560px;
+  min-width: 960px;
 
   [class*="wizard__step__index"] {
     height: 32px;
