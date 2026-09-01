@@ -23,6 +23,8 @@ export function SplitBillingStep({
   addBuyerToOrder,
   selectedBuyer: selectedBuyerFromParent,
   onChange,
+  option,
+  onOptionChange,
 }: {
   subscription: Subscription;
   split: AgreementSplit | null;
@@ -31,11 +33,18 @@ export function SplitBillingStep({
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: AgreementSplitAllocation | null;
   onChange: (buyer: AgreementSplitAllocation) => void;
+  option: SplitBillingOptionValue | null;
+  onOptionChange: (option: SplitBillingOptionValue | null) => void;
 }) {
   const { t } = useTranslation();
-  const { registerOnNextCallback } = useStepActions();
+  const { registerOnNextCallback, registerOnBackCallback } = useStepActions();
 
-  const [option, setOption] = useState<SplitBillingOptionValue | null>(null);
+  // The option list and the allocation/buyer view are two phases of this one
+  // step: ``selectedOption`` is what the radio shows, ``option`` is the choice
+  // Next has confirmed, and only the latter switches the view. The confirmed
+  // choice lives in the parent, so it survives the step being unmounted while
+  // the wizard shows a later step.
+  const [selectedOption, setSelectedOption] = useState<SplitBillingOptionValue | null>(option);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(
     selectedBuyerFromParent
   );
@@ -48,11 +57,16 @@ export function SplitBillingStep({
 
   const onNext = useCallback(
     async ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
-      const buyerId = option === 'buyer' ? selectedBuyer?.buyer?.id : undefined;
       if (option === null) {
-        setError(t('MidtermUpgrade:SplitBilling:Validation:SelectOption'));
+        if (selectedOption === null) {
+          setError(t('MidtermUpgrade:SplitBilling:Validation:SelectOption'));
+          return currentStepIndex;
+        }
+        onOptionChange(selectedOption);
+        setError('');
         return currentStepIndex;
       }
+      const buyerId = option === 'buyer' ? selectedBuyer?.buyer?.id : undefined;
       if (option === 'buyer' && !buyerId) {
         setError(t('MidtermUpgrade:SplitBilling:Validation:SelectBuyer'));
         return currentStepIndex;
@@ -70,12 +84,24 @@ export function SplitBillingStep({
       setError('');
       return targetStepIndex;
     },
-    [addBuyerToOrder, option, selectedBuyer?.buyer?.id, t]
+    [addBuyerToOrder, option, onOptionChange, selectedOption, selectedBuyer?.buyer?.id, t]
   );
 
-  useEffect(() => {
-    registerOnNextCallback(onNext);
-  }, [onNext, registerOnNextCallback]);
+  useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
+
+  const onBack = useCallback(
+    ({ currentStepIndex, targetStepIndex }: StepNavigationProperties) => {
+      if (option === null) {
+        return targetStepIndex;
+      }
+      onOptionChange(null);
+      setError('');
+      return currentStepIndex;
+    },
+    [option, onOptionChange]
+  );
+
+  useEffect(() => registerOnBackCallback(onBack), [onBack, registerOnBackCallback]);
 
   const changeSelectedBuyer = useCallback(
     (buyer: AgreementSplitAllocation) => {
@@ -102,7 +128,13 @@ export function SplitBillingStep({
           </InlineNotification>
         </div>
       )}
-      {option === null && <SplitBillingOption onSelect={setOption} isBuyerDisabled={noBuyers} />}
+      {option === null && (
+        <SplitBillingOption
+          onSelect={setSelectedOption}
+          selectedValue={selectedOption}
+          isBuyerDisabled={noBuyers}
+        />
+      )}
       {option === 'percentages' && (
         <SplitBillingAllocations allocations={allocations} agreementBuyerId={agreementBuyerId} />
       )}
