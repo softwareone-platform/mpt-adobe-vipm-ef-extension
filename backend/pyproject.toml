@@ -6,7 +6,7 @@ authors = [{ name = "SoftwareOne AG" }]
 requires-python = ">=3.12,<4"
 license = { text = "Apache-2.0 license" }
 dependencies = [
-    "mpt-extension-sdk[azure-monitor]==6.5.*",
+    "mpt-extension-sdk[azure-monitor]==6.7.*",
     "mpt-tool==6.0.*",
     "pyairtable==3.4.*",
 ]
@@ -90,6 +90,7 @@ per-file-ignores = [
   "mpt_adobe_vipm_ef/services/discount_codes.py: WPS202",
   "mpt_adobe_vipm_ef/services/renewal_three_yc.py: WPS202",
   "mpt_adobe_vipm_ef/services/discount_mapping.py: WPS202",
+  "mpt_adobe_vipm_ef/services/discount_sync.py: WPS202",
   "mpt_adobe_vipm_ef/services/discounts.py: WPS214",
   "mpt_adobe_vipm_ef/services/renewal_plan.py: WPS202",
   "mpt_adobe_vipm_ef/services/sku_mapping.py: WPS214",
