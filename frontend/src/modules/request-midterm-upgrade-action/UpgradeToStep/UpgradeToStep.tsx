@@ -6,6 +6,7 @@ import { StepNavigationProperties, useStepActions } from '@softwareone-platform/
 
 import { TargetSubscriptionGrid } from '../components/target-subscription-grid/TargetSubscriptionGrid';
 import { getPlaceOrderValidationError } from '../placeOrderValidation';
+import { Loader } from '../../shared/components/Loader/Loader';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TargetSubscription } from '../model';
@@ -25,7 +26,8 @@ interface UpgradeToStepProps {
 
 export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQuantity, offerStatus, onSubscriptionsChange, onSelectedTargetChange }: UpgradeToStepProps) {
   const { t } = useTranslation();
-  const showEmptyState = subscriptions.length === 0 && offerStatus !== 'idle' && offerStatus !== 'loading';
+  const isLoading = offerStatus === 'idle' || offerStatus === 'loading';
+  const showEmptyState = subscriptions.length === 0 && !isLoading;
   const { registerOnNextCallback } = useStepActions();
   const [selectedTarget, setSelectedTarget] = useState<TargetSubscription | null>(null);
   const [validationError, setValidationError] = useState('');
@@ -81,6 +83,11 @@ export function UpgradeToStep({ subscription, subscriptions, offerPaths, sourceQ
           onSubscriptionsChange={onSubscriptionsChange}
           onSelectedTargetChange={handleSelectedTargetChange}
         />
+        {isLoading && (
+          <div className="upgrade-to-step__loading-overlay">
+            <Loader />
+          </div>
+        )}
         {showEmptyState && (
           <div className="upgrade-to-step__empty-overlay">
             <NoDataCard

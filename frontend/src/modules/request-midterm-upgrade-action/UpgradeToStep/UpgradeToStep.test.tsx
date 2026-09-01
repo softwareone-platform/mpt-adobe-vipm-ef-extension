@@ -60,6 +60,18 @@ describe('UpgradeToStep', () => {
     expect(getByText(/auto-renewal will be enabled by default/)).toBeTruthy();
   });
 
+  it.each(['idle', 'loading'] as const)('shows the grid loading spinner while offers load (%s)', (offerStatus) => {
+    const { getByTestId } = render(<UpgradeToStep subscription={{ id: 'SUB-1' }} subscriptions={[]} offerPaths={[]} sourceQuantity={0} offerStatus={offerStatus} onSubscriptionsChange={() => {}} />);
+
+    expect(getByTestId('loader')).toBeTruthy();
+  });
+
+  it('hides the grid loading spinner once the offers have loaded', () => {
+    const { queryByTestId } = render(<UpgradeToStep subscription={{ id: 'SUB-1' }} subscriptions={[]} offerPaths={[]} sourceQuantity={0} offerStatus="success" onSubscriptionsChange={() => {}} />);
+
+    expect(queryByTestId('loader')).toBeNull();
+  });
+
   it('renders the estimated price disclaimer', () => {
     const { getByText } = render(<UpgradeToStep subscription={{ id: 'SUB-1' }} subscriptions={[]} offerPaths={[]} sourceQuantity={0} offerStatus="success" onSubscriptionsChange={() => {}} />);
 
