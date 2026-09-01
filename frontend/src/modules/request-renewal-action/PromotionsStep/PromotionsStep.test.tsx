@@ -84,7 +84,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/button', () => ({
   ),
 }));
 
-interface MockSelectProps {
+interface MockComboboxProps {
   value?: string;
   options: { label: string; value: string; isDisabled?: boolean }[];
   placeholder?: string;
@@ -92,8 +92,8 @@ interface MockSelectProps {
   onChange?: (value: string) => void;
 }
 
-jest.mock('@softwareone-platform/sdk-react-ui-v0/select', () => ({
-  Select: ({ value, options, placeholder, testId, onChange }: MockSelectProps) => (
+jest.mock('../../shared/components/CodeCombobox/CodeCombobox', () => ({
+  CodeCombobox: ({ value, options, placeholder, testId, onChange }: MockComboboxProps) => (
     <select
       data-testid={testId}
       data-placeholder={placeholder}
@@ -217,6 +217,7 @@ const renderStep = async ({
       discountSelections={discountSelections}
       path={path}
       onDiscountChange={onDiscountChange}
+      onPreview={jest.fn()}
     />,
   );
   await act(async () => {});
@@ -352,6 +353,25 @@ describe('PromotionsStep', () => {
     });
 
     expect(onDiscountChange).toHaveBeenCalledWith('SUB-1', 'CODE-ONE');
+  });
+
+  it('tells the customer a typed code is unknown, at the anniversary', async () => {
+    const { findByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'TYPED-CODE' },
+    });
+
+    const notice = await findByTestId('promotions-step-unknown-code');
+    expect(notice.textContent).toContain('TYPED-CODE');
+    expect(notice.textContent).toContain('is not known');
+  });
+
+  it('leaves an unknown code to Adobe on the early path', async () => {
+    const { queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'TYPED-CODE' },
+      path: 'now' as RenewalPath,
+    });
+
+    expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
   });
 
   it('keeps the list price on an applied code, since Review order carries the pricing', async () => {

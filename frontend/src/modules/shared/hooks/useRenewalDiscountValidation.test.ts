@@ -72,6 +72,64 @@ describe('useRenewalDiscountValidation', () => {
     expect(result.current.status).toBe('idle');
   });
 
+  it('drops the quote when the customer edits the codes again', async () => {
+    const onPreview = jest.fn();
+    const { result } = renderHook(() =>
+      useRenewalDiscountValidation('AGR-1234-5678', onPreview),
+    );
+
+    act(() => result.current.reset());
+
+    expect(onPreview).toHaveBeenCalledWith(null);
+  });
+
+  it('drops the quote when Adobe rejects the codes', async () => {
+    mockPost.mockRejectedValue({ response: { data: { detail: 'Adobe rejected the code.' } } });
+    const onPreview = jest.fn();
+    const { result } = renderHook(() =>
+      useRenewalDiscountValidation('AGR-1234-5678', onPreview),
+    );
+
+    await act(async () => {
+      await result.current.validateDiscounts(PLAN);
+    });
+
+    expect(onPreview).toHaveBeenCalledWith(null);
+  });
+
+  it('ignores a quote for a plan the customer has already moved past', async () => {
+    const onPreview = jest.fn();
+    const { result } = renderHook(() =>
+      useRenewalDiscountValidation('AGR-1234-5678', onPreview),
+    );
+
+    mockPost.mockResolvedValue({
+      data: { preview: { lineItems: [{ offerId: 'STALE' }] } },
+    });
+    const stale = act(async () => {
+      await result.current.validateDiscounts(PLAN);
+    });
+    await act(async () => {
+      await result.current.validateDiscounts({ ...PLAN, renewalPath: 'anniversary' });
+    });
+    await stale;
+
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+  });
+
+  it('drops the quote it held when the plan can no longer be quoted', async () => {
+    const onPreview = jest.fn();
+    const { result } = renderHook(() =>
+      useRenewalDiscountValidation('AGR-1234-5678', onPreview),
+    );
+
+    await act(async () => {
+      await result.current.validateDiscounts({ ...PLAN, renewalPath: 'anniversary' });
+    });
+
+    expect(onPreview).toHaveBeenCalledWith(null);
+  });
+
   it('skips the preview when the plan renews and adds nothing', async () => {
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 

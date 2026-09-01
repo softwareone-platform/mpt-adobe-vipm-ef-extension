@@ -174,6 +174,20 @@ def test_preview_renewal_order_calls_correct_url_and_returns_data(
 
 
 @responses.activate
+def test_preview_renewal_order_asks_adobe_to_price_the_quote(
+    adobe_client, preview_renewal_data, renewal_line_items
+):
+    """Adobe returns pricing only when the call asks for it."""
+    responses.post(_ORDERS_URL, json=preview_renewal_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_renewal_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", renewal_line_items
+    )
+
+    assert "fetch-price=true" in responses.calls[0].request.url
+
+
+@responses.activate
 def test_preview_renewal_order_sends_preview_renewal_body(
     adobe_client, preview_renewal_data, renewal_line_items
 ):

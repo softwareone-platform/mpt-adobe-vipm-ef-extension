@@ -6,6 +6,14 @@ export function formatPrice(value: number): string {
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+export function formatOptionalPrice(value: number | null | undefined): string {
+  return value == null ? '—' : formatPrice(value);
+}
+
+export function applyMarkup(unitPurchasePrice: number, markup: number): number {
+  return Math.round(unitPurchasePrice * (1 + markup / 100) * 100) / 100;
+}
+
 export function formatCurrency(value: number, currency?: string): string {
   if (!currency) return String(value);
   try {

@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { act, render } from '@testing-library/react';
 
 import { ReviewOrderStep } from './ReviewOrderStep';
-import type { Agreement, Subscription } from '../../shared/model';
+import type { Agreement, RenewalPreview, Subscription } from '../../shared/model';
 import type {
   NetNewItem,
   OrderDetails,
@@ -105,7 +105,7 @@ const SUBSCRIPTIONS: Subscription[] = [
         id: 'ALI-1',
         quantity: 10,
         item: { id: 'ITM-1', name: 'Item One', externalIds: { vendor: 'OFFER-1' } },
-        price: { unitSP: 120 },
+        price: { unitSP: 120, markup: 10 },
       },
     ],
   },
@@ -139,6 +139,7 @@ const renderStep = ({
   selections = {} as RenewalSelections,
   quantities = {} as RenewalQuantities,
   netNewItems = [] as NetNewItem[],
+  preview = null as RenewalPreview | null,
   details = { externalId: '', notes: '' } as OrderDetails,
   onPlaceOrder = jest.fn().mockResolvedValue(true),
   errorMessage = '',
@@ -150,6 +151,7 @@ const renderStep = ({
       selections={selections}
       quantities={quantities}
       netNewItems={netNewItems}
+      preview={preview}
       details={details}
       onPlaceOrder={onPlaceOrder}
       errorMessage={errorMessage}
@@ -181,13 +183,61 @@ describe('ReviewOrderStep', () => {
     expect(row.textContent).toContain('720.00');
   });
 
-  it('keeps a lapsing subscription in the grid with an em dash instead of a quantity', () => {
+  it('returns a subscription switched off as a credit over its whole quantity', () => {
     const { getByTestId } = renderStep();
 
     const row = getByTestId('row-SUB-2');
     expect(row.textContent).toContain('Item Two');
+    expect(row.textContent).toContain('-4');
+    expect(row.textContent).toContain('-20.00');
+    expect(row.textContent).toContain('-240.00');
+  });
+
+  it('shows an increase as a signed change over the seats held today', () => {
+    const { getByTestId } = renderStep({ quantities: { 'SUB-1': 16 } });
+
+    const row = getByTestId('row-SUB-1');
+    expect(row.textContent).toContain('+6');
+    expect(row.textContent).toContain('720.00');
+    expect(row.textContent).toContain('1,920.00');
+  });
+
+  it('prices a line from Adobe’s quote, with the line’s markup applied', () => {
+    const { getByTestId } = renderStep({
+      quantities: { 'SUB-1': 16 },
+      preview: {
+        lineItems: [{ offerId: 'OFFER-1', pricing: { discountedPartnerPrice: 100 } }],
+      },
+    });
+
+    const row = getByTestId('row-SUB-1');
+    expect(row.textContent).toContain('110.00');
+  });
+
+  it('keeps the stored price when Adobe quoted nothing', () => {
+    const { getByTestId } = renderStep({ quantities: { 'SUB-1': 16 }, preview: null });
+
+    const row = getByTestId('row-SUB-1');
+    expect(row.textContent).toContain('120.00');
+  });
+
+  it('leaves the change columns empty on a line renewing at the quantity it holds', () => {
+    const { getByTestId } = renderStep({ quantities: { 'SUB-1': 10 } });
+
+    const row = getByTestId('row-SUB-1');
     expect(row.textContent).toContain('—');
-    expect(row.textContent).not.toContain('240.00');
+    expect(row.textContent).toContain('100.00');
+    expect(row.textContent).toContain('1,200.00');
+  });
+
+  it('leads the order price with the net change and the resulting total beneath', () => {
+    const { getByTestId } = renderStep();
+
+    const row = getByTestId('row-order-price');
+    const change = row.textContent!.indexOf('-240.00');
+    const resulting = row.textContent!.indexOf('1,200.00');
+    expect(change).toBeGreaterThan(-1);
+    expect(resulting).toBeGreaterThan(change);
   });
 
   it('lists a net-new product as a new line', () => {
