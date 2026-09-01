@@ -1,9 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 
-import { isRenewalPreviewRequired } from '../model';
-import type { RenewalPlanBody } from '../model';
+import { isRenewalPreviewRequired, readRenewalPreview } from '../model';
+import type { RenewalPlanBody, RenewalPreview } from '../model';
 import { useGuardedRequest } from './useGuardedRequest';
 
 export interface RenewalPlanValidationOptions {
@@ -14,6 +14,7 @@ export interface RenewalPlanValidationOptions {
    * report a quantity error against quantities the customer cannot edit yet.
    */
   quoteThroughAdobe?: boolean;
+  onPreview?: (preview: RenewalPreview | null) => void;
 }
 
 /**
@@ -37,30 +38,52 @@ export interface RenewalPlanValidationOptions {
  */
 export function useRenewalPlanValidation(
   agreementId: string,
-  { quoteThroughAdobe = true }: RenewalPlanValidationOptions = {},
+  { quoteThroughAdobe = true, onPreview }: RenewalPlanValidationOptions = {},
 ) {
   const { run, cancel, reset, ...state } = useGuardedRequest('Errors:RenewalPlanValidation');
+  const attemptRef = useRef(0);
 
   const validatePlan = useCallback(
     async (plan: RenewalPlanBody): Promise<boolean> => {
+      attemptRef.current += 1;
+      const attempt = attemptRef.current;
+      const publish = (preview: RenewalPreview | null) => {
+        if (quoteThroughAdobe && attempt === attemptRef.current) {
+          onPreview?.(preview);
+        }
+      };
+
       if (plan.subscriptions.length === 0 && plan.netNewItems.length === 0) {
+        publish(null);
         return true;
       }
 
-      return run(async (signal) => {
+      const validated = await run(async (signal) => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
         await http.post(`${baseUrl}/3yc-check`, plan, { signal });
         if (quoteThroughAdobe && isRenewalPreviewRequired(plan)) {
           // The plan is built without discount selections on these steps, so
           // this quote carries no code; the codes are validated by
           // useRenewalDiscountValidation once the Promotions step picks them.
-          await http.post(`${baseUrl}/preview`, plan, { signal });
+          const response = await http.post(`${baseUrl}/preview`, plan, { signal });
+          return readRenewalPreview(response.data);
         }
-        return true;
+        return null;
       });
+
+      publish(validated === false ? null : validated);
+      return validated !== false;
     },
-    [agreementId, quoteThroughAdobe, run],
+    [agreementId, onPreview, quoteThroughAdobe, run],
   );
 
-  return { ...state, validatePlan, cancel, reset };
+  const resetPlan = useCallback(() => {
+    attemptRef.current += 1;
+    if (quoteThroughAdobe) {
+      onPreview?.(null);
+    }
+    reset();
+  }, [onPreview, quoteThroughAdobe, reset]);
+
+  return { ...state, validatePlan, cancel, reset: resetPlan };
 }

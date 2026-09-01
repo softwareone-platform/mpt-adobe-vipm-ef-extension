@@ -74,6 +74,47 @@ describe('useRenewalPlanValidation', () => {
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
 
+  it('drops the quote it held when the plan is no longer quoted', async () => {
+    mockPost.mockResolvedValue({ data: { data: {} } });
+    const onPreview = jest.fn();
+
+    const { result } = renderHook(() =>
+      useRenewalPlanValidation('AGR-1234-5678', { onPreview }),
+    );
+
+    await act(async () => {
+      await result.current.validatePlan(PLAN);
+    });
+
+    expect(onPreview).toHaveBeenCalledWith(null);
+  });
+
+  it('drops the quote when the customer edits the plan again', async () => {
+    const onPreview = jest.fn();
+    const { result } = renderHook(() =>
+      useRenewalPlanValidation('AGR-1234-5678', { onPreview }),
+    );
+
+    act(() => result.current.reset());
+
+    expect(onPreview).toHaveBeenCalledWith(null);
+  });
+
+  it('keeps the quote the Items step took when the Renewal step validates', async () => {
+    mockPost.mockResolvedValue({ data: { data: {} } });
+    const onPreview = jest.fn();
+
+    const { result } = renderHook(() =>
+      useRenewalPlanValidation('AGR-1234-5678', { quoteThroughAdobe: false, onPreview }),
+    );
+
+    await act(async () => {
+      await result.current.validatePlan(EARLY_PLAN);
+    });
+
+    expect(onPreview).not.toHaveBeenCalled();
+  });
+
   it('skips the Adobe quote when the caller owns no quantities', async () => {
     mockPost.mockResolvedValue({ data: { data: {} } });
 
