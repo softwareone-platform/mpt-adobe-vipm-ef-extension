@@ -133,6 +133,21 @@ describe("ScopeStep", () => {
     expect(screen.getByText("Add seats, Renewal")).toBeInTheDocument();
   });
 
+  it("offers mid-term upgrade alongside the other order types", () => {
+    const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW"] });
+
+    openOrderTypes();
+    pickOrderType("SWITCH");
+
+    expect(updateDraft).toHaveBeenCalledWith({ applicableOrderTypes: ["NEW", "SWITCH"] });
+  });
+
+  it("lists mid-term upgrade on the control by its label", () => {
+    renderStep({ applicableOrderTypes: ["SWITCH"] });
+
+    expect(screen.getByText("Mid-term upgrade")).toBeInTheDocument();
+  });
+
   it("adds a specific order type to the selection", () => {
     const { updateDraft } = renderStep({ applicableOrderTypes: ["NEW"] });
 
