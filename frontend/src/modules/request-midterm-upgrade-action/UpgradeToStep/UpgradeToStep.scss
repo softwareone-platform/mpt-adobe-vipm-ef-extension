@@ -14,7 +14,8 @@
       display: none;
     }
   }
-  &__empty-overlay {
+  &__empty-overlay,
+  &__loading-overlay {
     position: absolute;
     inset: 0;
     z-index: 2;

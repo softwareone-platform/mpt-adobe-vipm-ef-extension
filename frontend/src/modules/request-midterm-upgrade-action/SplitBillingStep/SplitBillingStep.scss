@@ -12,4 +12,16 @@
   &__error {
     padding-bottom: $var-spacing-3;
   }
+
+  [class*="list"] table tr td {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  [class*="list"] table tr td [class*="cell-container"] {
+    height: 55px;
+    min-height: 55px;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }

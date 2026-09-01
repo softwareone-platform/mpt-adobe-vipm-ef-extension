@@ -27,6 +27,7 @@ import { getMonthlyPrice, getYearlyPrice } from '../utils/price';
 import { UpgradeFromStep } from './UpgradeFromStep';
 import { UpgradeToStep } from './UpgradeToStep';
 import { SplitBillingStep } from './SplitBillingStep';
+import { SplitBillingOptionValue } from './components/split-billing-option/SplitBillingOption';
 import { DetailsStep } from './DetailsStep';
 import { ReviewOrderStep } from './ReviewOrderStep';
 import { SummaryStep } from './SummaryStep';
@@ -76,6 +77,7 @@ export default function App() {
     scrollStepToTop();
   }, []);
   const [selectedBuyer, setSelectedBuyer] = useState<AgreementSplitAllocation | null>(null);
+  const [splitOption, setSplitOption] = useState<SplitBillingOptionValue | null>(null);
   const [order, setOrder] = useState<Order>(initialOrder);
   const [targetSubscriptions, setTargetSubscriptions] = useState<TargetSubscription[]>([]);
   const [recommendationTrackerId, setRecommendationTrackerId] = useState<string>('');
@@ -319,6 +321,8 @@ export default function App() {
                 addBuyerToOrder={addBuyerToOrder}
                 selectedBuyer={selectedBuyer}
                 onChange={setSelectedBuyer}
+                option={splitOption}
+                onOptionChange={setSplitOption}
               />
             ),
           },
@@ -357,7 +361,7 @@ export default function App() {
           onActiveStepIndexChange={changeStep}
           onClose={onClose}
           onSave={viewOrder}
-          isToDisableSideNavigation={Boolean(order.id)}
+          isToDisableSideNavigation
         >
           <Wizard.Header>{t('MidtermUpgrade:Header')}</Wizard.Header>
           <Wizard.Content>

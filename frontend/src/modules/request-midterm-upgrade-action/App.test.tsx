@@ -687,42 +687,15 @@ describe('request-midterm-upgrade-action App', () => {
     expect(reviewOrderProps.errorMessage).toBe('Adobe rejected the switch preview.');
   });
 
-  it('locks the side navigation once the order is placed', async () => {
+  it('never allows side navigation, so only back and next move the wizard', async () => {
     mockActiveStepIndex = 1;
     const { rerender } = render(<App />);
     expect(await screen.findByText('Upgrade to step')).toBeTruthy();
-    expect(wizardProps.isToDisableSideNavigation).toBe(false);
+    expect(wizardProps.isToDisableSideNavigation).toBe(true);
 
-    const selectedTarget = {
-      id: null,
-      name: null,
-      status: '',
-      item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
-      targetBaseOfferId: '65322651CA02A12',
-      recommended: false,
-      currentQuantity: 0,
-      newQuantity: 6,
-      delta: 6,
-      unitSP: '',
-      spxM: '',
-      spxY: '',
-      terms: '',
-      commitment: '',
-    };
-    act(() => {
-      upgradeToProps.onSubscriptionsChange([selectedTarget]);
-      upgradeToProps.onSelectedTargetChange(selectedTarget);
-    });
     mockActiveStepIndex = 4;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
-    expect(wizardProps.isToDisableSideNavigation).toBe(false);
-
-    await act(async () => {
-      await reviewOrderProps.onPlaceOrder();
-    });
-    rerender(<App />);
-
     expect(wizardProps.isToDisableSideNavigation).toBe(true);
   });
 
