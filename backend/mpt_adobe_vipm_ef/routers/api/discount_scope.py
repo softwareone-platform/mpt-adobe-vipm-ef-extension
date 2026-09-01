@@ -30,8 +30,7 @@ _SUPPORTED_ORDER_TYPES = ", ".join(order_type.value for order_type in DiscountOr
 
 def require_editor_account(ctx: APIContext) -> None:
     """Allow only vendor and operations accounts to author or curate codes."""
-    auth = ctx.auth
-    if auth is None or auth.account.is_client():
+    if ctx.auth.account.is_client():
         raise ForbiddenError(
             detail="Managing discount codes requires a vendor or operations account.",
         )
@@ -43,8 +42,7 @@ def can_edit_open_codes(ctx: APIContext) -> bool:
     Only vendor accounts may: an open code is Adobe's, and operations accounts
     curate the closed codes they authored.
     """
-    auth = ctx.auth
-    return auth is not None and auth.account.is_vendor()
+    return ctx.auth.account.is_vendor()
 
 
 async def load_discount_scope(ctx: APIContext) -> DiscountScope:

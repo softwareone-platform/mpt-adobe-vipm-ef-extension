@@ -73,6 +73,124 @@ def test_build_update_fields_serializes_wizard_fields(create_body):
     assert "Code" not in result
 
 
+@pytest.fixture
+def flex_discount():
+    """An Adobe flex discount as ``GET /v3/flex-discounts`` returns it."""
+    return {
+        "id": "55555555-313b-476c-9d0b-6a610d5b91e0",
+        "category": "INTRO",
+        "code": "INTRO-PHSP",
+        "name": "Intro Discount - Photoshop",
+        "description": "Intro Discount - Photoshop - 15.99",
+        "startDate": "2025-11-30T23:59:59Z",
+        "endDate": "2026-12-31T23:59:59Z",
+        "status": "ACTIVE",
+        "discountLockEndDate": "2028-03-31T23:59:59Z",
+        "qualification": {"baseOfferIds": ["11083117CA01A12"]},
+        "outcomes": [
+            {
+                "type": "FIXED_PRICE",
+                "discountValues": [{"country": "US", "currency": "USD", "value": 15.99}],
+            }
+        ],
+    }
+
+
+def test_build_open_update_fields_maps_adobe_attributes(flex_discount):
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW)
+
+    assert result == {
+        "name": "Intro Discount - Photoshop",
+        "description": "Intro Discount - Photoshop - 15.99",
+        "adobe_discount_id": "55555555-313b-476c-9d0b-6a610d5b91e0",
+        "category": "INTRO",
+        "status": "ACTIVE",
+        "discount_type": "FIXED_PRICE",
+        "start_date": "2025-11-30T23:59:59+00:00",
+        "end_date": "2026-12-31T23:59:59+00:00",
+        "reusable": True,
+        "discount_lock_end_date": "2028-03-31T23:59:59+00:00",
+        "target_offer_ids": "11083117CA",
+        "qualifying_offer_ids": "",
+        "synchronized_at": "2026-07-21T12:00:00+00:00",
+        "updated_at": "2026-07-21T12:00:00+00:00",
+    }
+
+
+def test_build_open_update_fields_stores_partial_skus_deduplicated(flex_discount):
+    flex_discount["qualification"] = {
+        "baseOfferIds": ["65304520CA01A12", "65304520CA02A12", "65322651CA03A12"],
+        "qualifyingOfferIds": ["11083117CA01A12", "11083117CA12"],
+    }
+
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW)
+
+    assert result["target_offer_ids"] == "65304520CA,65322651CA"
+    assert result["qualifying_offer_ids"] == "11083117CA"
+
+
+def test_build_open_update_fields_maps_percentage_outcome_and_defaults():
+    discount = {"outcomes": [{"type": "PERCENTAGE_DISCOUNT"}]}
+
+    result = discount_mapping.build_open_update_fields(discount, _NOW)
+
+    assert result["discount_type"] == "PERCENTAGE"
+    assert result["status"] == "ACTIVE"
+    assert result["reusable"] is False
+    assert result["discount_lock_end_date"] is None
+
+
+def test_build_open_code_fields_stamps_sync_ownership(flex_discount):
+    result = discount_mapping.build_open_code_fields(flex_discount, "COM", _NOW)
+
+    ownership_keys = (
+        "Code",
+        "source",
+        "market_segment",
+        "enrichment_status",
+        "created_at",
+        "applicable_order_types",
+    )
+    assert {key: result[key] for key in ownership_keys} == {
+        "Code": "INTRO-PHSP",
+        "source": "API",
+        "market_segment": "COM",
+        "enrichment_status": "PENDING",
+        "created_at": "2026-07-21T12:00:00+00:00",
+        "applicable_order_types": ["NEW"],
+    }
+    assert "target_customer_id" not in result
+
+
+def test_build_open_code_fields_leaves_standard_order_types_for_enrichment(flex_discount):
+    flex_discount["category"] = "STANDARD"
+
+    result = discount_mapping.build_open_code_fields(flex_discount, "COM", _NOW)
+
+    assert "applicable_order_types" not in result
+
+
+def test_open_discount_values_flattens_outcome_values(flex_discount):
+    result = discount_mapping.open_discount_values(flex_discount)
+
+    assert result == [{"country": "US", "currency": "USD", "value": 15.99}]
+
+
+def test_open_discount_values_skips_incomplete_entries():
+    discount = {
+        "outcomes": [
+            {
+                "type": "FIXED_PRICE",
+                "discountValues": [{"currency": "USD", "value": 1}, {"country": "US"}],
+            }
+        ]
+    }
+
+    result = discount_mapping.open_discount_values(discount)
+
+    assert result == []
+
+
 def test_to_api_payload_maps_tdr_representation(code_record_factory):
     record = code_record_factory()
 

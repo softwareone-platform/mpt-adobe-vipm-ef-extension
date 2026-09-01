@@ -5,6 +5,7 @@ from mpt_extension_sdk.routing import (
     APIRouteDefinition,
     EventRouteDefinition,
     PlugRouteDefinition,
+    ScheduleRouteDefinition,
 )
 
 from mpt_adobe_vipm_ef.app import ext_app
@@ -34,6 +35,29 @@ def test_app_registers_api_route(path):
     result = {route.path: route for route in ext_app.routes}
 
     assert isinstance(result[path], APIRouteDefinition)
+
+
+def test_app_registers_open_discount_sync_schedule():
+    result = {route.path: route for route in ext_app.routes}
+
+    assert isinstance(result["/api/v2/schedules/discounts/open-sync"], ScheduleRouteDefinition)
+
+
+def test_app_generates_open_discount_sync_schedule_metadata():
+    result = ext_app.to_meta_config()
+
+    assert result.schedules is not None
+    assert [schedule.model_dump() for schedule in result.schedules] == [
+        {
+            "id": "schedule.discounts.open-sync",
+            "name": "schedule-discounts-open-sync",
+            "description": (
+                "Synchronize the open Adobe flexible discount catalogue into the discount store."
+            ),
+            "cron": "0 0 * * *",
+            "path": "/api/v2/schedules/discounts/open-sync",
+        }
+    ]
 
 
 def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218

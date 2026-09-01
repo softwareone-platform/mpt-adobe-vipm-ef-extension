@@ -28,6 +28,7 @@ SOURCE_OPEN = "API"
 SOURCE_CLOSED = "Ops/Vendor"
 ACTIVE_STATUS = "ACTIVE"
 ENRICHMENT_COMPLETE = "COMPLETE"
+ENRICHMENT_PENDING = "PENDING"
 
 AirtableRecord = RecordDict
 
@@ -111,6 +112,25 @@ class DiscountStore:
         formula = AND(
             EQ(Field("code"), code),
             EQ(Field("market_segment"), market_segment),
+        )
+        existing = values_table.all(formula=formula)
+        values_table.create(fields, typecast=True)
+        if existing:
+            values_table.batch_delete([record["id"] for record in existing])
+
+    def replace_country_value(
+        self, code: str, market_segment: str, country: str, fields: dict[str, Any]
+    ) -> None:
+        """Rewrite the value rows of a code for one country with a single fresh row.
+
+        The Adobe synchronization stores one row per country, so unlike
+        :meth:`replace_value` the rows of the other countries are preserved.
+        """
+        values_table = self._table(VALUES_TABLE)
+        formula = AND(
+            EQ(Field("code"), code),
+            EQ(Field("market_segment"), market_segment),
+            EQ(Field("country"), country),
         )
         existing = values_table.all(formula=formula)
         values_table.create(fields, typecast=True)

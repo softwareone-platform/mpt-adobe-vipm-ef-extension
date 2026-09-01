@@ -203,6 +203,33 @@ def test_replace_value_only_creates_when_no_rows_exist(table, store):
     table.create.assert_called_once_with({"value": 20}, typecast=True)
 
 
+def test_replace_country_value_creates_before_deleting_existing_rows(table, store):
+    table.all.return_value = [{"id": "recVal1", "fields": {}}]
+
+    store.replace_country_value("SUMMER25", _MARKET_SEGMENT, "US", {"value": 20})  # act
+
+    table.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("code"), "SUMMER25"),
+            EQ(Field("market_segment"), _MARKET_SEGMENT),
+            EQ(Field("country"), "US"),
+        )
+    )
+    table.create.assert_called_once_with({"value": 20}, typecast=True)
+    table.batch_delete.assert_called_once_with(["recVal1"])
+    called_methods = [name for name, _, _ in table.method_calls]
+    assert called_methods.index("create") < called_methods.index("batch_delete")
+
+
+def test_replace_country_value_only_creates_when_no_rows_exist(table, store):
+    table.all.return_value = []
+
+    store.replace_country_value("SUMMER25", _MARKET_SEGMENT, "US", {"value": 20})  # act
+
+    table.batch_delete.assert_not_called()
+    table.create.assert_called_once_with({"value": 20}, typecast=True)
+
+
 def test_list_redemptions_returns_empty_without_codes(api, store):
     result = store.list_redemptions([], _CUSTOMER_ID)
 
