@@ -4,7 +4,11 @@ import pytest
 from mpt_extension_sdk.api.errors import ValidationError
 from mpt_extension_sdk.models import Agreement
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeUpdateRequest, DiscountScope
+from mpt_adobe_vipm_ef.models.discount import (
+    DiscountCodeUpdateRequest,
+    DiscountScope,
+    DiscountType,
+)
 from mpt_adobe_vipm_ef.services import discount_codes
 
 _CODE = "SUMMER25"
@@ -80,7 +84,9 @@ async def _enter_after(scope, inside, code):
 
 def test_resolve_value_fields_builds_row_from_scope():
     result = discount_codes.resolve_value_fields(
-        _scope(_agreement_payload()), _CODE, _update_body()
+        _scope(_agreement_payload()),
+        _CODE,
+        _update_body(discountType="FIXED_DISCOUNT", currency="USD"),
     )
 
     assert result == {
@@ -92,11 +98,36 @@ def test_resolve_value_fields_builds_row_from_scope():
     }
 
 
+def test_resolve_value_fields_percentage_is_country_agnostic():
+    result = discount_codes.resolve_value_fields(
+        _scope(_agreement_payload()), _CODE, _update_body()
+    )
+
+    assert result == {
+        "code": _CODE,
+        "market_segment": _MARKET_SEGMENT,
+        "value": 20,
+    }
+
+
+def test_resolve_value_fields_percentage_needs_no_licensee_country():
+    payload = _agreement_payload()
+    payload["licensee"].pop("address")
+
+    result = discount_codes.resolve_value_fields(_scope(payload), _CODE, _update_body())
+
+    assert result == {
+        "code": _CODE,
+        "market_segment": _MARKET_SEGMENT,
+        "value": 20,
+    }
+
+
 def test_resolve_value_fields_prefers_body_currency_over_scope():
     result = discount_codes.resolve_value_fields(
         _scope(_agreement_payload()),
         _CODE,
-        _update_body(currency="EUR"),
+        _update_body(discountType="FIXED_DISCOUNT", currency="EUR"),
     )
 
     assert result["currency"] == "EUR"
@@ -107,15 +138,22 @@ def test_resolve_value_fields_requires_licensee_country():
     payload["licensee"].pop("address")
 
     with pytest.raises(ValidationError, match="no country"):
-        discount_codes.resolve_value_fields(_scope(payload), _CODE, _update_body())
+        discount_codes.resolve_value_fields(
+            _scope(payload), _CODE, _update_body(discountType="FIXED_DISCOUNT", currency="USD")
+        )
 
 
 def test_resolve_value_fields_requires_currency():
     payload = _agreement_payload()
     payload.pop("authorization")
+    body = DiscountCodeUpdateRequest.model_construct(
+        discount_type=DiscountType.FIXED_DISCOUNT,
+        currency=None,
+        amount=_update_body().amount,
+    )
 
     with pytest.raises(ValidationError, match="currency is required"):
-        discount_codes.resolve_value_fields(_scope(payload), _CODE, _update_body())
+        discount_codes.resolve_value_fields(_scope(payload), _CODE, body)
 
 
 async def test_guard_code_creation_serializes_same_pair():

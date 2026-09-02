@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <4"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1340,7 +1340,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mpt-extension-sdk", extras = ["azure-monitor"], specifier = "==6.5.*" },
+    { name = "mpt-extension-sdk", extras = ["azure-monitor"], specifier = "==6.7.*" },
     { name = "mpt-tool", specifier = "==6.0.*" },
     { name = "pyairtable", specifier = "==3.4.*" },
 ]
@@ -1366,20 +1366,20 @@ dev = [
 
 [[package]]
 name = "mpt-api-client"
-version = "6.3.1"
+version = "6.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "httpx-retries" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a6/f0/6d77d6235801223cfa6a82d13e208469cf12960f4777b841616f64238462/mpt_api_client-6.3.1.tar.gz", hash = "sha256:642f5088c4b2f9608fb70fa9078856423a9096fa118eeede60c6ae9bbb7200f1", size = 65853, upload-time = "2026-06-25T16:05:35.595Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/75/91/51679b504d7e95c84c8207cdcd7556c6d3daa2174758fefc0ced78a787a6/mpt_api_client-6.4.0.tar.gz", hash = "sha256:d51142471862c0b9faa4339c68b193f2bcf94ae63ce523ed00115d371770be83", size = 67099, upload-time = "2026-07-30T16:38:16.622Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/8d/a3ae1ad7836584e4caacae27816666c55858415f2a80390cefa4264be679/mpt_api_client-6.3.1-py3-none-any.whl", hash = "sha256:87cef1feb7d272dcda619818124605381861a633e442334316181ebb36ba18f7", size = 148484, upload-time = "2026-06-25T16:05:34.462Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/0c/b91b41941c7d9035b6a3cb5dba2279f274a339b3eb470a0cb77a5113bad9/mpt_api_client-6.4.0-py3-none-any.whl", hash = "sha256:6ac8bd1ce5a48cfa3b98ba9e70b40579cca4467a6fa36c502449b16512f1257c", size = 149517, upload-time = "2026-07-30T16:38:15.542Z" },
 ]
 
 [[package]]
 name = "mpt-extension-sdk"
-version = "6.5.2"
+version = "6.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
@@ -1394,9 +1394,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/9d/36f1b0eef3afa1a8f3adf165c71b6c4cc86390e86e817dc4f85fc2409fda/mpt_extension_sdk-6.5.2.tar.gz", hash = "sha256:ed72319f36935981545a26e4298b475af7e95eaadfd693ee084b605d1c0a8515", size = 54661, upload-time = "2026-07-16T10:31:43.913Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/0b/9d7094ad9e94a7a5bbc005c304073a6fae97ae4f91346b38caa212993bb7/mpt_extension_sdk-6.7.1.tar.gz", hash = "sha256:0f7e2be7fca0e32685039204631d91d831a237839d6d56e83fd53bb56a361422", size = 65488, upload-time = "2026-08-31T10:03:20.633Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/80/cf/9e87a6c8009a11dd327d7b26371db8e3c1a2c6820ece6502714bee337b8f/mpt_extension_sdk-6.5.2-py3-none-any.whl", hash = "sha256:fe620a4ac03ddcaeff38bda42f0eabbc835d693a767f906cb2cb491c27e9cbab", size = 94273, upload-time = "2026-07-16T10:31:42.741Z" },
+    { url = "https://files.pythonhosted.org/packages/db/c2/1c27609a204c5550b9e83b21a4e5df6b8cdd9c8034ee808dc9cf9e72c8af/mpt_extension_sdk-6.7.1-py3-none-any.whl", hash = "sha256:304352045b8491136b0afe5e0e3dd79b668daad770f82f75330d868605636cf6", size = 112004, upload-time = "2026-08-31T10:03:19.52Z" },
 ]
 
 [package.optional-dependencies]
@@ -1406,21 +1406,21 @@ azure-monitor = [
 
 [[package]]
 name = "mpt-tool"
-version = "6.0.2"
+version = "6.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mpt-api-client" },
     { name = "pyairtable" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/3d/ffad82b8d2b8fe41a4f12167bc801341d41262c40b16229794888b93f23a/mpt_tool-6.0.2.tar.gz", hash = "sha256:66f929d46391d30c1d9d852eddbe388efe255809b966dc4b1657053150817d9e", size = 20814, upload-time = "2026-07-13T12:41:20.411Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/8c/2d506e9f97e647fd758cdaf295fedaeedbdcb984e38d4fee744a793cc251/mpt_tool-6.0.4.tar.gz", hash = "sha256:e3ff1b0dbfb58744f21478de300774370a22e5011bb230d54c264d8607a7e47f", size = 21120, upload-time = "2026-08-04T12:44:48.048Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/a6/3f445c81363eb73483ca0d4d184e0607e85e3aae85729953d4ec00a5c1f9/mpt_tool-6.0.2-py3-none-any.whl", hash = "sha256:0f3734f2e207173b758aa3aae8f773785c97679fd4269e59932e639e0d44dda4", size = 34152, upload-time = "2026-07-13T12:41:19.417Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/10/e13a4c420f94f22c1da6ca84a4888de686fa95d4815362a05bcfb3dd5dd3/mpt_tool-6.0.4-py3-none-any.whl", hash = "sha256:823d9333a59bc204054e092ed13176c6ecb96e6f5bd63c132310c27e6e59022b", size = 34215, upload-time = "2026-08-04T12:44:47.118Z" },
 ]
 
 [[package]]
 name = "mrok"
-version = "0.10.4"
+version = "0.10.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asn1crypto" },
@@ -1445,9 +1445,9 @@ dependencies = [
     { name = "typer" },
     { name = "uvicorn-worker" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/d7/9191c6c4e3db391798b6fb8e4d3c37545b537c15fe9f4f5dde581ef40b32/mrok-0.10.4.tar.gz", hash = "sha256:7a2c33e902d375dca64cc76431e2a9c9b3256f33c8789aed839b0b68550de181", size = 812824, upload-time = "2026-07-10T13:03:50.91Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/b0/5c1b67a65072805802a323f5c7034ecd67e8e666c46753c1f6265f573fc3/mrok-0.10.6.tar.gz", hash = "sha256:9ba013c4b799a2026a607c2ad53cc2d52a39595115b1cb528992e456822044b9", size = 829686, upload-time = "2026-08-12T13:30:23.797Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/d2/8e2690aa3e8fad62dcd335dbf0ad458adbe14b71b066d317aabbfbaf85fe/mrok-0.10.4-py3-none-any.whl", hash = "sha256:f23daf2362b002b2fedf7e207eb927abb1cce600be22ee41e319a7e98d2d3c6e", size = 86986, upload-time = "2026-07-10T13:03:49.148Z" },
+    { url = "https://files.pythonhosted.org/packages/6a/58/61e1fbfd80b25468d6b4ffbe628645b9d1fe57720d865a3f6b426b4911c3/mrok-0.10.6-py3-none-any.whl", hash = "sha256:ec71065f6d0787c2de0f758664c05a870b40c8025d59c747475dfb350b1b27e3", size = 86973, upload-time = "2026-08-12T13:30:22.157Z" },
 ]
 
 [[package]]

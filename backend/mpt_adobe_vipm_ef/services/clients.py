@@ -9,10 +9,7 @@ def build_caller_client(ctx: APIContext) -> AsyncMPTClient | None:
     Unlike ``ctx.mpt_api_service`` (which mints its own account-scoped token),
     this acts as the original caller, so it sees exactly what the caller can --
     e.g. selling prices, which the extension's minted token does not receive.
-    Returns ``None`` when the request has no auth context.
     """
-    if ctx.auth is None:
-        return None
     return build_mpt_client(
         base_url=ctx.runtime_settings.mpt_api_base_url,
         api_token=ctx.auth.token,

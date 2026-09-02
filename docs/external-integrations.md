@@ -9,9 +9,67 @@ duplicate those tables.
 
 | System | Purpose | Auth | Configuration | Code |
 | --- | --- | --- | --- | --- |
-| Adobe VIPM API | Adobe VIP Marketplace customer and order operations | OAuth 2.0 (Adobe IMS); credentials and authorizations loaded from mounted JSON files | `EXT_ADOBE_API_BASE_URL`, `EXT_ADOBE_AUTH_ENDPOINT_URL`, `EXT_ADOBE_CREDENTIALS_FILE`, `EXT_ADOBE_AUTHORIZATIONS_FILE` | [`backend/adobe/`](../backend/adobe) |
+| Adobe VIPM API | Adobe VIP Marketplace customer and order operations, flexible discount catalogue retrieval | OAuth 2.0 (Adobe IMS); credentials and authorizations loaded from mounted JSON files | `EXT_ADOBE_API_BASE_URL`, `EXT_ADOBE_AUTH_ENDPOINT_URL`, `EXT_ADOBE_CREDENTIALS_FILE`, `EXT_ADOBE_AUTHORIZATIONS_FILE` | [`backend/adobe/`](../backend/adobe) |
 | SoftwareOne Marketplace (MPT) API | Order events, agreement/customer API, plug metadata | Bearer token (JWT) / extension credentials | `MPT_API_BASE_URL`, `MPT_API_TOKEN`, `MPT_PRODUCTS_IDS`, `SDK_EXTENSION_API_KEY`, `SDK_EXTENSION_ID`, `SDK_EXTENSION_URL` | provided by `mpt-extension-sdk` |
-| Airtable (optional) | `mpt-tool` storage backend when enabled | API key | `MPT_TOOL_STORAGE_TYPE`, `MPT_TOOL_STORAGE_AIRTABLE_API_KEY`, `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID`, `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` | `mpt-tool` |
+| Airtable | Discount code storage (required), optional `mpt-tool` storage backend | API key | Discount store: `EXT_AIRTABLE_API_TOKEN`, `EXT_AIRTABLE_DISCOUNTS_ID`; `mpt-tool`: `MPT_TOOL_STORAGE_TYPE`, `MPT_TOOL_STORAGE_AIRTABLE_API_KEY`, `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID`, `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` | [`backend/mpt_adobe_vipm_ef/services/discounts.py`](../backend/mpt_adobe_vipm_ef/services/discounts.py), `mpt-tool` |
+
+## Adobe flexible discount catalogue retrieval
+
+The extension synchronizes the open Adobe flexible discount catalogue daily via
+the `GET /v3/flex-discounts` endpoint. The sync is scoped by:
+
+- **Authorization** — each platform catalog authorization maps to an Adobe
+  credential set in the authorizations file; the sync derives the authorization
+  ID from the platform's catalog authorizations of the extension's products
+- **Market segment** — Adobe publishes open discounts per market segment; the
+  sync walks COM, EDU, and GOV (GOV_LGA has no open discounts)
+- **Country** — the storefront country is derived from the authorization owner's
+  address; the sync queries Adobe for discounts available in that country
+
+The endpoint returns the open catalogue only (closed codes must be queried
+individually by code). Adobe caps the page size at 50 items; the client walks
+pages until `totalCount` is exhausted. Each discount includes:
+
+- Code, name, description, category, status
+- Start date, end date, discount lock end date (for reusable codes)
+- Discount type (percentage, fixed discount, fixed price)
+- Target offer IDs and qualifying offer IDs
+- Per-country discount values (country, currency, amount)
+
+Open discounts are mirrored into the Airtable discount store with
+`source = "API"` and `enrichment_status = "PENDING"`. Enrichment fields
+(applicable order types, annual/3YC support) are curated by operations and left
+untouched by the sync.
+
+## Airtable discount-store synchronization
+
+The Airtable discount store (`EXT_AIRTABLE_DISCOUNTS_ID`) holds three tables:
+
+- **Discount Codes** — one row per code (open and closed), keyed by
+  `(code, market_segment)`; carries the code attributes (name, description,
+  dates, reusability, target/qualifying offer IDs, enrichment status)
+- **Discount Values** — per-country discount amount rows, linked to the code row
+- **Discount Redemptions** — one row per code redeemed by a customer, tracking
+  when the code was first applied
+
+The daily sync (`/schedules/discounts/open-sync`, cron `0 0 * * *`) upserts open
+codes atomically:
+
+1. New codes are inserted with the attributes Adobe reports
+2. Existing open codes are updated with fresh Adobe data; enrichment fields stay
+   untouched
+3. Closed codes (`source = "Ops/Vendor"`) are never overwritten by the sync
+4. Per-country values are replaced atomically (one row per country)
+
+Closed codes are authored manually through the discount management API
+(`/api/v2/discount-codes`) by vendor or operations accounts. They target a
+specific customer and are not visible to other customers in the segment.
+
+The discount management API scopes all operations to an agreement (passed as the
+`agreement` query parameter), deriving the customer ID and market segment from
+the agreement. Client accounts read; vendor and operations accounts also author
+and curate closed codes. Open codes belong to the sync, so only vendor accounts
+may edit them.
 
 ## Notes
 
@@ -21,8 +79,15 @@ duplicate those tables.
   through the `ExtensionSettings.adobe_authorizations` `@cached_property`, so the
   files are read on first access (during the first Adobe API request via
   `get_authorization()`), not during `load()`/app startup.
-- Airtable is only used when `MPT_TOOL_STORAGE_TYPE=airtable`; with the default
-  `local` storage the Airtable variables can remain unset.
+- The Airtable discount store is required for discount code management and is
+  configured separately from the optional `mpt-tool` Airtable storage backend.
+  When `MPT_TOOL_STORAGE_TYPE=airtable`, both Airtable integrations are active
+  but target different bases/tables.
+- The discount store is built on demand from settings via
+  `DiscountStore.from_settings(settings)`, which fails fast when
+  `EXT_AIRTABLE_API_TOKEN` or `EXT_AIRTABLE_DISCOUNTS_ID` is unset.
+- All Airtable HTTP calls are bounded by a 60-second timeout (matching the Adobe
+  transport timeout) to prevent stalled requests from hanging worker threads.
 - The split billing view is served by the subscription sync
   (`POST /subscriptions/{id}/sync`): when the subscription has a `splitStatus`,
   the sync reads it back with `select=split` using the caller's token, so
