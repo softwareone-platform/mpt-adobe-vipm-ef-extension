@@ -64,16 +64,17 @@ def is_visible(record: AirtableRecord, market_segment: str, customer_id: str) ->
 def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.datetime) -> bool:
     """Return whether an order of ``order_type`` can still apply the code.
 
-    The row must not be retired, must list the order type among its applicable
-    ones (an empty list is "any order type", so it restricts nothing), and
-    ``now`` must sit inside its usable window: the
+    The row must not be retired, must not be pending enrichment (its order
+    types and annual/3YC support are not curated yet), must list the order
+    type among its applicable ones (an empty list is "any order type", so it
+    restricts nothing), and ``now`` must sit inside its usable window: the
     ``start_date``/``end_date`` range for a single-use code, extended to
     ``discount_lock_end_date`` for a reusable one (the lock keeps a redeemed
     code applicable past its end date). A missing or unreadable bound leaves
     that side of the window open.
     """
     fields = record["fields"]
-    if fields.get("retired_at"):
+    if fields.get("retired_at") or fields.get("enrichment_status") == ENRICHMENT_PENDING:
         return False
     applicable = fields.get("applicable_order_types") or []
     if applicable and order_type.value not in applicable:

@@ -185,7 +185,8 @@ describe('Discounts view', () => {
     expect(screen.getByText('Add seats')).toBeInTheDocument();
     expect(screen.getByText('2026-03-14')).toBeInTheDocument();
     // The default actor is Operations, which curates only the closed row.
-    expect(screen.getAllByText('Edit')).toHaveLength(1);
+    expect(screen.getByTestId('discounts-action-rec2')).toHaveTextContent('Edit');
+    expect(screen.queryByTestId('discounts-action-rec1')).not.toBeInTheDocument();
   });
 
   it('offers operations no action on open codes', async () => {
@@ -194,15 +195,17 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.getByText('DISCOUNT-CODE-1')).toBeInTheDocument();
-    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('discounts-action-rec1')).not.toBeInTheDocument();
   });
 
-  it('offers vendors an action on open codes as well as closed ones', async () => {
+  it('offers vendors an action on closed codes only; open codes are read-only', async () => {
     mockAccount('Vendor');
 
     await renderDiscounts();
 
-    expect(screen.getAllByText('Edit')).toHaveLength(2);
+    // Only the closed row (DISCOUNT-CODE-2) is editable; the open row is sync-owned.
+    expect(screen.getByTestId('discounts-action-rec2')).toHaveTextContent('Edit');
+    expect(screen.queryByTestId('discounts-action-rec1')).not.toBeInTheDocument();
   });
 
   it('hides Actions and Add closed discount for client actors', async () => {
@@ -214,6 +217,7 @@ describe('Discounts view', () => {
     await renderDiscounts();
 
     expect(screen.queryByRole('button', { name: 'Add closed discount' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actions')).not.toBeInTheDocument();
   });
 
   it('shows Actions and Add closed discount for operations actors', async () => {
@@ -228,7 +232,7 @@ describe('Discounts view', () => {
 
     expect(screen.getByRole('button', { name: 'Add closed discount' })).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
-    expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('discounts-action-rec2')).toHaveTextContent('Edit');
   });
 
   it('renders expired closed codes with the lock date and the Any order type', async () => {

@@ -256,7 +256,9 @@ export function Discounts() {
 
   const agreementProductId = context.data?.agreement?.product?.id;
   const products = settings?.products;
-  const canAddClosedDiscount = canManageDiscountCodes(accountType, products, agreementProductId);
+  // Gates both the add action and the Actions column: clients (and accounts on
+  // unsupported products) get the read-only grid with no actions affordance.
+  const canManageDiscounts = canManageDiscountCodes(accountType, products, agreementProductId);
 
   const canEditDiscount = useCallback(
     (item: Discount) =>
@@ -312,27 +314,30 @@ export function Discounts() {
   );
 
   const columns = useMemo<GridColumnDefinition<Discount>[]>(
-    () => [
-      ...BASE_COLUMNS,
-      {
-        name: "actions",
-        title: i18n.t("Agreement:Discounts:Actions"),
-        fields: ["id"],
-        initialWidth: 80,
-        cell: (item: Discount) =>
-          canEditDiscount(item) ? (
-            <GridCellActions
-              item={item}
-              actions={DISCOUNT_ACTIONS}
-              onAction={onEditDiscountAction}
-              testId={`discounts-action-${item.id}`}
-            />
-          ) : (
-            <GridCellSimple />
-          ),
-      } as GridColumnDefinition<Discount>,
-    ],
-    [canEditDiscount, onEditDiscountAction],
+    () =>
+      !canManageDiscounts
+        ? BASE_COLUMNS
+        : [
+            ...BASE_COLUMNS,
+            {
+              name: "actions",
+              title: i18n.t("Agreement:Discounts:Actions"),
+              fields: ["id"],
+              initialWidth: 80,
+              cell: (item: Discount) =>
+                canEditDiscount(item) ? (
+                  <GridCellActions
+                    item={item}
+                    actions={DISCOUNT_ACTIONS}
+                    onAction={onEditDiscountAction}
+                    testId={`discounts-action-${item.id}`}
+                  />
+                ) : (
+                  <GridCellSimple />
+                ),
+            } as GridColumnDefinition<Discount>,
+          ],
+    [canManageDiscounts, canEditDiscount, onEditDiscountAction],
   );
 
   const isLoading = discounts.status === 'idle' || discounts.status === 'loading';
@@ -390,7 +395,7 @@ export function Discounts() {
         Refresh instead of above the grid.
       */}
       <Grid {...gridProps} containerClassName="discounts__grid">
-        {canAddClosedDiscount && (
+        {canManageDiscounts && (
           <Grid.Actions>
             <Button
               type="secondary"
