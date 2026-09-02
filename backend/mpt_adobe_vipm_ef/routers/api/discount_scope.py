@@ -36,15 +36,6 @@ def require_editor_account(ctx: APIContext) -> None:
         )
 
 
-def can_edit_open_codes(ctx: APIContext) -> bool:
-    """Return whether the caller may write to open (sync-owned) codes.
-
-    Only vendor accounts may: an open code is Adobe's, and operations accounts
-    curate the closed codes they authored.
-    """
-    return ctx.auth.account.is_vendor()
-
-
 async def load_discount_scope(ctx: APIContext) -> DiscountScope:
     """Resolve the agreement, market segment and customer id for the request."""
     agreement_id = ctx.request.query.get(AGREEMENT_QUERY_PARAM)

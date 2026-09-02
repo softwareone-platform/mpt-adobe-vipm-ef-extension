@@ -308,17 +308,12 @@ async def test_update_rejects_open_codes_for_operations(agreement, fake_store, c
         await update_discount_code(discount_id=_RECORD_ID, ctx=ctx, body=_update_body())
 
 
-async def test_update_allows_open_codes_for_vendors(agreement, fake_store, code_record_factory):
+async def test_update_rejects_open_codes_for_vendors(agreement, fake_store, code_record_factory):
     ctx = FakeDiscountContext(agreement, account_type=AccountType.VENDOR)
     fake_store.get_code.return_value = code_record_factory(source="API")
 
-    result = await update_discount_code(
-        discount_id=_RECORD_ID, ctx=ctx, body=_update_body(name="Summer 2025 v2")
-    )
-
-    assert result.status_code == http.HTTPStatus.OK
-    updated_fields = fake_store.update_code.call_args.args[1]
-    assert updated_fields["name"] == "Summer 2025 v2"
+    with pytest.raises(ValidationError):
+        await update_discount_code(discount_id=_RECORD_ID, ctx=ctx, body=_update_body())
 
 
 async def test_update_rewrites_code_and_value_rows(agreement, fake_store):
