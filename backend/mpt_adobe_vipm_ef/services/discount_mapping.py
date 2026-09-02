@@ -5,23 +5,36 @@ from types import MappingProxyType
 from typing import Any
 
 from mpt_adobe_vipm_ef.models.discount import (
+    DiscountCategory,
     DiscountCodeCreateRequest,
     DiscountCodeUpdateRequest,
     DiscountOrderType,
+    DiscountType,
 )
 from mpt_adobe_vipm_ef.services.discounts import (
     ACTIVE_STATUS,
     CODE_FIELD,
     ENRICHMENT_COMPLETE,
+    ENRICHMENT_PENDING,
     SOURCE_CLOSED,
     SOURCE_OPEN,
     AirtableRecord,
 )
+from mpt_adobe_vipm_ef.services.items import get_partial_sku
 
 ValueEntry = dict[str, Any]
+AdobeFlexDiscount = dict[str, Any]
 
 _SOURCE_LABELS = MappingProxyType({SOURCE_OPEN: "Open", SOURCE_CLOSED: "Closed"})
 _CSV_SEPARATOR = ","
+
+# Adobe's flex-discount outcome types keyed to the discount types the store uses.
+_ADOBE_DISCOUNT_TYPES = MappingProxyType({
+    "PERCENTAGE_DISCOUNT": DiscountType.PERCENTAGE.value,
+    "PERCENTAGE": DiscountType.PERCENTAGE.value,
+    "FIXED_DISCOUNT": DiscountType.FIXED_DISCOUNT.value,
+    "FIXED_PRICE": DiscountType.FIXED_PRICE.value,
+})
 
 
 def record_code(record: AirtableRecord) -> str:
@@ -123,21 +136,102 @@ def build_closed_code_fields(
     return fields
 
 
+def build_open_update_fields(discount: AdobeFlexDiscount, now: dt.datetime) -> dict[str, Any]:
+    """Build the Airtable fields the Adobe sync owns on an open code row.
+
+    Only the attributes ``GET /v3/flex-discounts`` reports are written; the
+    enrichment fields (order types, annual/3YC support) are curated by
+    operations and deliberately left untouched.
+    """
+    qualification = discount.get("qualification") or {}
+    lock_end_date = _adobe_iso(discount.get("discountLockEndDate"))
+    return {
+        "name": str(discount.get("name") or ""),
+        "description": str(discount.get("description") or ""),
+        "adobe_discount_id": str(discount.get("id") or ""),
+        "category": str(discount.get("category") or ""),
+        "status": str(discount.get("status") or ACTIVE_STATUS),
+        "discount_type": _open_discount_type(discount),
+        "start_date": _adobe_iso(discount.get("startDate")),
+        "end_date": _adobe_iso(discount.get("endDate")),
+        # Reusability is derived from the lock date presence (TDR rule).
+        "reusable": lock_end_date is not None,
+        "discount_lock_end_date": lock_end_date,
+        "target_offer_ids": _partial_sku_csv(qualification.get("baseOfferIds") or []),
+        "qualifying_offer_ids": _partial_sku_csv(qualification.get("qualifyingOfferIds") or []),
+        "synchronized_at": _iso(now),
+        "updated_at": _iso(now),
+    }
+
+
+def build_open_code_fields(
+    discount: AdobeFlexDiscount, market_segment: str, now: dt.datetime
+) -> dict[str, Any]:
+    """Build the Airtable fields for an open code row first seen by the sync."""
+    fields = build_open_update_fields(discount, now)
+    fields.update({
+        CODE_FIELD: str(discount.get("code") or ""),
+        "source": SOURCE_OPEN,
+        "market_segment": market_segment,
+        "enrichment_status": ENRICHMENT_PENDING,
+        "created_at": _iso(now),
+    })
+    if fields["category"] == DiscountCategory.INTRO.value:
+        # The only order-type enrichment the TDR fixes: INTRO is net-new only.
+        fields["applicable_order_types"] = [DiscountOrderType.NEW.value]
+    return fields
+
+
+def _partial_sku_csv(offer_ids: list[Any]) -> str:
+    """Store Adobe offer ids as their 10-char partial SKUs, deduplicated in order.
+
+    The MPT item vendor external id carries the partial SKU, so trimming the
+    discount-level/segment suffix here lets the wizards match a code to a line
+    regardless of the customer's volume level.
+    """
+    partial_skus = dict.fromkeys(get_partial_sku(str(offer_id)) for offer_id in offer_ids)
+    return _CSV_SEPARATOR.join(sku for sku in partial_skus if sku)
+
+
+def open_discount_values(discount: AdobeFlexDiscount) -> list[ValueEntry]:
+    """Extract the value entries of an Adobe flex discount.
+
+    Fixed-type outcomes carry one value per country; percentage outcomes are
+    country-agnostic, reported by Adobe as a bare ``{"value": ...}`` without
+    country or currency.
+    """
+    entries: list[ValueEntry] = []
+    for outcome in discount.get("outcomes") or []:
+        is_percentage = _outcome_discount_type(outcome) == DiscountType.PERCENTAGE.value
+        for discount_value in outcome.get("discountValues") or []:
+            entry = _value_entry(discount_value, require_country=not is_percentage)
+            if entry is not None:
+                entries.append(entry)
+    return entries
+
+
 def build_value_fields(
     code: str,
     market_segment: str,
-    country: str,
-    currency: str,
+    country: str | None,
+    currency: str | None,
     amount: float,
 ) -> dict[str, Any]:
-    """Build the Airtable fields of the per-country value row of a closed code."""
-    return {
+    """Build the Airtable fields of one value row of a code.
+
+    Country and currency are set for fixed-type values only: a percentage is
+    country-agnostic and its single row leaves both fields blank.
+    """
+    fields: dict[str, Any] = {
         "code": code,
         "market_segment": market_segment,
-        "country": country,
-        "currency": currency,
         "value": amount,
     }
+    if country:
+        fields["country"] = country
+    if currency:
+        fields["currency"] = currency
+    return fields
 
 
 def group_values(value_records: list[AirtableRecord]) -> dict[str, list[ValueEntry]]:
@@ -202,6 +296,42 @@ def to_api_payload(
         "createdAt": fields.get("created_at"),
         "updatedAt": fields.get("updated_at"),
     }
+
+
+def _value_entry(discount_value: dict[str, Any], *, require_country: bool) -> ValueEntry | None:
+    """Build one value entry, or None when it is incomplete.
+
+    ``require_country`` is False for percentage outcomes: Adobe reports those
+    without a country, so only the value itself is mandatory.
+    """
+    country = discount_value.get("country")
+    amount = discount_value.get("value")
+    if amount is None or (require_country and not country):
+        return None
+    return {
+        "country": country,
+        "currency": discount_value.get("currency"),
+        "value": amount,
+    }
+
+
+def _open_discount_type(discount: AdobeFlexDiscount) -> str:
+    """Map the first Adobe outcome type to the discount type the store uses."""
+    outcomes = discount.get("outcomes") or []
+    if not outcomes:
+        return ""
+    return _outcome_discount_type(outcomes[0])
+
+
+def _outcome_discount_type(outcome: dict[str, Any]) -> str:
+    """Map one Adobe outcome type to the discount type the store uses."""
+    adobe_type = str(outcome.get("type") or "")
+    return _ADOBE_DISCOUNT_TYPES.get(adobe_type, adobe_type)
+
+
+def _adobe_iso(raw_date: Any) -> str | None:
+    """Normalize an Adobe ISO-8601 date string to the stored UTC format."""
+    return _iso(_read_date(raw_date))
 
 
 def _usable_until(fields: dict[str, Any]) -> dt.datetime | None:

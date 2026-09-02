@@ -14,6 +14,7 @@ from mpt_adobe_vipm_ef.routers.api.subscriptions import subscriptions_router
 from mpt_adobe_vipm_ef.routers.api.upgrade import upgrade_router
 from mpt_adobe_vipm_ef.routers.events.order import orders_router
 from mpt_adobe_vipm_ef.routers.plugs import plugs_router
+from mpt_adobe_vipm_ef.routers.schedules.discounts import discount_schedules_router
 
 ext_app = ExtensionApp(prefix="/api/v2", version="6.0.0")
 ext_app.include_router(orders_router)
@@ -29,3 +30,4 @@ ext_app.include_router(subscriptions_router)
 ext_app.include_router(upgrade_router)
 ext_app.include_router(renewal_router)
 ext_app.include_router(discounts_router)
+ext_app.include_router(discount_schedules_router)

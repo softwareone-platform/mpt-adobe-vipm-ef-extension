@@ -276,7 +276,7 @@ async def test_create_returns_created_payload(agreement, fake_store):
 
     result = await create_discount_code(ctx=ctx, body=_create_body())
 
-    expected_values = [{"country": "US", "currency": "USD", "value": 20}]
+    expected_values = [{"country": None, "currency": None, "value": 20}]
     assert result.status_code == http.HTTPStatus.CREATED
     assert result.payload["code"] == "SUMMER25"
     assert result.payload["values"] == expected_values
@@ -288,11 +288,10 @@ async def test_create_stores_code_and_value_row(agreement, fake_store):
     await create_discount_code(ctx=ctx, body=_create_body())
 
     created_fields = fake_store.create_code.call_args.args[0]
+    # The fixture body is a percentage: its value row is country-agnostic.
     expected_value_fields = {
         "code": "SUMMER25",
         "market_segment": "COM",
-        "country": "US",
-        "currency": "USD",
         "value": 20,
     }
     assert created_fields["source"] == "Ops/Vendor"

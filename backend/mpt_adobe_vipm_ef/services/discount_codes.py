@@ -20,7 +20,11 @@ from mpt_extension_sdk.api import (
 )
 from requests import RequestException
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeUpdateRequest, DiscountScope
+from mpt_adobe_vipm_ef.models.discount import (
+    DiscountCodeUpdateRequest,
+    DiscountScope,
+    DiscountType,
+)
 from mpt_adobe_vipm_ef.services import discount_mapping
 from mpt_adobe_vipm_ef.services.discounts import AirtableRecord, DiscountStore
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
@@ -108,7 +112,16 @@ async def reject_duplicate_code(store: DiscountStore, scope: DiscountScope, code
 def resolve_value_fields(
     scope: DiscountScope, code: str, body: DiscountCodeUpdateRequest
 ) -> dict[str, Any]:
-    """Build the per-country value row, resolving country and currency from scope."""
+    """Build the stored value row of an authored code.
+
+    Fixed-type discounts are priced per country and currency, resolved from
+    the agreement scope. A percentage is country-agnostic — its row carries
+    the bare value, mirroring how Adobe reports open percentage discounts.
+    """
+    if body.discount_type is DiscountType.PERCENTAGE:
+        return discount_mapping.build_value_fields(
+            code, scope.market_segment, None, None, body.amount
+        )
     country = scope.country
     if not country:
         raise ValidationError(
@@ -125,8 +138,8 @@ def resolve_value_fields(
 def value_entry(value_fields: dict[str, Any]) -> dict[str, Any]:
     """Shape a stored value row as the API ``values`` entry."""
     return {
-        "country": value_fields["country"],
-        "currency": value_fields["currency"],
+        "country": value_fields.get("country"),
+        "currency": value_fields.get("currency"),
         "value": value_fields["value"],
     }
 
