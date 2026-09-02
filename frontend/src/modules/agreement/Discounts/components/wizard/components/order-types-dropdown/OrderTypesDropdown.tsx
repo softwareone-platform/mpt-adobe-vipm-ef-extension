@@ -21,6 +21,7 @@ const OPTIONS: ListOption<OrderTypeSelection>[] = [
   { type: "divider" },
   { label: "Add seats", value: "NEW" },
   { label: "Renewal", value: "RENEWAL" },
+  { label: "Mid-term upgrade", value: "SWITCH" },
 ];
 
 export interface OrderTypesDropdownProps {
