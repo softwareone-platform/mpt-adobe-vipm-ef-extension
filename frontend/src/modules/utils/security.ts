@@ -87,6 +87,12 @@ export function canManageDiscountCodes(
   return canRequestAdobeAction(accountType, products, agreementProductId);
 }
 
+/**
+ * Open (sync-owned) codes are read-only on this surface for every actor, per
+ * the BDR: they are authored in Operations' internal tooling and the catalogue
+ * sync overwrites their Adobe-sourced fields on each run. Only closed codes
+ * are editable here.
+ */
 export function canEditDiscountCode(
   source: string | null | undefined,
   accountType: AccountType | undefined,
@@ -95,6 +101,6 @@ export function canEditDiscountCode(
 ): boolean {
   return (
     canManageDiscountCodes(accountType, products, agreementProductId) &&
-    (accountType === 'Vendor' || source?.toUpperCase() === 'CLOSED')
+    source?.toUpperCase() === 'CLOSED'
   );
 }

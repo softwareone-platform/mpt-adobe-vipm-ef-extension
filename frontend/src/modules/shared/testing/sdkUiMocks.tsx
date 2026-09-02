@@ -200,8 +200,14 @@ export function createGridMock(onUseGridAsync?: (config: MockGridConfig) => void
 
   return {
     GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    GridCellActions: ({ actions }: { actions: MockActionOption[] }) => (
-      <div>
+    GridCellActions: ({
+      actions,
+      testId,
+    }: {
+      actions: MockActionOption[];
+      testId?: string;
+    }) => (
+      <div data-testid={testId}>
         {actions
           .filter((action) => action.type !== 'divider' && action.type !== 'group')
           .map((action, index) => (

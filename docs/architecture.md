@@ -35,8 +35,10 @@ frontend/                    TypeScript plug UI (esbuild)
   - `api/discounts.py` — discount code management endpoints (Discount Management
     TDR); CRUD over the Airtable discount data store, scoped to an agreement
     passed as the `agreement` query parameter. Client accounts read; vendor and
-    operations accounts also author and curate closed codes. Open codes belong
-    to the Adobe synchronization job, so only vendor accounts may edit them.
+    operations accounts also author and curate closed codes. Open codes are
+    read-only for every account: they belong to the Adobe synchronization job,
+    which rewrites their fields on every run, so update and delete only accept
+    closed codes.
   - `api/order_render.py` — `GET /api/v2/orders/{order_id}/render` renders the
     product template a placed order carries, which the wizards' summary steps
     show instead of wording of their own. It proxies the marketplace's own
@@ -132,7 +134,8 @@ frontend/                    TypeScript plug UI (esbuild)
     customer).
   - `discount_mapping.py` — mapping between Airtable discount rows and the API
     object representation (TDR); handles serialization/deserialization,
-    filtering offerable codes by order type and validity windows.
+    filtering offerable codes by order type, validity windows, and
+    enrichment status (codes pending enrichment are never offered).
   - `discount_sync.py` — scheduled synchronization of the open Adobe flexible
     discount catalogue into the Airtable store; walks platform catalog
     authorizations, derives storefront countries, and mirrors the open

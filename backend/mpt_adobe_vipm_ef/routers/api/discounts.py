@@ -3,7 +3,7 @@
 CRUD over the Airtable discount data store, scoped to an agreement passed as
 the ``agreement`` query parameter. Client accounts read; vendor and operations
 accounts also author and curate closed codes. Open codes belong to the Adobe
-synchronization job, so only vendor accounts may edit them.
+synchronization job and are read-only on this surface for every actor.
 """
 
 import datetime as dt
@@ -15,7 +15,6 @@ from mpt_extension_sdk.routing import APIRouter
 from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountCodeUpdateRequest
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import (
-    can_edit_open_codes,
     load_discount_scope,
     read_order_type_filter,
     require_editor_account,
@@ -98,14 +97,13 @@ async def update_discount_code(  # noqa: WPS210
 ) -> APIResponse:
     """Update a discount code from the edit wizard; the code is immutable.
 
-    Operations may only curate closed codes; vendors also own the open ones.
+    Only closed codes are editable: open codes are owned by the catalogue sync,
+    which rewrites their Adobe-sourced fields on every run.
     """
     require_editor_account(ctx)
     scope = await load_discount_scope(ctx)
     store = build_store(ctx)
-    record = await require_visible_record(
-        store, scope, discount_id, closed_only=not can_edit_open_codes(ctx)
-    )
+    record = await require_visible_record(store, scope, discount_id, closed_only=True)
     code = discount_mapping.record_code(record)
     now = dt.datetime.now(tz=dt.UTC)
     value_fields = resolve_value_fields(scope, code, body)
