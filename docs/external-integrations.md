@@ -68,8 +68,9 @@ specific customer and are not visible to other customers in the segment.
 The discount management API scopes all operations to an agreement (passed as the
 `agreement` query parameter), deriving the customer ID and market segment from
 the agreement. Client accounts read; vendor and operations accounts also author
-and curate closed codes. Open codes belong to the sync, so only vendor accounts
-may edit them.
+and curate closed codes. Open codes are read-only for every account: they belong
+to the sync, which rewrites their fields on every run, so update and delete only
+accept closed codes.
 
 ## Notes
 

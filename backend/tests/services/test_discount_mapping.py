@@ -298,6 +298,14 @@ def test_is_offerable_accepts_a_code_inside_its_validity_window(code_record_fact
     assert result is True
 
 
+def test_is_offerable_accepts_an_enriched_code(code_record_factory):
+    record = code_record_factory(enrichment_status="COMPLETE")
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is True
+
+
 @pytest.mark.parametrize(
     "field_overrides",
     [
@@ -322,6 +330,7 @@ def test_is_offerable_accepts_the_bounds_of_the_validity_window(
         pytest.param({"start_date": "2026-08-01T00:00:00Z"}, id="not-started"),
         pytest.param({"end_date": "2026-07-01T00:00:00Z"}, id="expired"),
         pytest.param({"retired_at": "2026-07-01T00:00:00Z"}, id="retired"),
+        pytest.param({"enrichment_status": "PENDING"}, id="pending-enrichment"),
     ],
 )
 def test_is_offerable_rejects_codes_out_of_play(field_overrides, code_record_factory):
