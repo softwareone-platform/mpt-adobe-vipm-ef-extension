@@ -20,6 +20,8 @@ export const COTERM_DATE_PARAM = 'cotermDate';
 
 export const WIZARD_GRID_PAGE_SIZE = 10;
 export const DISCOUNTS_FETCH_SIZE = 100;
+export const ADOBE_UNKNOWN_DISCOUNT_CODE = '2146';
+export const ADOBE_ERROR_CODE_PATTERN = /^(\d{4})\s*-/;
 
 export interface RequestState {
   error: string;

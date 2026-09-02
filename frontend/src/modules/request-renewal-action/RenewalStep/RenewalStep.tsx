@@ -141,7 +141,7 @@ function buildColumns(
       name: 'quantity',
       title: i18n.t('Renewal:Grid:Current qty'),
       fields: ['quantity'],
-      initialWidth: 100,
+      initialWidth: 112,
       cell: (row) => <TextCell text={row.quantity ?? EMPTY_VALUE} />,
     },
     {

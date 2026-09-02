@@ -24,6 +24,7 @@ import { Order, TargetSubscription } from '../model';
 import { Agreement, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { getMonthlyPrice, getYearlyPrice, parseUnitPrice, sumPrices } from '../../utils/price';
+import { formatQuantityDelta } from '../../utils/quantity';
 
 import './ReviewOrderStep.scss';
 
@@ -148,7 +149,7 @@ function getColumns(
         item.isSummary ? (
           <GridCellSimple></GridCellSimple>
         ) : (
-          <TextCell text={item.delta > 0 ? `+${item.delta}` : item.delta} secondaryContent={item.newQuantity} />
+          <TextCell text={formatQuantityDelta(item.delta)} secondaryContent={item.newQuantity} />
         ),
     },
     {

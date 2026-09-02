@@ -183,8 +183,6 @@ def test_is_offerable_accepts_the_bounds_of_the_validity_window(
     "field_overrides",
     [
         pytest.param({"applicable_order_types": ["NEW", "SWITCH"]}, id="other-order-types"),
-        pytest.param({"applicable_order_types": []}, id="no-order-types"),
-        pytest.param({"applicable_order_types": None}, id="missing-order-types"),
         pytest.param({"start_date": "2026-08-01T00:00:00Z"}, id="not-started"),
         pytest.param({"end_date": "2026-07-01T00:00:00Z"}, id="expired"),
         pytest.param({"retired_at": "2026-07-01T00:00:00Z"}, id="retired"),
@@ -196,6 +194,24 @@ def test_is_offerable_rejects_codes_out_of_play(field_overrides, code_record_fac
     result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
 
     assert result is False
+
+
+@pytest.mark.parametrize(
+    "applicable_order_types",
+    [
+        pytest.param([], id="no-order-types"),
+        pytest.param(None, id="missing-order-types"),
+    ],
+)
+def test_is_offerable_accepts_a_code_listing_no_order_type(
+    applicable_order_types, code_record_factory
+):
+    """A code that names no order type applies to any of them."""
+    record = code_record_factory(applicable_order_types=applicable_order_types)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.RENEWAL, _NOW)
+
+    assert result is True
 
 
 def test_is_offerable_extends_a_reusable_code_to_its_discount_lock(code_record_factory):

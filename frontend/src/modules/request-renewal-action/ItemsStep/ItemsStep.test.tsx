@@ -258,6 +258,7 @@ const renderStep = ({
       renewalStates={renewalStates}
       onQuantityChange={onQuantityChange}
       onNetNewItemsChange={onNetNewItemsChange}
+      onPreview={jest.fn()}
     />,
   );
 
@@ -802,6 +803,7 @@ describe('ItemsStep', () => {
           renewalStates={{}}
           onQuantityChange={onQuantityChange}
           onNetNewItemsChange={jest.fn()}
+          onPreview={jest.fn()}
         />,
       );
 

@@ -11,13 +11,13 @@ import {
   useGridInMemory,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
-import { Select } from '@softwareone-platform/sdk-react-ui-v0/select';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
 import { useStepActions } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepNavigationProperties } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 
 import { i18n } from '../../../i18n/translations';
 import { ChipCell } from '../../shared/components/GridCell/ChipCell/ChipCell';
+import { CodeCombobox } from '../../shared/components/CodeCombobox/CodeCombobox';
 import { TextCell } from '../../shared/components/GridCell/TextCell/TextCell';
 import { LinkReference } from '../../shared/components/LinkReference/LinkReference';
 import { NoDataCard } from '../../shared/components/NoDataCard/NoDataCard';
@@ -31,7 +31,8 @@ import {
 } from '../../shared/constants';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useRenewalDiscountValidation } from '../../shared/hooks/useRenewalDiscountValidation';
-import type { Agreement, Discount, Subscription } from '../../shared/model';
+import type { Agreement, Discount, RenewalPreview, Subscription } from '../../shared/model';
+import { toDiscountErrorMessage } from '../../utils/adobeError';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import {
@@ -62,6 +63,7 @@ export interface PromotionsStepProps {
   /** The path picked on the first step; the early one gates Next on Adobe's preview. */
   path: RenewalPath;
   onDiscountChange: (rowId: string, code: string) => void;
+  onPreview: (preview: RenewalPreview | null) => void;
 }
 
 interface Row {
@@ -180,10 +182,9 @@ function DiscountCodeCell({ row }: { row: Row }) {
   const { getOptions, onDiscountChange } = useContext(CellContext);
   return (
     <GridCellSimple>
-      <Select
+      <CodeCombobox
         value={row.code}
         options={getOptions(row.sku)}
-        cssPosition="fixed"
         placeholder={i18n.t('Renewal:Promotions:Select or type code')}
         onChange={(code: string) => onDiscountChange(row.id, code)}
         testId={`discount-code-${row.id}`}
@@ -228,7 +229,7 @@ const columns: GridColumnDefinition<Row>[] = [
     name: 'billingModel',
     title: i18n.t('Renewal:Items:Billing model'),
     fields: ['billingModel'],
-    initialWidth: 120,
+    initialWidth: 100,
     cell: (row) => <TextCell text={row.billingModel} />,
   },
   {
@@ -253,14 +254,14 @@ const columns: GridColumnDefinition<Row>[] = [
     name: 'terms',
     title: i18n.t('Common:Terms title'),
     fields: ['terms', 'commitment'],
-    initialWidth: 140,
+    initialWidth: 120,
     cell: (row) => <TextCell text={row.terms} secondaryContent={row.commitment} />,
   },
   {
     name: 'discountCode',
     title: i18n.t('Renewal:Promotions:Discount code'),
     fields: ['code'],
-    initialWidth: 220,
+    initialWidth: 180,
     isScalable: false,
     cell: (row) => <DiscountCodeCell row={row} />,
   },
@@ -268,7 +269,7 @@ const columns: GridColumnDefinition<Row>[] = [
     name: 'unitSP',
     title: i18n.t('Renewal:Grid:Unit SP'),
     fields: ['unitSP'],
-    initialWidth: 120,
+    initialWidth: 110,
     cell: (row) => (
       <TextCell
         text={row.unitSP != null ? formatPrice(row.unitSP) : '—'}
@@ -280,14 +281,14 @@ const columns: GridColumnDefinition<Row>[] = [
     name: 'spxM',
     title: i18n.t('Renewal:Grid:SPxM'),
     fields: ['spxM'],
-    initialWidth: 120,
+    initialWidth: 100,
     cell: (row) => <PriceCell row={row} price={getMonthlyPrice} />,
   },
   {
     name: 'spxY',
     title: i18n.t('Renewal:Grid:SPxY'),
     fields: ['spxY'],
-    initialWidth: 120,
+    initialWidth: 100,
     cell: (row) => <PriceCell row={row} price={getYearlyPrice} />,
   },
   {
@@ -325,6 +326,7 @@ export function PromotionsStep({
   discountSelections,
   path,
   onDiscountChange,
+  onPreview,
 }: PromotionsStepProps) {
   const { t } = useTranslation();
   const discounts = useAllDiscounts(agreement.id, 'RENEWAL');
@@ -335,7 +337,7 @@ export function PromotionsStep({
     validateDiscounts,
     cancel: cancelDiscountValidation,
     reset: resetDiscountValidation,
-  } = useRenewalDiscountValidation(agreement.id);
+  } = useRenewalDiscountValidation(agreement.id, onPreview);
 
   // A code that cannot apply to a renewal is never offered on this step.
   const renewalDiscounts = useMemo(() => discounts.data.filter(appliesToRenewal), [discounts.data]);
@@ -361,7 +363,8 @@ export function PromotionsStep({
             : t('Renewal:Promotions:Redeemed code', { code: getDiscountLabel(discount) }),
           value: normalizeDiscountCode(discount.code),
           isDisabled: !isDiscountAvailable(discount),
-        }));
+        }))
+        .sort((left, right) => left.value.localeCompare(right.value));
       byOffer.set(vendorExternalId, options);
       return options;
     };
@@ -371,6 +374,13 @@ export function PromotionsStep({
     () => ({ discounts: renewalDiscounts, getOptions, onDiscountChange }),
     [renewalDiscounts, getOptions, onDiscountChange],
   );
+
+  const unknownCode = useMemo(() => {
+    const known = new Set(renewalDiscounts.map((discount) => normalizeDiscountCode(discount.code)));
+    return Object.values(discountSelections).find((code) => code && !known.has(code)) ?? '';
+  }, [discountSelections, renewalDiscounts]);
+
+  const validationMessage = toDiscountErrorMessage(discountValidationError, unknownCode);
 
   // Any discount edit invalidates the previous validation outcome.
   useEffect(() => {
@@ -440,13 +450,23 @@ export function PromotionsStep({
             </InlineNotification>
           </div>
         )}
+        {path === 'anniversary' && unknownCode && (
+          <div
+            className="promotions-step__validation"
+            data-testid="promotions-step-unknown-code"
+          >
+            <InlineNotification status="neutral">
+              {t('Renewal:Promotions:Unknown code', { code: unknownCode })}
+            </InlineNotification>
+          </div>
+        )}
         {discountValidationError && (
           <div
             className="promotions-step__validation"
             data-testid="promotions-step-validation-error"
           >
-            <InlineNotification status="error">
-              {discountValidationError}
+            <InlineNotification status={validationMessage === discountValidationError ? 'error' : 'neutral'}>
+              {validationMessage}
             </InlineNotification>
           </div>
         )}

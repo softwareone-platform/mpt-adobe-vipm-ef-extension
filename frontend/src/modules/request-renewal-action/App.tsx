@@ -22,7 +22,7 @@ import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
 import { useRenewalPathState } from '../shared/hooks/useRenewalPathState';
 import { useSettingsResult } from '../shared/hooks/useSettings';
 import { canPlanRenewal, getRecommendedOfferIds, readParameter } from '../shared/model';
-import type { RenewalOrderResult } from '../shared/model';
+import type { RenewalOrderResult, RenewalPreview } from '../shared/model';
 import type { AccountType } from '../shared/three-year-commitment';
 import { getPortalOrigin } from '../utils/link';
 import { canRequestRenewalAction } from '../utils/security';
@@ -72,6 +72,7 @@ export default function App() {
   const [renewalQuantities, setRenewalQuantities] = useState<RenewalQuantities>({});
   const [netNewItems, setNetNewItems] = useState<NetNewItem[]>([]);
   const [discountSelections, setDiscountSelections] = useState<DiscountSelections>({});
+  const [renewalPreview, setRenewalPreview] = useState<RenewalPreview | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails>({ externalId: '', notes: '' });
   const [order, setOrder] = useState<RenewalOrderResult | null>(null);
   const {
@@ -362,6 +363,7 @@ export default function App() {
           renewalStates={renewalState.data}
           onQuantityChange={onRenewalQuantityChange}
           onNetNewItemsChange={setNetNewItems}
+          onPreview={setRenewalPreview}
         />
       ),
     },
@@ -377,6 +379,7 @@ export default function App() {
           discountSelections={discountSelections}
           path={renewalPath}
           onDiscountChange={onDiscountChange}
+          onPreview={setRenewalPreview}
         />
       ),
     },
@@ -403,6 +406,7 @@ export default function App() {
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
           netNewItems={netNewItems}
+          preview={renewalPreview}
           details={orderDetails}
           onPlaceOrder={placeOrder}
           errorMessage={submitError}
