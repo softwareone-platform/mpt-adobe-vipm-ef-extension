@@ -62,7 +62,7 @@ async def create_upgrade_order(  # noqa: WPS210, WPS217
     in Processing status) carrying the hidden ``switchPayload`` DataObject
     parameter.
     """
-    if ctx.auth is None or not ctx.auth.account.is_client():
+    if not ctx.auth.account.is_client():
         raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)

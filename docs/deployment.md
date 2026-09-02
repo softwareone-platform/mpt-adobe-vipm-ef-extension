@@ -37,6 +37,17 @@ Local setup instructions live in [docs/local-development.md](local-development.m
 | `EXT_ADOBE_CREDENTIALS_FILE` | - | `/extension/adobe_credentials.json` | Path to the Adobe credentials JSON file |
 | `EXT_PRODUCT_SEGMENTS` | - | `{"PRD-1111-1111":"COM"}` | Per-product Adobe segment mapping (JSON) |
 
+## Airtable Discount Store Settings
+
+The Airtable discount store is required for discount code management. It holds the local copy of the Adobe flexible discount catalogue synchronized daily, plus manually-authored closed codes.
+
+| Environment Variable | Default | Example | Description |
+| --- | --- | --- | --- |
+| `EXT_AIRTABLE_API_TOKEN` | - | `patXXXXXXXXXXXXXX` | Airtable API key for the discount store; required for discount code management and scheduled sync |
+| `EXT_AIRTABLE_DISCOUNTS_ID` | - | `appXXXXXXXXXXXXXX` | Airtable base ID for the discount store; must contain `Discount Codes`, `Discount Values`, and `Discount Redemptions` tables |
+
+The discount store is built on demand via `DiscountStore.from_settings(settings)`, which fails fast when either variable is unset. The scheduled sync (`/schedules/discounts/open-sync`) runs daily at midnight UTC (`cron: 0 0 * * *`) and requires both variables to be configured.
+
 ## AppInsights Settings
 
 `APPLICATIONINSIGHTS_CONNECTION_STRING` and `OTEL_SERVICE_NAME` are optional for local development unless local telemetry is explicitly enabled. In production or telemetry-enabled environments, set both variables together.
@@ -60,6 +71,8 @@ MPT_TOOL_STORAGE_TYPE=local
 MPT_TOOL_STORAGE_AIRTABLE_API_KEY=<airtable-api-key>
 MPT_TOOL_STORAGE_AIRTABLE_BASE_ID=<airtable-base-id>
 MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME=<airtable-table-name>
+EXT_AIRTABLE_API_TOKEN=<discount-store-airtable-api-key>
+EXT_AIRTABLE_DISCOUNTS_ID=<discount-store-base-id>
 ```
 
 `MPT_PRODUCTS_IDS` is a comma-separated list of Marketplace product identifiers.
@@ -67,5 +80,7 @@ MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME=<airtable-table-name>
 For each product id in `MPT_PRODUCTS_IDS`, define the corresponding secret in `EXT_WEBHOOKS_SECRETS` using the product id as the key.
 
 The `MPT_TOOL_STORAGE_*` variables mirror the storage configuration documented in `mpt-tool`. When `MPT_TOOL_STORAGE_TYPE=local`, the Airtable variables may remain unset locally. When `MPT_TOOL_STORAGE_TYPE=airtable`, set `MPT_TOOL_STORAGE_AIRTABLE_API_KEY`, `MPT_TOOL_STORAGE_AIRTABLE_BASE_ID`, and `MPT_TOOL_STORAGE_AIRTABLE_TABLE_NAME` together.
+
+The `EXT_AIRTABLE_*` variables configure the discount store, which is independent from the optional `mpt-tool` Airtable storage. Both Airtable integrations can be active simultaneously, targeting different bases/tables. The discount store is required for discount code management; when `EXT_AIRTABLE_API_TOKEN` or `EXT_AIRTABLE_DISCOUNTS_ID` is unset, discount endpoints and the scheduled sync will fail.
 
 Adjust examples in this file to match the actual package names, service names, endpoints, and integrations used by the target repository.

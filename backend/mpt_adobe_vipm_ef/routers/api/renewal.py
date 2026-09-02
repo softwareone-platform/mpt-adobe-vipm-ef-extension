@@ -403,7 +403,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
 
 
 def _require_client_account(ctx: APIContext) -> None:
-    if ctx.auth is None or not ctx.auth.account.is_client():
+    if not ctx.auth.account.is_client():
         raise ForbiddenError(
             detail="The at-anniversary renewal is available to client accounts only.",
         )
