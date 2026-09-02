@@ -198,14 +198,13 @@ describe('Discounts view', () => {
     expect(screen.queryByTestId('discounts-action-rec1')).not.toBeInTheDocument();
   });
 
-  it('offers vendors an action on closed codes only; open codes are read-only', async () => {
+  it('offers vendors an action on both open and closed codes', async () => {
     mockAccount('Vendor');
 
     await renderDiscounts();
 
-    // Only the closed row (DISCOUNT-CODE-2) is editable; the open row is sync-owned.
+    expect(screen.getByTestId('discounts-action-rec1')).toHaveTextContent('Edit');
     expect(screen.getByTestId('discounts-action-rec2')).toHaveTextContent('Edit');
-    expect(screen.queryByTestId('discounts-action-rec1')).not.toBeInTheDocument();
   });
 
   it('hides Actions and Add closed discount for client actors', async () => {

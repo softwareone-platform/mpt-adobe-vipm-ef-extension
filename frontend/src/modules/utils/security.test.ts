@@ -1,5 +1,6 @@
 import { ProductSegment } from '../shared/hooks/useSettings';
 import {
+  canEditDiscountCode,
   canManageDiscountCodes,
   canRequestGlobalCustomer,
   canRequestLinkedMembership,
@@ -170,6 +171,43 @@ describe('canManageDiscountCodes', () => {
 
   it('returns false when the product is not in settings', () => {
     expect(canManageDiscountCodes('Operations', products, 'PRD-9999-9999')).toBe(false);
+  });
+});
+
+describe('canEditDiscountCode', () => {
+  it('returns true for a vendor account on a closed code', () => {
+    expect(canEditDiscountCode('CLOSED', 'Vendor', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true for a vendor account on an open code', () => {
+    expect(canEditDiscountCode('OPEN', 'Vendor', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns true for an operations account on a closed code', () => {
+    expect(canEditDiscountCode('CLOSED', 'Operations', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns false for an operations account on an open code', () => {
+    expect(canEditDiscountCode('OPEN', 'Operations', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('matches the source case-insensitively', () => {
+    expect(canEditDiscountCode('Closed', 'Operations', products, 'PRD-1111-1111')).toBe(true);
+  });
+
+  it('returns false for a client account on either source', () => {
+    expect(canEditDiscountCode('CLOSED', 'Client', products, 'PRD-1111-1111')).toBe(false);
+    expect(canEditDiscountCode('OPEN', 'Client', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the source is missing', () => {
+    expect(canEditDiscountCode(undefined, 'Operations', products, 'PRD-1111-1111')).toBe(false);
+    expect(canEditDiscountCode(null, 'Operations', products, 'PRD-1111-1111')).toBe(false);
+  });
+
+  it('returns false when the product is not in settings', () => {
+    expect(canEditDiscountCode('OPEN', 'Vendor', products, 'PRD-9999-9999')).toBe(false);
+    expect(canEditDiscountCode('CLOSED', 'Operations', products, 'PRD-9999-9999')).toBe(false);
   });
 });
 

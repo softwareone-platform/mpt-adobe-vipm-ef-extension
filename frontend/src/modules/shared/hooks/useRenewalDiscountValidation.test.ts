@@ -106,13 +106,11 @@ describe('useRenewalDiscountValidation', () => {
     mockPost.mockResolvedValue({
       data: { preview: { lineItems: [{ offerId: 'STALE' }] } },
     });
-    const stale = act(async () => {
-      await result.current.validateDiscounts(PLAN);
-    });
     await act(async () => {
+      const stale = result.current.validateDiscounts(PLAN);
       await result.current.validateDiscounts({ ...PLAN, renewalPath: 'anniversary' });
+      await stale;
     });
-    await stale;
 
     expect(onPreview).toHaveBeenLastCalledWith(null);
   });
