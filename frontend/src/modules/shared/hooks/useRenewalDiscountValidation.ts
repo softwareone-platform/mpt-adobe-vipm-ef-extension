@@ -1,9 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 
-import { isRenewalPreviewRequired } from '../model';
-import type { RenewalPlanBody } from '../model';
+import { isRenewalPreviewRequired, readRenewalPreview } from '../model';
+import type { RenewalPlanBody, RenewalPreview } from '../model';
 import { useGuardedRequest } from './useGuardedRequest';
 
 /**
@@ -19,23 +19,45 @@ import { useGuardedRequest } from './useGuardedRequest';
  * equivalent rejection surfaces on the order details page at fulfilment and
  * no preview runs here.
  */
-export function useRenewalDiscountValidation(agreementId: string) {
+export function useRenewalDiscountValidation(
+  agreementId: string,
+  onPreview?: (preview: RenewalPreview | null) => void,
+) {
   const { run, cancel, reset, ...state } = useGuardedRequest('Errors:RenewalDiscountValidation');
+  const attemptRef = useRef(0);
 
   const validateDiscounts = useCallback(
     async (plan: RenewalPlanBody): Promise<boolean> => {
+      attemptRef.current += 1;
+      const attempt = attemptRef.current;
+      const publish = (preview: RenewalPreview | null) => {
+        if (attempt === attemptRef.current) {
+          onPreview?.(preview);
+        }
+      };
+
       if (!isRenewalPreviewRequired(plan)) {
+        publish(null);
         return true;
       }
 
-      return run(async (signal) => {
+      const quote = await run(async (signal) => {
         const baseUrl = `/api/v2/agreements/${encodeURIComponent(agreementId)}/renewal-order`;
-        await http.post(`${baseUrl}/preview`, plan, { signal });
-        return true;
+        const response = await http.post(`${baseUrl}/preview`, plan, { signal });
+        return readRenewalPreview(response.data);
       });
+
+      publish(quote === false ? null : quote);
+      return quote !== false;
     },
-    [agreementId, run],
+    [agreementId, onPreview, run],
   );
 
-  return { ...state, validateDiscounts, cancel, reset };
+  const resetDiscounts = useCallback(() => {
+    attemptRef.current += 1;
+    onPreview?.(null);
+    reset();
+  }, [onPreview, reset]);
+
+  return { ...state, validateDiscounts, cancel, reset: resetDiscounts };
 }

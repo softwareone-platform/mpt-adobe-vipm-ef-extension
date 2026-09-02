@@ -1,4 +1,5 @@
 import {
+  applyMarkup,
   parsePrice,
   formatCurrency,
   formatPrice,
@@ -79,6 +80,17 @@ describe('formatCurrency', () => {
 
   it('falls back to the amount and the code for an unknown currency', () => {
     expect(formatCurrency(5, 'XXXX')).toBe('5 XXXX');
+  });
+});
+
+describe('applyMarkup', () => {
+  it('turns a purchase price into the selling price the price list carries', () => {
+    expect(applyMarkup(273.48, 12.3595505618)).toBe(307.28);
+    expect(applyMarkup(644.16, 11.1111111111)).toBe(715.73);
+  });
+
+  it('returns the price unchanged when nothing is added to it', () => {
+    expect(applyMarkup(100, 0)).toBe(100);
   });
 });
 

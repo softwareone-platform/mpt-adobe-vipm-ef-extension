@@ -463,6 +463,42 @@ export function isRenewalPreviewRequired(plan: RenewalPlanBody): boolean {
   );
 }
 
+/** A line of Adobe's quote: purchase prices, before the price list's markup. */
+export interface RenewalPreviewLine {
+  offerId?: string;
+  subscriptionId?: string;
+  quantity?: number;
+  pricing?: {
+    partnerPrice?: number;
+    discountedPartnerPrice?: number;
+    netPartnerPrice?: number;
+    lineItemPartnerPrice?: number;
+  };
+}
+
+/** Adobe's ``PREVIEW_RENEWAL`` quote for the basket the wizard holds. */
+export interface RenewalPreview {
+  lineItems?: RenewalPreviewLine[];
+}
+
+/**
+ * Read the Adobe quote out of a preview response.
+ *
+ * The endpoint answers with the quote under ``preview`` alongside the
+ * eligibility it derives, and returns it as ``null`` for a plan that has
+ * nothing to quote, such as one that only takes renewed seats back. A quote
+ * whose lines are not readable is read as no quote at all, so the wizard falls
+ * back to the prices the Marketplace already holds rather than failing.
+ */
+export function readRenewalPreview(payload: unknown): RenewalPreview | null {
+  const preview = (payload as { preview?: RenewalPreview } | null)?.preview;
+  if (!preview) {
+    return null;
+  }
+  const lines = Array.isArray(preview.lineItems) ? preview.lineItems : [];
+  return { lineItems: lines.filter((line): line is RenewalPreviewLine => Boolean(line)) };
+}
+
 /** The renewal order body: the plan plus everything only the submission carries. */
 export interface RenewalOrderInput extends RenewalPlanBody {
   recommendationTrackerId?: string;

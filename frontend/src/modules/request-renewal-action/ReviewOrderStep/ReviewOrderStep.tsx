@@ -22,9 +22,10 @@ import { ItemCard } from '../components/item-card/ItemCard';
 import { SubscriptionCard } from '../components/subscription-card/SubscriptionCard';
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
-import type { Agreement, ProductItem, Subscription } from '../../shared/model';
+import type { Agreement, ProductItem, RenewalPreview, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
-import { formatPrice } from '../../utils/price';
+import { applyMarkup, formatOptionalPrice, formatPrice } from '../../utils/price';
+import { formatQuantityDelta } from '../../utils/quantity';
 import {
   getRenewalQuantity,
   isRenewing,
@@ -42,6 +43,7 @@ export interface ReviewOrderStepProps {
   selections: RenewalSelections;
   quantities: RenewalQuantities;
   netNewItems: NetNewItem[];
+  preview: RenewalPreview | null;
   details: OrderDetails;
   onPlaceOrder: () => Promise<boolean>;
   errorMessage?: string;
@@ -60,11 +62,13 @@ interface Row {
   subscriptionName: string;
   terms: string;
   commitment: string;
-  /** ``null`` marks a subscription that renews at no quantity: shown with an em dash. */
-  quantity: number | null;
+  delta: number | null;
+  newQuantity: number | null;
   unitSP: number | null;
   spxM: number | null;
   spxY: number | null;
+  newSpxM: number | null;
+  newSpxY: number | null;
 }
 
 function totalPrice(unitSP: number | null, quantity: number | null, months: number): number | null {
@@ -76,16 +80,42 @@ function sumTotals(rows: Row[], pick: (row: Row) => number | null): number | nul
   return totals.length ? totals.reduce((sum, total) => sum + total, 0) : null;
 }
 
+function quotedUnitSP(
+  preview: RenewalPreview | null,
+  adobeSubscriptionId: string | undefined,
+  sku: string | undefined,
+  markup: number | null | undefined,
+): number | null {
+  if (!preview || markup == null) {
+    return null;
+  }
+  const line = (preview.lineItems ?? []).find((item) =>
+    adobeSubscriptionId ? item.subscriptionId === adobeSubscriptionId : item.offerId === sku,
+  );
+  const unitPP = line?.pricing?.discountedPartnerPrice;
+  return unitPP == null ? null : applyMarkup(unitPP, markup);
+}
+
 function toSubscriptionRows(
   subscriptions: Subscription[],
   selections: RenewalSelections,
   quantities: RenewalQuantities,
+  preview: RenewalPreview | null,
 ): Row[] {
   return subscriptions.map((subscription, index) => {
     const line = subscription.lines?.[0];
     const renews = isRenewing(subscription, selections);
-    const quantity = renews ? getRenewalQuantity(subscription, quantities) : null;
-    const unitSP = line?.price?.unitSP ?? null;
+    const currentQuantity = line?.quantity ?? 0;
+    const newQuantity = renews ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0;
+    const change = newQuantity - currentQuantity;
+    const delta = change === 0 ? null : change;
+    const unitSP =
+      quotedUnitSP(
+        preview,
+        subscription.externalIds?.vendor,
+        line?.item.externalIds?.vendor,
+        line?.price?.markup,
+      ) ?? line?.price?.unitSP ?? null;
     return {
       id: subscription.id,
       kind: 'subscription' as const,
@@ -99,10 +129,13 @@ function toSubscriptionRows(
       subscriptionName: subscription.name ?? '',
       terms: TERM_PERIOD_LABELS[subscription.terms?.period ?? ''] ?? '—',
       commitment: TERM_COMMITMENT_LABELS[subscription.terms?.commitment ?? ''] ?? '',
-      quantity,
+      delta,
+      newQuantity,
       unitSP,
-      spxM: totalPrice(unitSP, quantity, 12),
-      spxY: totalPrice(unitSP, quantity, 1),
+      spxM: totalPrice(unitSP, delta, 12),
+      spxY: totalPrice(unitSP, delta, 1),
+      newSpxM: totalPrice(unitSP, newQuantity, 12),
+      newSpxY: totalPrice(unitSP, newQuantity, 1),
     };
   });
 }
@@ -119,10 +152,13 @@ function toNetNewRows(netNewItems: NetNewItem[], offset: number): Row[] {
     subscriptionName: '',
     terms: TERM_PERIOD_LABELS[item.terms?.period ?? ''] ?? '—',
     commitment: TERM_COMMITMENT_LABELS[item.terms?.commitment ?? ''] ?? '',
-    quantity: item.quantity,
+    delta: item.quantity,
+    newQuantity: item.quantity,
     unitSP: item.unitSP,
     spxM: totalPrice(item.unitSP, item.quantity, 12),
     spxY: totalPrice(item.unitSP, item.quantity, 1),
+    newSpxM: totalPrice(item.unitSP, item.quantity, 12),
+    newSpxY: totalPrice(item.unitSP, item.quantity, 1),
   }));
 }
 
@@ -138,10 +174,13 @@ function toTotalRow(rows: Row[]): Row {
     subscriptionName: '',
     terms: '',
     commitment: '',
-    quantity: null,
+    delta: null,
+    newQuantity: null,
     unitSP: null,
     spxM: sumTotals(rows, (row) => row.spxM),
     spxY: sumTotals(rows, (row) => row.spxY),
+    newSpxM: sumTotals(rows, (row) => row.newSpxM),
+    newSpxY: sumTotals(rows, (row) => row.newSpxY),
   };
 }
 
@@ -216,12 +255,16 @@ const columns: GridColumnDefinition<Row>[] = [
       ),
   },
   {
-    name: 'quantity',
+    name: 'delta',
     title: i18n.t('Renewal:Review:Qty'),
-    fields: ['quantity'],
+    fields: ['delta'],
     initialWidth: 90,
     cell: (row) =>
-      row.kind === 'total' ? <GridCellSimple /> : <TextCell text={row.quantity ?? '—'} />,
+      row.kind === 'total' ? (
+        <GridCellSimple />
+      ) : (
+        <TextCell text={formatQuantityDelta(row.delta)} secondaryContent={row.newQuantity ?? undefined} />
+      ),
   },
   {
     name: 'unitSP',
@@ -243,14 +286,18 @@ const columns: GridColumnDefinition<Row>[] = [
     title: i18n.t('Renewal:Grid:SPxM'),
     fields: ['spxM'],
     initialWidth: 120,
-    cell: (row) => <TextCell text={row.spxM == null ? '—' : formatPrice(row.spxM)} />,
+    cell: (row) => (
+      <TextCell text={formatOptionalPrice(row.spxM)} secondaryContent={formatOptionalPrice(row.newSpxM)} />
+    ),
   },
   {
     name: 'spxY',
     title: i18n.t('Renewal:Grid:SPxY'),
     fields: ['spxY'],
     initialWidth: 120,
-    cell: (row) => <TextCell text={row.spxY == null ? '—' : formatPrice(row.spxY)} />,
+    cell: (row) => (
+      <TextCell text={formatOptionalPrice(row.spxY)} secondaryContent={formatOptionalPrice(row.newSpxY)} />
+    ),
   },
 ];
 
@@ -262,7 +309,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'subscriptionId', title: i18n.t('Common:Subscription ID') },
   { name: 'terms', title: i18n.t('Common:Terms title') },
   { name: 'commitment', title: i18n.t('Common:Commitment') },
-  { name: 'quantity', title: i18n.t('Renewal:Review:Qty'), type: 'number' },
+  { name: 'delta', title: i18n.t('Renewal:Review:Qty'), type: 'number' },
   { name: 'unitSP', title: i18n.t('Renewal:Grid:Unit SP'), type: 'number' },
   { name: 'spxM', title: i18n.t('Renewal:Grid:SPxM'), type: 'number' },
   { name: 'spxY', title: i18n.t('Renewal:Grid:SPxY'), type: 'number' },
@@ -274,6 +321,7 @@ export function ReviewOrderStep({
   selections,
   quantities,
   netNewItems,
+  preview,
   details,
   onPlaceOrder,
   errorMessage,
@@ -283,10 +331,10 @@ export function ReviewOrderStep({
   const { registerOnNextCallback } = useStepActions();
 
   const rows = useMemo(() => {
-    const subscriptionRows = toSubscriptionRows(subscriptions, selections, quantities);
+    const subscriptionRows = toSubscriptionRows(subscriptions, selections, quantities, preview);
     const lineRows = [...subscriptionRows, ...toNetNewRows(netNewItems, subscriptionRows.length)];
     return [...lineRows, toTotalRow(lineRows)];
-  }, [subscriptions, selections, quantities, netNewItems]);
+  }, [subscriptions, selections, quantities, netNewItems, preview]);
 
   const orderingParameters = (agreement.parameters?.ordering ?? []).filter(
     (parameter) => !parameter.constraints?.hidden,

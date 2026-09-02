@@ -89,7 +89,7 @@ class OrderClient:
         return self._transport.request(
             "POST",
             authorization,
-            f"/v3/customers/{customer_id}/orders",
+            f"/v3/customers/{customer_id}/orders?fetch-price=true",
             json={
                 "orderType": AdobeOrderType.PREVIEW_RENEWAL.value,
                 "currencyCode": currency_code,

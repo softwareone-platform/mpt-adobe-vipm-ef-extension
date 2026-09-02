@@ -52,7 +52,8 @@ def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.
     """Return whether an order of ``order_type`` can still apply the code.
 
     The row must not be retired, must list the order type among its applicable
-    ones, and ``now`` must sit inside its usable window: the
+    ones (an empty list is "any order type", so it restricts nothing), and
+    ``now`` must sit inside its usable window: the
     ``start_date``/``end_date`` range for a single-use code, extended to
     ``discount_lock_end_date`` for a reusable one (the lock keeps a redeemed
     code applicable past its end date). A missing or unreadable bound leaves
@@ -62,7 +63,7 @@ def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.
     if fields.get("retired_at"):
         return False
     applicable = fields.get("applicable_order_types") or []
-    if order_type.value not in applicable:
+    if applicable and order_type.value not in applicable:
         return False
     return _is_within(now, _read_date(fields.get("start_date")), _usable_until(fields))
 

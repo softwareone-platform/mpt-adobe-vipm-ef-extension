@@ -29,7 +29,7 @@ import {
   TERM_PERIOD_LABELS,
 } from '../../shared/constants';
 import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
-import type { Agreement, Subscription } from '../../shared/model';
+import type { Agreement, RenewalPreview, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import { getPartialSku } from '../../utils/sku';
@@ -72,6 +72,7 @@ export interface ItemsStepProps {
   renewalStates: RenewalStates;
   onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
   onNetNewItemsChange: (items: NetNewItem[]) => void;
+  onPreview: (preview: RenewalPreview | null) => void;
 }
 
 interface Row {
@@ -440,6 +441,7 @@ export function ItemsStep({
   renewalStates,
   onQuantityChange,
   onNetNewItemsChange,
+  onPreview,
 }: ItemsStepProps) {
   const { t } = useTranslation();
   const [isDialogOpen, setDialogOpen] = useState(false);
@@ -447,6 +449,7 @@ export function ItemsStep({
   const { registerOnNextCallback } = useStepActions();
   const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(
     agreement.id,
+    { onPreview },
   );
   const [quantityError, setQuantityError] = useState('');
 
