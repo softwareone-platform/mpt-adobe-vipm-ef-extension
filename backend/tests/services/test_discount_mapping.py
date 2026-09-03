@@ -1,8 +1,14 @@
 import datetime as dt
 
 import pytest
+from freezegun import freeze_time
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountOrderType
+from mpt_adobe_vipm_ef.models.discount import (
+    Commitment,
+    DiscountCodeCreateRequest,
+    DiscountOrderType,
+    EligibilityContext,
+)
 from mpt_adobe_vipm_ef.services import discount_mapping
 
 _NOW = dt.datetime.fromisoformat("2026-07-21T12:00:00+00:00")
@@ -577,5 +583,186 @@ def test_exclude_redeemed_keeps_a_code_the_customer_has_not_redeemed(code_record
     record = code_record_factory(reusable=False)
 
     result = discount_mapping.exclude_redeemed([record], {})
+
+    assert result == [record]
+
+
+def test_allows_category_rejects_intro_codes_on_renewing_lines(code_record_factory):
+    record = code_record_factory(category="INTRO")
+
+    result = discount_mapping.allows_category(record, DiscountOrderType.RENEWAL)
+
+    assert result is False
+
+
+def test_allows_category_offers_intro_codes_on_net_new_lines(code_record_factory):
+    record = code_record_factory(category="INTRO")
+
+    result = discount_mapping.allows_category(record, DiscountOrderType.NEW)
+
+    assert result is True
+
+
+def test_allows_category_offers_standard_codes_on_any_order_type(code_record_factory):
+    record = code_record_factory(category="STANDARD")
+
+    result = discount_mapping.allows_category(record, DiscountOrderType.RENEWAL)
+
+    assert result is True
+
+
+@pytest.mark.parametrize(
+    ("target_offer_ids", "offer_partial_sku", "expected"),
+    [
+        pytest.param("65322651CA,11083117CA", "65322651CA", True, id="sku-in-target-set"),
+        pytest.param("65322651CA,11083117CA", "99999999ZZ", False, id="sku-outside-target-set"),
+        pytest.param("", "65322651CA", True, id="empty-target-set-is-any"),
+        pytest.param("65322651CA", None, True, id="unknown-sku-is-kept"),
+        pytest.param("65322651CA02A12", "65322651CA", True, id="full-stored-sku-matches-partial"),
+    ],
+)
+def test_matches_target_sku(target_offer_ids, offer_partial_sku, expected, code_record_factory):
+    record = code_record_factory(target_offer_ids=target_offer_ids)
+
+    result = discount_mapping.matches_target_sku(record, offer_partial_sku)
+
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    ("qualifying_offer_ids", "owned", "expected"),
+    [
+        pytest.param("11083117CA", frozenset(("11083117CA",)), True, id="owns-a-qualifying-sku"),
+        pytest.param("11083117CA", frozenset(("65322651CA",)), False, id="owns-no-qualifying-sku"),
+        pytest.param("", frozenset(("65322651CA",)), True, id="no-qualifying-set-required"),
+        pytest.param("11083117CA", frozenset(), True, id="unknown-owned-skus-are-kept"),
+        pytest.param(
+            "11083117CA01A12",
+            frozenset(("11083117CA",)),
+            True,
+            id="full-qualifying-sku-matches-owned-partial",
+        ),
+    ],
+)
+def test_matches_qualifying(qualifying_offer_ids, owned, expected, code_record_factory):
+    record = code_record_factory(qualifying_offer_ids=qualifying_offer_ids)
+
+    result = discount_mapping.matches_qualifying(record, owned)
+
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    ("supports", "commitment", "expected"),
+    [
+        pytest.param(
+            {"supports_annual": True, "supports_3yc": False},
+            Commitment.ANNUAL,
+            True,
+            id="annual-code-annual-line",
+        ),
+        pytest.param(
+            {"supports_annual": True, "supports_3yc": False},
+            Commitment.THREE_YC,
+            False,
+            id="annual-code-3yc-line",
+        ),
+        pytest.param(
+            {"supports_annual": False, "supports_3yc": True},
+            Commitment.THREE_YC,
+            True,
+            id="3yc-code-3yc-line",
+        ),
+        pytest.param(
+            {"supports_annual": False, "supports_3yc": False},
+            Commitment.THREE_YC,
+            True,
+            id="no-support-flags-constrains-nothing",
+        ),
+        pytest.param(
+            {"supports_annual": True, "supports_3yc": True},
+            None,
+            True,
+            id="unknown-commitment-is-kept",
+        ),
+    ],
+)
+def test_matches_commitment(supports, commitment, expected, code_record_factory):
+    record = code_record_factory(**supports)
+
+    result = discount_mapping.matches_commitment(record, commitment)
+
+    assert result is expected
+
+
+def test_exclude_out_of_country_keeps_a_code_offered_in_the_country(code_record_factory):
+    record = code_record_factory()
+    value_records = [{"id": "recV", "fields": {"code": "SUMMER25", "country": "US"}}]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US")
+
+    assert result == [record]
+
+
+def test_exclude_out_of_country_keeps_a_country_agnostic_percentage_code(code_record_factory):
+    record = code_record_factory()
+    value_records = [{"id": "recV", "fields": {"code": "SUMMER25", "value": 20}}]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US")
+
+    assert result == [record]
+
+
+def test_exclude_out_of_country_drops_a_code_priced_only_for_other_countries(code_record_factory):
+    record = code_record_factory()
+    value_records = [{"id": "recV", "fields": {"code": "SUMMER25", "country": "CA"}}]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US")
+
+    assert result == []
+
+
+def test_exclude_out_of_country_keeps_a_code_with_no_value_rows(code_record_factory):
+    record = code_record_factory()
+
+    result = discount_mapping.exclude_out_of_country([record], [], "US")
+
+    assert result == [record]
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+def test_filter_offerable_applies_the_context_gates(code_record_factory):
+    hit = code_record_factory(target_offer_ids="65322651CA")
+    miss = code_record_factory(target_offer_ids="99999999ZZ")
+    context = EligibilityContext(offer_partial_sku="65322651CA")
+
+    result = discount_mapping.filter_offerable([hit, miss], DiscountOrderType.RENEWAL, context)
+
+    assert result == [hit]
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+def test_filter_offerable_without_context_keeps_offerable_codes(code_record_factory):
+    record = code_record_factory(target_offer_ids="99999999ZZ")
+
+    result = discount_mapping.filter_offerable([record], DiscountOrderType.RENEWAL)
+
+    assert result == [record]
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+def test_filter_offerable_enforces_the_intro_category_gate(code_record_factory):
+    record = code_record_factory(category="INTRO", applicable_order_types=[])
+
+    result = discount_mapping.filter_offerable([record], DiscountOrderType.RENEWAL)
+
+    assert result == []
+
+
+def test_filter_offerable_without_order_type_returns_records_untouched(code_record_factory):
+    record = code_record_factory(target_offer_ids="99999999ZZ")
+    context = EligibilityContext(offer_partial_sku="65322651CA")
+
+    result = discount_mapping.filter_offerable([record], None, context)
 
     assert result == [record]

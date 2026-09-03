@@ -38,6 +38,13 @@ class DiscountOrderType(StrEnum):
     SWITCH = "SWITCH"
 
 
+class Commitment(StrEnum):
+    """The line's commitment term, matched coarsely against a code's support flags."""
+
+    ANNUAL = "ANNUAL"
+    THREE_YC = "THREE_YC"
+
+
 @dataclass(frozen=True)
 class DiscountScope:
     """Agreement-derived context every discount endpoint works within."""
@@ -57,6 +64,25 @@ class DiscountScope:
         """The customer country, taken from the licensee address."""
         address = self.agreement.licensee.address
         return None if address is None else address.country
+
+
+@dataclass(frozen=True)
+class EligibilityContext:
+    """Per-line context the offer shortlist evaluates codes against.
+
+    Supplied as optional query parameters on the listing endpoint; every field
+    is absent by default. Where a field is unknown the shortlist prefers showing
+    a code (Adobe's preview is the backstop), so an absent field never hides a
+    code (asymmetry rule).
+
+    ``offer_partial_sku`` is the line's SKU (target-offer gate), ``owned_partial_skus``
+    the customer's currently owned SKUs (qualifying-offer gate), and ``commitment``
+    the line's commitment term (coarse ``supports_annual`` / ``supports_3yc`` match).
+    """
+
+    offer_partial_sku: str | None = None
+    owned_partial_skus: frozenset[str] = frozenset()
+    commitment: Commitment | None = None
 
 
 def _clean_offer_ids(offer_ids: list[str]) -> list[str]:

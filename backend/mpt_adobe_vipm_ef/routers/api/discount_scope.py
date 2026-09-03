@@ -16,16 +16,27 @@ from mpt_extension_sdk.api import (
 )
 from mpt_extension_sdk.models import Agreement
 
-from mpt_adobe_vipm_ef.models.discount import DiscountOrderType, DiscountScope
+from mpt_adobe_vipm_ef.models.discount import (
+    Commitment,
+    DiscountOrderType,
+    DiscountScope,
+    EligibilityContext,
+)
 from mpt_adobe_vipm_ef.routers.api.customer import load_agreement, require_customer_id
+from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
 
 logger = logging.getLogger(__name__)
 
 AGREEMENT_QUERY_PARAM = "agreement"
 ORDER_TYPE_QUERY_PARAM = "orderType"
+OFFER_ID_QUERY_PARAM = "offerId"
+OWNED_OFFER_IDS_QUERY_PARAM = "ownedOfferIds"
+COMMITMENT_QUERY_PARAM = "commitment"
 
+_OFFER_ID_SEPARATOR = ","
 _SUPPORTED_ORDER_TYPES = ", ".join(order_type.value for order_type in DiscountOrderType)
+_SUPPORTED_COMMITMENTS = ", ".join(commitment.value for commitment in Commitment)
 
 
 def require_editor_account(ctx: APIContext) -> None:
@@ -69,6 +80,53 @@ def read_order_type_filter(ctx: APIContext) -> DiscountOrderType | None:
         raise ValidationError(
             detail=f"The 'orderType' query parameter must be one of {_SUPPORTED_ORDER_TYPES}.",
             errors=[ErrorDetail(pointer="#/orderType", detail="Unsupported order type.")],
+        )
+
+
+def read_eligibility_context(ctx: APIContext) -> EligibilityContext:
+    """Read the optional per-line eligibility parameters of the shortlist request.
+
+    The renewal wizard passes the line's offer id, the customer's owned offer ids
+    and the commitment term so the shortlist can evaluate the SKU, qualifying-SKU
+    and commitment gates. Every parameter is optional; offer ids are normalised to
+    their 10-char partial SKUs to match how the store holds them.
+    """
+    query = ctx.request.query
+    return EligibilityContext(
+        offer_partial_sku=_read_partial_sku(query.get(OFFER_ID_QUERY_PARAM)),
+        owned_partial_skus=_read_owned_partial_skus(query.get(OWNED_OFFER_IDS_QUERY_PARAM)),
+        commitment=_read_commitment(query.get(COMMITMENT_QUERY_PARAM)),
+    )
+
+
+def _read_partial_sku(raw_offer_id: str | None) -> str | None:
+    """Normalise a single offer id to its partial SKU, or None when absent."""
+    if not raw_offer_id or not raw_offer_id.strip():
+        return None
+    return get_partial_sku(raw_offer_id.strip())
+
+
+def _read_owned_partial_skus(raw_offer_ids: str | None) -> frozenset[str]:
+    """Normalise the comma-separated owned offer ids to a set of partial SKUs."""
+    if not raw_offer_ids:
+        return frozenset()
+    return frozenset(
+        get_partial_sku(token.strip())
+        for token in raw_offer_ids.split(_OFFER_ID_SEPARATOR)
+        if token.strip()
+    )
+
+
+def _read_commitment(raw_commitment: str | None) -> Commitment | None:
+    """Parse the optional ``commitment`` filter, rejecting an unknown value."""
+    if not raw_commitment:
+        return None
+    try:
+        return Commitment(raw_commitment.strip().upper())
+    except ValueError:
+        raise ValidationError(
+            detail=f"The 'commitment' query parameter must be one of {_SUPPORTED_COMMITMENTS}.",
+            errors=[ErrorDetail(pointer="#/commitment", detail="Unsupported commitment.")],
         )
 
 

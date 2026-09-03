@@ -38,7 +38,12 @@ frontend/                    TypeScript plug UI (esbuild)
     operations accounts also author and curate closed codes. Open codes are
     read-only for every account: they belong to the Adobe synchronization job,
     which rewrites their fields on every run, so update and delete only accept
-    closed codes.
+    closed codes. The listing endpoint doubles as the offer shortlist: when an
+    `orderType` is given (the renewal wizard) it also reads the optional per-line
+    eligibility parameters — `offerId` (the line's SKU), `ownedOfferIds` (the
+    customer's owned SKUs) and `commitment` (`ANNUAL` / `THREE_YC`) — and returns
+    only the codes that survive the full eligibility filter; without an
+    `orderType` (the discounts tab) it lists every code, redeemed ones included.
   - `api/order_render.py` — `GET /api/v2/orders/{order_id}/render` renders the
     product template a placed order carries, which the wizards' summary steps
     show instead of wording of their own. It proxies the marketplace's own
@@ -136,15 +141,23 @@ frontend/                    TypeScript plug UI (esbuild)
     country and the countries of a region from the packaged
     `mpt_adobe_vipm_ef/data/region_country_mapping.json`.
   - `discount_mapping.py` — mapping between Airtable discount rows and the API
-    object representation (TDR); handles serialization/deserialization,
-    filtering offerable codes by order type, validity windows, and
-    enrichment status (codes pending enrichment are never offered), and
-    excluding codes the customer has already redeemed from the offer shortlist
-    (once per customer). Only single-use codes are excluded: a reusable stays
-    offerable within its discount lock window even after redemption. The
-    redemption read model exposes the redeeming order alongside the redemption
-    timestamp, matching the `Discount Redemptions` rows the fulfilment engine
-    writes on confirmed order completion.
+    object representation (TDR); handles serialization/deserialization and the
+    offer-shortlist eligibility filter. Beyond order type, validity windows and
+    enrichment status (codes pending enrichment are never offered), the shortlist
+    evaluates each stored prerequisite against the per-line context: the INTRO
+    category (offered on net-new lines only), the line's SKU against
+    `target_offer_ids`, the customer's owned SKUs against `qualifying_offer_ids`,
+    the commitment term against `supports_annual` / `supports_3yc` (a coarse
+    match — Adobe's `PREVIEW_RENEWAL` owns the full 3YC logic), and the customer's
+    country against the `Discount Values` support matrix. The filter honours the
+    asymmetry rule: where a context input is absent or the data is uncertain it
+    keeps the code (Adobe's preview is the backstop; over-restrictive hiding is
+    not), so absent parameters never hide a code. It also excludes codes the
+    customer has already redeemed (once per customer); only single-use codes are
+    excluded — a reusable stays offerable within its discount lock window even
+    after redemption. The redemption read model exposes the redeeming order
+    alongside the redemption timestamp, matching the `Discount Redemptions` rows
+    the fulfilment engine writes on confirmed order completion.
   - `discount_sync.py` — scheduled synchronization of the open Adobe flexible
     discount catalogue into the Airtable store; walks platform catalog
     authorizations, derives the storefront country, expands it into the Adobe
