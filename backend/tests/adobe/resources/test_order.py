@@ -239,3 +239,55 @@ def test_preview_renewal_order_raises_adobe_http_error_when_response_has_no_json
         )
 
     assert exc_info.value.status_code == http.HTTPStatus.SERVICE_UNAVAILABLE
+
+
+@pytest.fixture
+def automated_renewal_data(renewal_line_items):
+    return {
+        "orderType": "PREVIEW_RENEWAL",
+        "currencyCode": "USD",
+        "lineItems": renewal_line_items,
+    }
+
+
+@responses.activate
+def test_preview_automated_renewal_order_asks_adobe_to_price_the_quote(
+    adobe_client, automated_renewal_data
+):
+    responses.post(_ORDERS_URL, json=automated_renewal_data, status=http.HTTPStatus.OK)
+
+    result = adobe_client.order.preview_automated_renewal_order("AUT-1234-5678", "CUST-000", "USD")
+
+    assert result == automated_renewal_data
+    assert "fetch-price=true" in responses.calls[0].request.url
+
+
+@responses.activate
+def test_preview_automated_renewal_order_sends_body_without_line_items(
+    adobe_client, automated_renewal_data
+):
+    """The automated preview omits line items so Adobe uses standing auto-renewal preferences."""
+    responses.post(_ORDERS_URL, json=automated_renewal_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_automated_renewal_order("AUT-1234-5678", "CUST-000", "USD")  # act
+
+    body = json.loads(responses.calls[0].request.body)
+    assert body == {"orderType": "PREVIEW_RENEWAL", "currencyCode": "USD"}
+    assert "lineItems" not in body
+
+
+@responses.activate
+def test_preview_automated_renewal_order_raises_adobe_api_error_when_no_auto_renewal(
+    adobe_client,
+):
+    """Adobe rejects the automated preview when no subscription has auto-renewal enabled."""
+    responses.post(
+        _ORDERS_URL,
+        json={"code": "2131", "message": "No subscriptions with autoRenewal enabled"},
+        status=http.HTTPStatus.BAD_REQUEST,
+    )
+
+    with pytest.raises(AdobeAPIError) as exc_info:
+        adobe_client.order.preview_automated_renewal_order("AUT-1234-5678", "CUST-000", "USD")
+
+    assert exc_info.value.status_code == http.HTTPStatus.BAD_REQUEST
