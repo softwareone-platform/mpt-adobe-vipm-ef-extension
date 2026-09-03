@@ -37,15 +37,26 @@ discounts_router = APIRouter(prefix="/discount-codes")
 @discounts_router.get(path="/", name="discount-codes-list")
 @log_inputs
 async def list_discount_codes(ctx: APIContext) -> APIResponse:  # noqa: WPS210
-    """List the discounts in scope for the agreement's customer (open + closed)."""
+    """List the discounts in scope for the agreement's customer (open + closed).
+
+    The offer shortlist (an ``orderType`` is given, e.g. the renewal wizard)
+    also drops single-use codes the customer has already redeemed; the discounts
+    tab (no ``orderType``) lists every code, redeemed ones included.
+    """
     order_type = read_order_type_filter(ctx)
     scope = await load_discount_scope(ctx)
     store = build_store(ctx)
     stored = await store_call(store.list_codes, scope.market_segment, scope.customer_id)
     records = discount_mapping.filter_offerable(stored, order_type)
+    redemptions = None
+    if order_type is not None:
+        codes = [discount_mapping.record_code(record) for record in records]
+        redemption_records = await store_call(store.list_redemptions, codes, scope.customer_id)
+        redemptions = discount_mapping.redemptions_by_code(redemption_records)
+        records = discount_mapping.exclude_redeemed(records, redemptions)
     pagination = ctx.request.pagination
     page = records[pagination.offset : pagination.offset + pagination.limit]
-    payloads = await serialize_page(store, scope, page)
+    payloads = await serialize_page(store, scope, page, redemptions)
     return APIResponse.paginated(
         PaginatedResult.from_pagination(pagination, payload=payloads, total=len(records)),
     )

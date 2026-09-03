@@ -431,11 +431,48 @@ def test_group_values_groups_by_code():
     assert result["OTHER"] == [{"country": "US", "currency": "USD", "value": 5}]
 
 
-def test_redeemed_at_by_code_maps_timestamps():
+def test_redemptions_by_code_maps_redeemed_at_and_order_id():
     redemption_records = [
-        {"id": "recR", "fields": {"code": "SUMMER25", "redeemed_at": "2026-07-01T00:00:00Z"}},
+        {
+            "id": "recR",
+            "fields": {
+                "code": "SUMMER25",
+                "redeemed_at": "2026-07-01T00:00:00Z",
+                "order_id": "ORD-1",
+            },
+        },
     ]
 
-    result = discount_mapping.redeemed_at_by_code(redemption_records)
+    result = discount_mapping.redemptions_by_code(redemption_records)
 
-    assert result == {"SUMMER25": "2026-07-01T00:00:00Z"}
+    assert result == {
+        "SUMMER25": discount_mapping.Redemption(
+            redeemed_at="2026-07-01T00:00:00Z", order_id="ORD-1"
+        )
+    }
+
+
+def test_exclude_redeemed_drops_a_redeemed_single_use_code(code_record_factory):
+    record = code_record_factory(reusable=False)
+    redemptions = {"SUMMER25": discount_mapping.Redemption("2026-07-01T00:00:00Z", "ORD-1")}
+
+    result = discount_mapping.exclude_redeemed([record], redemptions)
+
+    assert result == []
+
+
+def test_exclude_redeemed_keeps_a_redeemed_reusable_code(code_record_factory):
+    record = code_record_factory(reusable=True)
+    redemptions = {"SUMMER25": discount_mapping.Redemption("2026-07-01T00:00:00Z", "ORD-1")}
+
+    result = discount_mapping.exclude_redeemed([record], redemptions)
+
+    assert result == [record]
+
+
+def test_exclude_redeemed_keeps_a_code_the_customer_has_not_redeemed(code_record_factory):
+    record = code_record_factory(reusable=False)
+
+    result = discount_mapping.exclude_redeemed([record], {})
+
+    assert result == [record]

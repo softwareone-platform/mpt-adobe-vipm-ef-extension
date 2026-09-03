@@ -135,7 +135,13 @@ frontend/                    TypeScript plug UI (esbuild)
   - `discount_mapping.py` — mapping between Airtable discount rows and the API
     object representation (TDR); handles serialization/deserialization,
     filtering offerable codes by order type, validity windows, and
-    enrichment status (codes pending enrichment are never offered).
+    enrichment status (codes pending enrichment are never offered), and
+    excluding codes the customer has already redeemed from the offer shortlist
+    (once per customer). Only single-use codes are excluded: a reusable stays
+    offerable within its discount lock window even after redemption. The
+    redemption read model exposes the redeeming order alongside the redemption
+    timestamp, matching the `Discount Redemptions` rows the fulfilment engine
+    writes on confirmed order completion.
   - `discount_sync.py` — scheduled synchronization of the open Adobe flexible
     discount catalogue into the Airtable store; walks platform catalog
     authorizations, derives storefront countries, and mirrors the open
