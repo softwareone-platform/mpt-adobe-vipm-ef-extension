@@ -6,11 +6,13 @@ from types import MappingProxyType
 from typing import Any
 
 from mpt_adobe_vipm_ef.models.discount import (
+    Commitment,
     DiscountCategory,
     DiscountCodeCreateRequest,
     DiscountCodeUpdateRequest,
     DiscountOrderType,
     DiscountType,
+    EligibilityContext,
 )
 from mpt_adobe_vipm_ef.services.discounts import (
     ACTIVE_STATUS,
@@ -118,9 +120,17 @@ def is_expired(fields: dict[str, Any], now: dt.datetime) -> bool:
 
 
 def filter_offerable(
-    records: list[AirtableRecord], order_type: DiscountOrderType | None
+    records: list[AirtableRecord],
+    order_type: DiscountOrderType | None,
+    context: EligibilityContext | None = None,
 ) -> list[AirtableRecord]:
     """Keep the codes an order of ``order_type`` can still apply today.
+
+    Beyond retirement, enrichment, order type and the validity window
+    (:func:`is_offerable`), an offer for a concrete order type is also gated on
+    category (INTRO is net-new only) and, when a per-line ``context`` is given,
+    on the line's SKU, the customer's owned SKUs and the commitment term. Each
+    context gate keeps a code whose data is absent (asymmetry rule).
 
     Without an order type the rows are returned untouched: the discounts tab
     curates codes of every order type and validity, expired ones included.
@@ -128,7 +138,103 @@ def filter_offerable(
     if order_type is None:
         return records
     now = dt.datetime.now(tz=dt.UTC)
-    return [record for record in records if is_offerable(record, order_type, now)]
+    return [
+        record
+        for record in records
+        if is_offerable(record, order_type, now)
+        and allows_category(record, order_type)
+        and _matches_context(record, context)
+    ]
+
+
+def allows_category(record: AirtableRecord, order_type: DiscountOrderType) -> bool:
+    """Offer INTRO-category codes on net-new lines only, never on renewing ones."""
+    if _fields(record).get("category") != DiscountCategory.INTRO.value:
+        return True
+    return order_type is DiscountOrderType.NEW
+
+
+def matches_target_sku(record: AirtableRecord, offer_partial_sku: str | None) -> bool:
+    """Keep a code whose target set covers the line's SKU (an empty set is any).
+
+    An unknown line SKU keeps the code: the shortlist prefers showing a code
+    Adobe can still reject over hiding one with no backstop (asymmetry rule).
+    """
+    targets = _partial_skus(_fields(record).get("target_offer_ids"))
+    if not targets or offer_partial_sku is None:
+        return True
+    return offer_partial_sku in targets
+
+
+def matches_qualifying(record: AirtableRecord, owned_partial_skus: frozenset[str]) -> bool:
+    """Keep a code whose qualifying (prerequisite) SKUs the customer already owns.
+
+    An empty qualifying set requires nothing. When the owned SKUs are unknown
+    (none supplied) the code is kept: ownership has no backstop, so the shortlist
+    errs towards showing it (asymmetry rule).
+    """
+    qualifying = _partial_skus(_fields(record).get("qualifying_offer_ids"))
+    if not qualifying or not owned_partial_skus:
+        return True
+    return any(sku in owned_partial_skus for sku in qualifying)
+
+
+def matches_commitment(record: AirtableRecord, commitment: Commitment | None) -> bool:
+    """Coarsely match the line's commitment against the code's support flags.
+
+    A code declaring no commitment support constrains nothing; one that does is
+    kept only if it supports the line's commitment. An unknown commitment keeps
+    the code (asymmetry rule) — Adobe's PREVIEW_RENEWAL owns the full 3YC logic.
+    """
+    if commitment is None:
+        return True
+    fields = _fields(record)
+    annual = bool(fields.get("supports_annual"))
+    three_yc = bool(fields.get("supports_3yc"))
+    if not annual and not three_yc:
+        return True
+    return three_yc if commitment is Commitment.THREE_YC else annual
+
+
+def exclude_out_of_country(
+    records: list[AirtableRecord], value_records: list[AirtableRecord], country: str
+) -> list[AirtableRecord]:
+    """Drop codes not offered in the customer's country.
+
+    The Discount Values rows are the support matrix: a code is offered in a
+    country when it has a value row for it, or a country-agnostic (percentage)
+    row. A code with no value rows at all is kept — the shortlist errs towards
+    showing on a data gap rather than hiding it (asymmetry rule).
+    """
+    priced = {_value_code(record) for record in value_records}
+    offered = {_value_code(record) for record in value_records if _offered_in(record, country)}
+    return [
+        record
+        for record in records
+        if record_code(record) not in priced or record_code(record) in offered
+    ]
+
+
+def _matches_context(record: AirtableRecord, context: EligibilityContext | None) -> bool:
+    """Apply the per-line context gates, or keep the code when no context is given."""
+    if context is None:
+        return True
+    return (
+        matches_target_sku(record, context.offer_partial_sku)
+        and matches_qualifying(record, context.owned_partial_skus)
+        and matches_commitment(record, context.commitment)
+    )
+
+
+def _value_code(value_record: AirtableRecord) -> str:
+    """Return the code a value row belongs to."""
+    return str(value_record["fields"].get("code", ""))
+
+
+def _offered_in(value_record: AirtableRecord, country: str) -> bool:
+    """Whether a value row prices its code in the country (blank = country-agnostic)."""
+    row_country = value_record["fields"].get("country")
+    return not row_country or row_country == country
 
 
 def build_update_fields(body: DiscountCodeUpdateRequest, now: dt.datetime) -> dict[str, Any]:
@@ -453,6 +559,16 @@ def _split_csv(raw_csv: Any) -> list[str]:
     if not isinstance(raw_csv, str):
         return []
     return [token.strip() for token in raw_csv.split(_CSV_SEPARATOR) if token.strip()]
+
+
+def _partial_skus(raw_csv: Any) -> list[str]:
+    """Split a stored offer-id CSV into 10-char partial SKUs for matching.
+
+    Open codes are stored already normalized (:func:`_partial_sku_csv`), but a
+    closed code can persist full offer ids as authored; normalizing both sides
+    here lets either representation match a line's partial SKU.
+    """
+    return [get_partial_sku(token) for token in _split_csv(raw_csv)]
 
 
 def _text_or_none(raw_text: Any) -> str | None:
