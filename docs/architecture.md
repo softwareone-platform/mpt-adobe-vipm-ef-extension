@@ -77,6 +77,20 @@ frontend/                    TypeScript plug UI (esbuild)
     empty still previews (as an empty quote) when it carries one. A plan that
     keeps renewing but asks for fewer seats than already renewed is rejected
     on preview and submit alike, since a partial return is not supported.
+    `inherited-discounts` reports the reusable discounts the customer already
+    holds, per renewing line, so the wizard's discount codes step can pre-fill
+    them and auto-apply them without an explicit pick. The set comes from an
+    *automated* `PREVIEW_RENEWAL` (an order with no line items), which returns
+    the flexible discounts Adobe auto-applies to each renewing line and whether
+    each still qualifies — Adobe owns the precedence between several held
+    reusables and the extended lock window — enriched from the customer's
+    held-reusable catalogue (`GET /v3/customers/{id}/flex-discounts`) for
+    display. The pre-filled codes ride the plan like any other per-line code, so
+    the customer can override one (which takes precedence) and the priced order
+    matches the preview; a reusable Adobe reports as no longer eligible is
+    flagged rather than applied. The lookup is advisory — Adobe re-validates
+    every code on the real preview and at submit — so its failure degrades to no
+    inherited discounts rather than blocking the renewal.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
     a renewal order and a scheduled net-new subscription only between 30 and 3
     days before the anniversary, and only for a customer holding an active
@@ -155,6 +169,11 @@ frontend/                    TypeScript plug UI (esbuild)
     curate. Each run ends with an expiry review that retires the open rows out
     of their usable window, while the upsert un-retires a row Adobe reports as
     usable again.
+  - `inherited_discounts.py` — maps Adobe's automated `PREVIEW_RENEWAL` (the
+    reusables Adobe auto-applies to each renewing line, with its SUCCESS/FAILURE
+    verdict) together with the customer's held-reusable catalogue into the
+    inherited discounts the renewal wizard surfaces and pre-fills, keyed by the
+    line's full Adobe offer id.
 - `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including
   the Adobe settings and Airtable credentials, from environment variables and
   credential files.
@@ -170,11 +189,18 @@ scheduled synchronization:
 - `resources/` — resource-specific operations:
   - `customer.py`, `offer.py`, `order.py`, `subscription.py` — core VIPM
     resources
-  - `discount.py` — flexible discount catalogue endpoints; exposes
+  - `discount.py` — flexible discount endpoints; exposes
     `list_flex_discounts(authorization_id, market_segment, country)` which
-    retrieves the open flexible discounts via `GET /v3/flex-discounts`, walking
-    pages until `totalCount` is exhausted (Adobe caps page size at 50 items).
+    retrieves the open flexible discounts via `GET /v3/flex-discounts`, and
+    `get_flex_discounts(authorization_id, customer_id)` which retrieves the
+    reusables a customer already holds via
+    `GET /v3/customers/{customer_id}/flex-discounts`. Both walk pages until
+    `totalCount` is exhausted (Adobe caps page size at 50 items).
   - `recommendation.py` — recommendation endpoints
+  - `order.py` also exposes `preview_automated_renewal_order(authorization_id,
+    customer_id, currency_code)` — a `PREVIEW_RENEWAL` with no line items — which
+    returns the flexible discounts Adobe auto-applies to each renewing line, the
+    source for the inherited discounts.
 - `dataclasses.py`, `enums.py`, `errors.py` — request/response types and errors
 
 ## Frontend

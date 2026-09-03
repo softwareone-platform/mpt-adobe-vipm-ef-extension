@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +17,7 @@ import { useAgreementSubscriptions } from '../shared/hooks/useAgreementSubscript
 import { useAgreementSync } from '../shared/hooks/useAgreementSync';
 import { useAdobeRecommendations } from '../shared/hooks/useAdobeRecommendations';
 import { useAutoRenewSupport } from '../shared/hooks/useAutoRenewSupport';
+import { useInheritedDiscounts } from '../shared/hooks/useInheritedDiscounts';
 import { useRenewalState } from '../shared/hooks/useRenewalState';
 import { useRenewalOrderRequest } from '../shared/hooks/useRenewalOrderRequest';
 import { useRenewalPathState } from '../shared/hooks/useRenewalPathState';
@@ -36,6 +37,7 @@ import { ReviewOrderStep } from './ReviewOrderStep';
 import { SummaryStep } from './SummaryStep';
 import { TimingStep } from './TimingStep';
 import {
+  buildInheritedDiscountSelections,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
   canRenewAtAnniversary,
@@ -99,6 +101,7 @@ export default function App() {
   const autoRenewSupport = useAutoRenewSupport(agreementId, heldSkus);
   const renewalState = useRenewalState(agreementId);
   const pathState = useRenewalPathState(agreementId);
+  const inheritedDiscounts = useInheritedDiscounts(agreementId);
   const anniversarySubscriptions = useMemo(
     () =>
       subscriptions.data.filter((subscription) =>
@@ -203,6 +206,23 @@ export default function App() {
       );
     }
   }, [subscriptionsLoaded, subscriptionData]);
+
+  // Pre-fill each renewing line with the reusable the customer already holds, so
+  // it auto-applies without an explicit pick. Seeded once, and only where the
+  // customer has not chosen a code, so a later override is never overwritten.
+  const inheritedSeeded = useRef(false);
+  const inheritedLoaded = inheritedDiscounts.status === 'success';
+  const inheritedData = inheritedDiscounts.data;
+  useEffect(() => {
+    if (inheritedSeeded.current || !inheritedLoaded || !subscriptionsLoaded) {
+      return;
+    }
+    inheritedSeeded.current = true;
+    const defaults = buildInheritedDiscountSelections(subscriptionData, inheritedData);
+    if (Object.keys(defaults).length > 0) {
+      setDiscountSelections((current) => ({ ...defaults, ...current }));
+    }
+  }, [inheritedLoaded, inheritedData, subscriptionsLoaded, subscriptionData]);
 
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
@@ -377,6 +397,7 @@ export default function App() {
           quantities={renewalQuantities}
           netNewItems={netNewItems}
           discountSelections={discountSelections}
+          inheritedDiscounts={inheritedData}
           path={renewalPath}
           onDiscountChange={onDiscountChange}
           onPreview={setRenewalPreview}
