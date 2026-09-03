@@ -194,6 +194,74 @@ async def test_list_keeps_only_the_codes_the_order_type_can_apply(
 
 
 @freeze_time("2026-07-21T12:00:00Z")
+async def test_list_excludes_a_redeemed_single_use_code(agreement, fake_store, code_record_factory):
+    fake_store.list_codes.return_value = [
+        code_record_factory(),
+        code_record_factory(Code="WINTER25"),
+    ]
+    fake_store.list_redemptions.return_value = [
+        {
+            "id": "recR",
+            "fields": {
+                "code": "SUMMER25",
+                "redeemed_at": "2026-07-01T00:00:00Z",
+                "order_id": "ORD-1",
+            },
+        },
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert [payload["code"] for payload in result.payload] == ["WINTER25"]
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_a_redeemed_reusable_code(agreement, fake_store, code_record_factory):
+    fake_store.list_codes.return_value = [code_record_factory(reusable=True)]
+    fake_store.list_redemptions.return_value = [
+        {
+            "id": "recR",
+            "fields": {
+                "code": "SUMMER25",
+                "redeemed_at": "2026-07-01T00:00:00Z",
+                "order_id": "ORD-1",
+            },
+        },
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert result.payload[0]["code"] == "SUMMER25"
+    assert result.payload[0]["redeemedAt"] == "2026-07-01T00:00:00Z"
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_without_order_type_keeps_a_redeemed_code(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_redemptions.return_value = [
+        {
+            "id": "recR",
+            "fields": {
+                "code": "SUMMER25",
+                "redeemed_at": "2026-07-01T00:00:00Z",
+                "order_id": "ORD-1",
+            },
+        },
+    ]
+    ctx = FakeDiscountContext(agreement)
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert result.payload[0]["redeemedAt"] == "2026-07-01T00:00:00Z"
+
+
+@freeze_time("2026-07-21T12:00:00Z")
 async def test_list_without_order_type_keeps_every_code(agreement, fake_store, code_record_factory):
     fake_store.list_codes.return_value = [
         code_record_factory(applicable_order_types=["NEW"]),
