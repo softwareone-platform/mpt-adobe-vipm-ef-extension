@@ -145,21 +145,37 @@ def value_entry(value_fields: dict[str, Any]) -> dict[str, Any]:
 
 
 async def serialize_page(
-    store: DiscountStore, scope: DiscountScope, page: list[AirtableRecord]
+    store: DiscountStore,
+    scope: DiscountScope,
+    page: list[AirtableRecord],
+    redemptions: dict[str, "discount_mapping.Redemption"] | None = None,
 ) -> list[dict[str, Any]]:
-    """Serialize code rows, enriched with their values and the customer's redemptions."""
+    """Serialize code rows, enriched with their values and the customer's redemptions.
+
+    A caller that has already loaded the redemptions (the offer shortlist, which
+    needs them to exclude redeemed codes) passes them in to avoid a second store
+    read; otherwise they are fetched here alongside the values.
+    """
     codes = [discount_mapping.record_code(record) for record in page]
-    value_records, redemption_records = await asyncio.gather(
-        store_call(store.list_values, codes, scope.market_segment),
-        store_call(store.list_redemptions, codes, scope.customer_id),
-    )
+    if redemptions is None:
+        value_records, redemption_records = await asyncio.gather(
+            store_call(store.list_values, codes, scope.market_segment),
+            store_call(store.list_redemptions, codes, scope.customer_id),
+        )
+        redemptions = discount_mapping.redemptions_by_code(redemption_records)
+    else:
+        value_records = await store_call(store.list_values, codes, scope.market_segment)
     values_by_code = discount_mapping.group_values(value_records)
-    redemptions = discount_mapping.redeemed_at_by_code(redemption_records)
     return [
         discount_mapping.to_api_payload(
             record,
             values_by_code.get(discount_mapping.record_code(record), []),
-            redemptions.get(discount_mapping.record_code(record)),
+            _redeemed_at(redemptions.get(discount_mapping.record_code(record))),
         )
         for record in page
     ]
+
+
+def _redeemed_at(redemption: "discount_mapping.Redemption | None") -> Any:
+    """The redemption timestamp for the payload, or None when never redeemed."""
+    return None if redemption is None else redemption.redeemed_at

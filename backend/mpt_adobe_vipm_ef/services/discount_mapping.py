@@ -1,6 +1,7 @@
 """Mapping between Airtable discount rows and the API object representation (TDR)."""
 
 import datetime as dt
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
@@ -25,6 +26,19 @@ from mpt_adobe_vipm_ef.services.items import get_partial_sku
 ValueEntry = dict[str, Any]
 AdobeFlexDiscount = dict[str, Any]
 
+
+@dataclass(frozen=True)
+class Redemption:
+    """A customer's redemption of a code, as read from the redemptions store.
+
+    Mirrors the row the fulfilment engine writes on confirmed order completion;
+    ``order_id`` is the MPT order that consumed the code.
+    """
+
+    redeemed_at: Any
+    order_id: Any
+
+
 _SOURCE_LABELS = MappingProxyType({SOURCE_OPEN: "Open", SOURCE_CLOSED: "Closed"})
 _CSV_SEPARATOR = ","
 
@@ -37,14 +51,24 @@ _ADOBE_DISCOUNT_TYPES = MappingProxyType({
 })
 
 
+def _fields(record: AirtableRecord) -> dict[str, Any]:
+    """Return the Airtable row's field mapping."""
+    return record["fields"]
+
+
 def record_code(record: AirtableRecord) -> str:
     """Return the discount code stored on a code row."""
-    return str(record["fields"].get(CODE_FIELD, ""))
+    return str(_fields(record).get(CODE_FIELD, ""))
 
 
 def is_closed(record: AirtableRecord) -> bool:
     """Return whether the row is a closed (Ops/Vendor-authored) code."""
-    return bool(record["fields"].get("source") == SOURCE_CLOSED)
+    return bool(_fields(record).get("source") == SOURCE_CLOSED)
+
+
+def is_reusable(record: AirtableRecord) -> bool:
+    """Return whether the row is a reusable code (carries a discount lock)."""
+    return bool(_fields(record).get("reusable"))
 
 
 def is_visible(record: AirtableRecord, market_segment: str, customer_id: str) -> bool:
@@ -250,13 +274,36 @@ def group_values(value_records: list[AirtableRecord]) -> dict[str, list[ValueEnt
     return grouped
 
 
-def redeemed_at_by_code(redemption_records: list[AirtableRecord]) -> dict[str, Any]:
-    """Map each redeemed code to its redemption timestamp."""
+def redemptions_by_code(redemption_records: list[AirtableRecord]) -> dict[str, Redemption]:
+    """Map each redeemed code to the customer's redemption of it.
+
+    The store already scopes the query to one customer, so keying by code is
+    enough; a code with several rows collapses to the last-seen redemption.
+    """
     redemptions = {}
     for record in redemption_records:
         fields = record["fields"]
-        redemptions[str(fields.get("code", ""))] = fields.get("redeemed_at")
+        redemptions[str(fields.get("code", ""))] = Redemption(
+            redeemed_at=fields.get("redeemed_at"),
+            order_id=fields.get("order_id"),
+        )
     return redemptions
+
+
+def exclude_redeemed(
+    records: list[AirtableRecord], redemptions: dict[str, Redemption]
+) -> list[AirtableRecord]:
+    """Drop single-use codes the customer has already redeemed (once-per-customer).
+
+    A reusable code is kept even after redemption: it stays valid for the
+    customer until its discount lock end date (the window extension in
+    :func:`is_offerable` honours that), so only single-use codes are excluded.
+    """
+    return [
+        record
+        for record in records
+        if is_reusable(record) or record_code(record) not in redemptions
+    ]
 
 
 def to_api_payload(
