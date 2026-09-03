@@ -106,6 +106,17 @@ def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.
     return _is_within(now, _read_date(fields.get("start_date")), _usable_until(fields))
 
 
+def is_expired(fields: dict[str, Any], now: dt.datetime) -> bool:
+    """Return whether the code's usable window closed before ``now``.
+
+    Mirrors the upper bound of :func:`is_offerable`: ``end_date`` for a
+    single-use code, extended to ``discount_lock_end_date`` for a reusable one.
+    A code without a readable upper bound never expires.
+    """
+    usable_until = _usable_until(fields)
+    return usable_until is not None and usable_until < now
+
+
 def filter_offerable(
     records: list[AirtableRecord], order_type: DiscountOrderType | None
 ) -> list[AirtableRecord]:
@@ -161,16 +172,28 @@ def build_closed_code_fields(
     return fields
 
 
-def build_open_update_fields(discount: AdobeFlexDiscount, now: dt.datetime) -> dict[str, Any]:
+def build_open_update_fields(
+    discount: AdobeFlexDiscount, now: dt.datetime, existing: AirtableRecord | None = None
+) -> dict[str, Any]:
     """Build the Airtable fields the Adobe sync owns on an open code row.
 
     Only the attributes ``GET /v3/flex-discounts`` reports are written; the
     enrichment fields (order types, annual/3YC support) are curated by
     operations and deliberately left untouched.
+
+    The offer id fields accumulate: Adobe scopes a discount's offer ids to the
+    country being listed, so the ids already stored on ``existing`` are kept
+    and the ones this listing reports are added to them. Without ``existing``
+    (a row first seen by the sync) only Adobe's ids are written.
+
+    ``retired_at`` is cleared when ``existing`` carries one and the dates Adobe
+    now reports leave the code usable again: Adobe extending (or correcting) an
+    end date must bring a row the expiry pass had retired back into scope.
     """
+    stored_fields = existing["fields"] if existing else {}
     qualification = discount.get("qualification") or {}
     lock_end_date = _adobe_iso(discount.get("discountLockEndDate"))
-    return {
+    fields = {
         "name": str(discount.get("name") or ""),
         "description": str(discount.get("description") or ""),
         "adobe_discount_id": str(discount.get("id") or ""),
@@ -182,11 +205,19 @@ def build_open_update_fields(discount: AdobeFlexDiscount, now: dt.datetime) -> d
         # Reusability is derived from the lock date presence (TDR rule).
         "reusable": lock_end_date is not None,
         "discount_lock_end_date": lock_end_date,
-        "target_offer_ids": _partial_sku_csv(qualification.get("baseOfferIds") or []),
-        "qualifying_offer_ids": _partial_sku_csv(qualification.get("qualifyingOfferIds") or []),
+        "target_offer_ids": _merged_offer_csv(
+            stored_fields.get("target_offer_ids"), qualification.get("baseOfferIds") or []
+        ),
+        "qualifying_offer_ids": _merged_offer_csv(
+            stored_fields.get("qualifying_offer_ids"),
+            qualification.get("qualifyingOfferIds") or [],
+        ),
         "synchronized_at": _iso(now),
         "updated_at": _iso(now),
     }
+    if stored_fields.get("retired_at") and not is_expired(fields, now):
+        fields["retired_at"] = None
+    return fields
 
 
 def build_open_code_fields(
@@ -207,14 +238,18 @@ def build_open_code_fields(
     return fields
 
 
-def _partial_sku_csv(offer_ids: list[Any]) -> str:
-    """Store Adobe offer ids as their 10-char partial SKUs, deduplicated in order.
+def _merged_offer_csv(stored_csv: Any, offer_ids: list[Any]) -> str:
+    """Union the stored partial SKUs with Adobe's, deduplicated and in order.
 
-    The MPT item vendor external id carries the partial SKU, so trimming the
+    Adobe offer ids are stored as their 10-char partial SKUs: the MPT item
+    vendor external id carries the partial SKU, so trimming the
     discount-level/segment suffix here lets the wizards match a code to a line
-    regardless of the customer's volume level.
+    regardless of the customer's volume level. The stored SKUs come first so a
+    code keeps the ids of the countries and segments synchronized before this
+    listing.
     """
-    partial_skus = dict.fromkeys(get_partial_sku(str(offer_id)) for offer_id in offer_ids)
+    adobe_skus = [get_partial_sku(str(offer_id)) for offer_id in offer_ids]
+    partial_skus = dict.fromkeys(_split_csv(stored_csv) + adobe_skus)
     return _CSV_SEPARATOR.join(sku for sku in partial_skus if sku)
 
 

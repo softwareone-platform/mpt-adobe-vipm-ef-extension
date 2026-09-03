@@ -127,11 +127,14 @@ frontend/                    TypeScript plug UI (esbuild)
 - `mpt_adobe_vipm_ef/services/` — business logic services:
   - `discounts.py` — Airtable-backed data store for discount code management;
     wraps the Airtable API with discount-specific queries (list, find, create,
-    update codes and values). The extension keeps a local copy of the Adobe
+    update codes and values, list the open rows and retire them in batches). The extension keeps a local copy of the Adobe
     flexible discount catalogue in an Airtable base with three tables: `Discount
     Codes` (one row per code, open and closed), `Discount Values` (per-country
     amount) and `Discount Redemptions` (one row per code redeemed by a
     customer).
+  - `regions.py` — Adobe region metadata: resolves the region of a storefront
+    country and the countries of a region from the packaged
+    `mpt_adobe_vipm_ef/data/region_country_mapping.json`.
   - `discount_mapping.py` — mapping between Airtable discount rows and the API
     object representation (TDR); handles serialization/deserialization,
     filtering offerable codes by order type, validity windows, and
@@ -144,11 +147,14 @@ frontend/                    TypeScript plug UI (esbuild)
     writes on confirmed order completion.
   - `discount_sync.py` — scheduled synchronization of the open Adobe flexible
     discount catalogue into the Airtable store; walks platform catalog
-    authorizations, derives storefront countries, and mirrors the open
+    authorizations, derives the storefront country, expands it into the Adobe
+    region's countries (each region only once per run), and mirrors the open
     `GET /v3/flex-discounts` listing of every market segment (COM, EDU, GOV).
     Open rows are keyed by `(code, market_segment)` and owned by this sync
     (`source = "API"`); enrichment fields stay untouched for operations to
-    curate.
+    curate. Each run ends with an expiry review that retires the open rows out
+    of their usable window, while the upsert un-retires a row Adobe reports as
+    usable again.
 - `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including
   the Adobe settings and Airtable credentials, from environment variables and
   credential files.
@@ -189,9 +195,14 @@ Airtable discount store via the scheduled task defined in
    authorizations for the extension's products, filtering to those with Adobe
    credentials configured and a valid owner country (derived from the
    authorization owner's address)
-3. **Deduplication** — authorizations sharing the same Adobe credential set and
-   country are deduplicated to avoid redundant API calls
-4. **Segment iteration** — for each unique (authorization, country) target, the
+3. **Region expansion** — the owner country only selects the Adobe region
+   (`services/regions.py`, backed by
+   `mpt_adobe_vipm_ef/data/region_country_mapping.json`): the authorization's
+   credentials are used to sync every country of that region. The regions
+   already expanded are remembered in memory for the run, so a later
+   authorization of an already synchronized region is skipped; a country that
+   maps to no region is synchronized on its own
+4. **Segment iteration** — for each (authorization, country) target, the
    sync walks the three public market segments (COM, EDU, GOV; GOV_LGA has no
    open discounts)
 5. **Adobe retrieval** — for each (authorization, segment, country) triple, the
@@ -207,15 +218,29 @@ Airtable discount store via the scheduled task defined in
    - Closed codes (authored by vendor/operations) are never overwritten by the
      sync
    - Per-country discount values are replaced atomically (one row per country)
-7. **Error handling** — a failing (authorization, segment) pair is logged and
+   - A stored `retired_at` is cleared when the dates Adobe now reports leave the
+     code usable again, bringing a row an earlier expiry review had retired back
+     into scope
+7. **Expiry review** — once the mirroring is done, the sync reads every
+   non-retired open row and stamps `retired_at` with the run time on the ones
+   whose usable window has closed, in a single Airtable batch. The window is the
+   one the offer filter uses (`end_date`, extended to `discount_lock_end_date`
+   for a reusable code), so a reusable code is not retired while its lock is
+   still open, and a row without a readable upper bound is never retired. The
+   review reads the dates the same run just refreshed and runs even when no
+   authorization is synchronizable, since retiring stale rows needs no Adobe call
+8. **Error handling** — a failing (authorization, segment) pair is logged and
    skipped so the rest of the catalogue still synchronizes; the task fails at
-   the end when any pair could not be synchronized
-8. **Progress reporting** — the task reports progress as pairs complete, reaching
+   the end when any pair could not be synchronized, or when the expiry review
+   could not be written
+9. **Progress reporting** — the task reports progress as pairs complete, reaching
    100% when all (authorization × segment) pairs are processed
 
 Open codes are keyed by `(code, market_segment)` in the Airtable store and
 remain visible to all customers in that segment. Closed codes target a specific
-customer and are authored/curated manually through the discount management API.
+customer and are authored/curated manually through the discount management API;
+their `retired_at` belongs to that API's soft delete and the sync never writes
+it.
 
 ## External integrations
 

@@ -24,7 +24,11 @@ the `GET /v3/flex-discounts` endpoint. The sync is scoped by:
 - **Market segment** — Adobe publishes open discounts per market segment; the
   sync walks COM, EDU, and GOV (GOV_LGA has no open discounts)
 - **Country** — the storefront country is derived from the authorization owner's
-  address; the sync queries Adobe for discounts available in that country
+  address, and that country resolves to an Adobe region through the packaged
+  `mpt_adobe_vipm_ef/data/region_country_mapping.json`; the sync then queries
+  Adobe once per country of the region with the same credentials. Each region is
+  processed once per run, and a country belonging to no region is queried on its
+  own
 
 The endpoint returns the open catalogue only (closed codes must be queried
 individually by code). Adobe caps the page size at 50 items; the client walks
@@ -61,9 +65,29 @@ codes atomically:
 3. Closed codes (`source = "Ops/Vendor"`) are never overwritten by the sync
 4. Per-country values are replaced atomically (one row per country)
 
+Every run then closes with an expiry review of the stored open rows, so the
+store keeps up with codes whose window has moved or that Adobe has dropped from
+the open catalogue altogether:
+
+- **Retirement** — a non-retired open row whose usable window closed before the
+  run time is retired in a single Airtable batch (`retired_at` stamped with the
+  run time). The window is the same one the offer filter uses: `end_date`, or
+  `discount_lock_end_date` for a reusable code, so a redeemed reusable code is
+  not retired while its lock is still open. A row without a readable upper
+  bound is never retired
+- **Un-retirement** — while an open row is upserted, a stored `retired_at` is
+  cleared when the dates Adobe now reports leave the code usable again (Adobe
+  extending or correcting an end date). Being tied to the upsert, this only
+  reverses the sync's own retirements: a closed code soft-deleted through the
+  API stays retired
+- The review reads the dates the same run just refreshed, runs even when no
+  authorization is synchronizable (retiring stale rows needs no Adobe call), and
+  only ever touches `source = "API"` rows
+
 Closed codes are authored manually through the discount management API
 (`/api/v2/discount-codes`) by vendor or operations accounts. They target a
-specific customer and are not visible to other customers in the segment.
+specific customer and are not visible to other customers in the segment. Their
+`retired_at` is owned by that API's soft delete, never by the sync.
 
 The discount management API scopes all operations to an agreement (passed as the
 `agreement` query parameter), deriving the customer ID and market segment from
