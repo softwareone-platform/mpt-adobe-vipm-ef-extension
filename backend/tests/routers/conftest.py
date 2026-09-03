@@ -48,6 +48,7 @@ class FakeAdobeClient:
 
     def __init__(self, call):
         self.customer = FakeAdobeNamespace(call)
+        self.discount = FakeAdobeNamespace(call)
         self.offer = FakeAdobeNamespace(call)
         self.order = FakeAdobeNamespace(call)
         self.recommendation = FakeAdobeNamespace(call)

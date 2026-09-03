@@ -5,7 +5,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react';
 import { http } from '@mpt-extension/sdk';
 
 import { PromotionsStep } from './PromotionsStep';
-import type { Agreement, Discount, Subscription } from '../../shared/model';
+import type { Agreement, Discount, InheritedDiscount, Subscription } from '../../shared/model';
 import type { DiscountSelections, NetNewItem, RenewalPath } from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -204,6 +204,7 @@ const renderStep = async ({
   quantities = {},
   netNewItems = [] as NetNewItem[],
   discountSelections = {} as DiscountSelections,
+  inheritedDiscounts = [] as InheritedDiscount[],
   path = 'anniversary' as RenewalPath,
   onDiscountChange = jest.fn(),
 } = {}) => {
@@ -215,6 +216,7 @@ const renderStep = async ({
       quantities={quantities}
       netNewItems={netNewItems}
       discountSelections={discountSelections}
+      inheritedDiscounts={inheritedDiscounts}
       path={path}
       onDiscountChange={onDiscountChange}
       onPreview={jest.fn()}
@@ -223,6 +225,19 @@ const renderStep = async ({
   await act(async () => {});
   return result;
 };
+
+const inheritedDiscount = (overrides: Partial<InheritedDiscount> = {}): InheritedDiscount => ({
+  offerId: 'OFFER-1',
+  subscriptionId: '',
+  code: 'CODE-ONE',
+  adobeId: 'adobe-1',
+  eligible: true,
+  name: 'Black Friday',
+  description: '',
+  discountLockEndDate: '',
+  discountValues: [],
+  ...overrides,
+});
 
 const codesOf = (select: HTMLSelectElement) =>
   Array.from(select.querySelectorAll('option'))
@@ -416,6 +431,37 @@ describe('PromotionsStep', () => {
     expect((await findByTestId('promotions-step-error')).textContent).toContain(
       'Discounts are down',
     );
+  });
+
+  it('marks a line whose code is the reusable the customer already holds', async () => {
+    const { findByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'CODE-ONE' },
+      inheritedDiscounts: [inheritedDiscount({ offerId: 'OFFER-1', code: 'CODE-ONE' })],
+    });
+
+    expect(await findByTestId('inherited-SUB-1')).toBeTruthy();
+  });
+
+  it('does not mark a code the customer picked themselves as inherited', async () => {
+    const { findByTestId, queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'CODE-ONE' },
+      inheritedDiscounts: [],
+    });
+
+    await findByTestId('discount-code-SUB-1');
+    expect(queryByTestId('inherited-SUB-1')).toBeNull();
+  });
+
+  it('warns about a held reusable that no longer qualifies', async () => {
+    const { findByTestId } = await renderStep({
+      inheritedDiscounts: [
+        inheritedDiscount({ offerId: 'OFFER-9', code: 'OLD-CODE', eligible: false }),
+      ],
+    });
+
+    const notice = await findByTestId('promotions-step-ineligible-inherited');
+    expect(notice.textContent).toContain('OLD-CODE');
+    expect(notice.textContent).toContain('no longer qualify');
   });
 
   describe('next-step gate', () => {

@@ -1,5 +1,6 @@
 import type {
   Discount,
+  InheritedDiscount,
   RenewalPath,
   RenewalPlanBody,
   RenewalStateEntry,
@@ -306,6 +307,53 @@ function getLineDiscountCodes(
 ): string[] {
   const code = normalizeDiscountCode(discountSelections?.[rowId] ?? '');
   return code ? [code] : [];
+}
+
+/**
+ * The eligible inherited code the customer holds for each renewing line's SKU.
+ *
+ * Adobe's automated preview resolves which reusable auto-applies to a line
+ * (and its precedence when several apply), so the map keeps the first eligible
+ * code per partial SKU. Ineligible ones — a reusable that no longer qualifies —
+ * are left out and surfaced as a warning instead.
+ */
+export function inheritedCodesBySku(inherited: InheritedDiscount[]): Map<string, string> {
+  const codeBySku = new Map<string, string>();
+  for (const discount of inherited) {
+    if (!discount.eligible) continue;
+    const sku = getPartialSku(discount.offerId);
+    if (sku && !codeBySku.has(sku)) {
+      codeBySku.set(sku, normalizeDiscountCode(discount.code));
+    }
+  }
+  return codeBySku;
+}
+
+/** The held reusables Adobe reports as no longer eligible for the customer's lines. */
+export function ineligibleInheritedCodes(inherited: InheritedDiscount[]): InheritedDiscount[] {
+  return inherited.filter((discount) => !discount.eligible);
+}
+
+/**
+ * Seed the per-line discount selections with the reusables the customer already
+ * holds, so a held reusable auto-applies at renewal without the customer picking
+ * it. Only eligible inherited codes are seeded; the customer can still override
+ * any line, which replaces the inherited default.
+ */
+export function buildInheritedDiscountSelections(
+  subscriptions: Subscription[],
+  inherited: InheritedDiscount[],
+): DiscountSelections {
+  const codeBySku = inheritedCodesBySku(inherited);
+  const selections: DiscountSelections = {};
+  for (const subscription of subscriptions) {
+    const sku = getPartialSku(subscription.lines?.[0]?.item.externalIds?.vendor ?? '');
+    const code = sku ? codeBySku.get(sku) : undefined;
+    if (code) {
+      selections[subscription.id] = code;
+    }
+  }
+  return selections;
 }
 
 export function findDiscountByCode(code: string, discounts: Discount[]): Discount | undefined {

@@ -41,6 +41,11 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import resolve_market_segment
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
+from mpt_adobe_vipm_ef.services.inherited_discounts import (
+    InheritedDiscount,
+    build_inherited_discounts,
+    serialize_inherited_discounts,
+)
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.services.renewal import require_scheduled_creation_window
 from mpt_adobe_vipm_ef.services.renewal_auto_renew import (
@@ -198,6 +203,34 @@ async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIRespo
             "hasActiveSubscriptions": has_active_subscriptions(subscriptions),
             "lockedPath": locked_path.value if locked_path else None,
         },
+    )
+
+
+@renewal_router.get(
+    path="/{agreement_id}/renewal-order/inherited-discounts",
+    name="agreements-renewal-order-inherited-discounts",
+)
+@validate_agreement_access
+@log_inputs
+async def get_inherited_discounts(agreement_id: str, ctx: APIContext) -> APIResponse:
+    """Report the reusable discounts the customer already holds, per renewing line.
+
+    The discount codes step reads this to surface the customer's *inherited*
+    discounts: the reusables Adobe auto-applies to each renewing subscription at
+    the anniversary, sourced from an automated ``PREVIEW_RENEWAL`` (Adobe owns
+    the precedence between several held reusables and the extended lock window)
+    and enriched from the customer's held-reusable catalogue for display. A code
+    Adobe returns as no longer eligible is flagged (``eligible`` false) so the
+    step can warn rather than silently drop it. An empty list means the customer
+    holds no auto-applied reusables (or has no auto-renewing subscriptions).
+    """
+    _require_client_account(ctx)
+    agreement = await load_agreement(ctx, agreement_id)
+    require_active_agreement(agreement)
+    currency_code = agreement.authorization.currency or ""
+    inherited = await _load_inherited_discounts(ctx, agreement_id, currency_code)
+    return APIResponse.ok(
+        payload={"inheritedDiscounts": serialize_inherited_discounts(inherited)},
     )
 
 
@@ -712,6 +745,52 @@ async def _load_adobe_subscriptions(ctx: APIContext, agreement_id: str) -> dict[
         )
         raise ValidationError(detail=str(error))
     return subscriptions
+
+
+async def _load_inherited_discounts(
+    ctx: APIContext, agreement_id: str, currency_code: str
+) -> dict[str, list[InheritedDiscount]]:
+    """Load the reusables Adobe auto-applies to the customer's renewing lines.
+
+    An automated ``PREVIEW_RENEWAL`` (no line items) returns, per renewing line,
+    the flexible discounts Adobe would auto-apply and whether each still
+    qualifies; the customer's held-reusable catalogue enriches them for display.
+    The lookup is advisory — Adobe re-validates every code on the real preview
+    and at commit — so a failure never blocks the renewal: it degrades to no
+    inherited discounts. Adobe also errors here when the customer has no
+    auto-renewal-enabled subscriptions, which reads the same way.
+    """
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
+    try:
+        return await _fetch_inherited_discounts(ctx, authorization_id, customer_id, currency_code)
+    except AdobeError as error:
+        logger.warning("Could not load inherited discounts for %s: %s", agreement_id, error)
+        return {}
+
+
+async def _fetch_inherited_discounts(
+    ctx: APIContext, authorization_id: str, customer_id: str, currency_code: str
+) -> dict[str, list[InheritedDiscount]]:
+    """Read the automated renewal preview and the held catalogue, then map them together.
+
+    The two reads are independent Adobe calls, so they are started together and
+    awaited as one to add no more than a single round-trip of latency.
+    """
+    automated_preview, held_catalogue = await asyncio.gather(
+        asyncio.to_thread(
+            adobe_client(ctx).order.preview_automated_renewal_order,
+            authorization_id,
+            customer_id,
+            currency_code,
+        ),
+        asyncio.to_thread(
+            adobe_client(ctx).discount.get_flex_discounts,
+            authorization_id,
+            customer_id,
+        ),
+    )
+    return build_inherited_discounts(automated_preview, held_catalogue)
 
 
 async def _preview_renewal(
