@@ -3,10 +3,18 @@
 The schedule walks the platform's catalog authorizations of the extension's
 products (each one maps to an Adobe credential set in the authorizations
 file), derives the storefront country from the authorization owner's address,
-and mirrors the open ``GET /v3/flex-discounts`` listing of every market
-segment into the Airtable discount store. Open rows are keyed by
+resolves the Adobe region that country belongs to, and mirrors the open
+``GET /v3/flex-discounts`` listing of every market segment of every country of
+that region into the Airtable discount store. Regions already walked are
+remembered for the run so they are never synchronized twice. Open rows are keyed by
 ``(code, market_segment)`` and owned by this sync (``source = "API"``); the
 enrichment fields stay untouched for operations to curate.
+
+Every run closes with an expiry review of the stored open rows: a code whose
+usable window has passed is retired (``retired_at`` stamped with the run time),
+and conversely a row Adobe reports as usable again is un-retired while it is
+upserted. Closed (``Ops/Vendor``) rows are never touched: their retirement is
+the discount management API's soft delete.
 """
 
 import asyncio
@@ -27,9 +35,12 @@ from mpt_adobe_vipm_ef.services.discount_mapping import (
     build_open_update_fields,
     build_value_fields,
     is_closed,
+    is_expired,
     open_discount_values,
+    record_code,
 )
 from mpt_adobe_vipm_ef.services.discounts import DiscountStore
+from mpt_adobe_vipm_ef.services.regions import region_countries, region_of_country
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
 
 logger = logging.getLogger(__name__)
@@ -47,29 +58,67 @@ class SyncTarget:
 
     authorization_id: str
     country: str
+    region: str | None = None
 
 
 async def sync_open_discounts(ctx: ScheduleContext) -> None:  # noqa: WPS210
     """Mirror the open Adobe flex-discount catalogue into the Airtable store.
 
-    A failing (authorization, segment) pair is logged and skipped so the rest
+    A failing (authorization, country, segment) pair is logged and skipped so the rest
     of the catalogue still synchronizes; the task fails at the end when any
-    pair could not be synchronized.
+    pair could not be synchronized. The mirroring is followed by the expiry
+    review of the stored open rows, which runs whatever the mirroring outcome.
     """
     settings = cast(ExtensionSettings, ctx.ext_settings)
     store = DiscountStore.from_settings(settings)
     targets = await _collect_sync_targets(ctx, settings)
-    if not targets:
+    failed_pairs: list[str] = []
+    if targets:
+        failed_pairs = await _sync_targets(ctx, store, get_adobe_client(), targets)
+    else:
         ctx.logger.warning("Open discount sync found no synchronizable authorizations")
-        return
-    failed_pairs = await _sync_targets(ctx, store, get_adobe_client(), targets)
+    # The expiry review runs last so it reads the dates this run just refreshed,
+    # and runs even without targets: retiring stale rows needs no Adobe call.
+    retire_error = await _retire_expired_open_codes(ctx, store)
     if failed_pairs:
         failed_summary = ", ".join(failed_pairs)
         failed_count = len(failed_pairs)
         raise FailError(
             f"Open discount sync failed for {failed_count} "
-            f"authorization/segment pairs: {failed_summary}"
+            f"authorization/country/segment pairs: {failed_summary}"
         )
+    if retire_error is not None:
+        raise FailError(f"Open discount sync could not retire the expired codes: {retire_error}")
+
+
+async def _retire_expired_open_codes(
+    ctx: ScheduleContext, store: DiscountStore
+) -> HTTPError | None:
+    """Retire the stored open codes whose usable window has passed.
+
+    Reviews every non-retired open row, not only the ones Adobe reported this
+    run: a code Adobe has dropped from the open catalogue must be retired too.
+    Returns the Airtable error that stopped the review, or None on success.
+    """
+    now = dt.datetime.now(tz=dt.UTC)
+    try:
+        retired_codes = await asyncio.to_thread(_retire_expired_records, store, now)
+    except HTTPError as error:
+        ctx.logger.warning("Open discount expiry review failed: %s", error)
+        return error
+    ctx.logger.info(
+        "Retired %s expired open discount codes: %s",
+        len(retired_codes),
+        ", ".join(retired_codes) or "none",
+    )
+    return None
+
+
+def _retire_expired_records(store: DiscountStore, now: dt.datetime) -> list[str]:
+    """Stamp ``now`` on the open rows out of their window, returning their codes."""
+    expired = [record for record in store.list_open_codes() if is_expired(record["fields"], now)]
+    store.retire_codes([record["id"] for record in expired], now.isoformat())
+    return [record_code(record) for record in expired]
 
 
 async def _sync_targets(  # noqa: WPS210
@@ -89,7 +138,7 @@ async def _sync_targets(  # noqa: WPS210
                 _sync_target_segment, store, adobe_client, target, segment
             )
         except (AdobeError, HTTPError) as error:
-            failed_pairs.append(f"{target.authorization_id}/{segment}")
+            failed_pairs.append(f"{target.authorization_id}/{target.country}/{segment}")
             ctx.logger.warning(
                 "Open discount sync failed for authorization %s segment %s country %s: %s",
                 target.authorization_id,
@@ -99,11 +148,13 @@ async def _sync_targets(  # noqa: WPS210
             )
         else:
             ctx.logger.info(
-                "Synchronized %s open discounts for authorization %s segment %s country %s",
+                "Synchronized %s open discounts for authorization %s segment %s "
+                "country %s region %s",
                 synced,
                 target.authorization_id,
                 segment,
                 target.country,
+                target.region,
             )
         await ctx.task.progress(position / len(pairs) * _FULL_PROGRESS)  # noqa: WPS476
     return failed_pairs
@@ -112,24 +163,53 @@ async def _sync_targets(  # noqa: WPS210
 async def _collect_sync_targets(
     ctx: ScheduleContext, settings: ExtensionSettings
 ) -> list[SyncTarget]:
-    """List the platform authorizations the sync can serve, one per country.
+    """List the (authorization, country) pairs the sync can serve.
 
     Authorizations without Adobe credentials in the authorizations file or
-    without an owner country are skipped; authorizations sharing the same
-    Adobe credential set and country are deduplicated.
+    without an owner country are skipped. The owner country only selects the
+    Adobe region: the region's whole country list is synchronized with that
+    authorization's credentials, and the regions already expanded during the
+    run are remembered so a second authorization of the same region is skipped.
     """
     targets: list[SyncTarget] = []
-    seen_credentials = set()
+    synced_regions: set[str] = set()
     async for authorization in _authorizations_query(ctx, settings).iterate():
-        target = _build_sync_target(ctx, settings, authorization)
-        if target is None:
+        owner_target = _build_sync_target(ctx, settings, authorization)
+        if owner_target is None:
             continue
-        credentials_key = _credentials_key(settings, target)
-        if credentials_key in seen_credentials:
-            continue
-        seen_credentials.add(credentials_key)
-        targets.append(target)
+        targets.extend(_region_targets(ctx, owner_target, synced_regions))
     return targets
+
+
+def _region_targets(
+    ctx: ScheduleContext, owner_target: SyncTarget, synced_regions: set[str]
+) -> list[SyncTarget]:
+    """Expand an authorization into one target per country of its Adobe region.
+
+    ``synced_regions`` accumulates the regions expanded so far in the run: an
+    authorization whose region is already there yields no target at all.
+    """
+    region = region_of_country(owner_target.country)
+    if region is None:
+        ctx.logger.warning(
+            "Authorization %s country %s belongs to no Adobe region: "
+            "synchronizing that country only",
+            owner_target.authorization_id,
+            owner_target.country,
+        )
+        return [owner_target]
+    if region in synced_regions:
+        ctx.logger.info(
+            "Skipping authorization %s: its region %s is already synchronized",
+            owner_target.authorization_id,
+            region,
+        )
+        return []
+    synced_regions.add(region)
+    return [
+        SyncTarget(authorization_id=owner_target.authorization_id, country=country, region=region)
+        for country in region_countries(region)
+    ]
 
 
 def _authorizations_query(ctx: ScheduleContext, settings: ExtensionSettings) -> Any:
@@ -137,12 +217,6 @@ def _authorizations_query(ctx: ScheduleContext, settings: ExtensionSettings) -> 
     product_filter = RQLQuery().n("product.id").in_(list(settings.product_ids))
     catalog = ctx.mpt_api_service.client.catalog
     return catalog.authorizations.filter(product_filter).select("owner")
-
-
-def _credentials_key(settings: ExtensionSettings, target: SyncTarget) -> tuple[str, str]:
-    """Key a target by its Adobe credential set and country for deduplication."""
-    adobe_authorization = settings.get_authorization(target.authorization_id)
-    return (adobe_authorization.client_id, target.country)
 
 
 def _build_sync_target(
@@ -207,7 +281,7 @@ def _upsert_open_discount(
         )
         return False
     else:
-        store.update_code(existing["id"], build_open_update_fields(discount, now))
+        store.update_code(existing["id"], build_open_update_fields(discount, now, existing))
     for entry in open_discount_values(discount):
         store.replace_country_value(
             code,

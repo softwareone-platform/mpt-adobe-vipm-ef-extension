@@ -45,10 +45,14 @@ The extension runs scheduled tasks for background operations:
     Airtable discount store
   - Requirements: `EXT_AIRTABLE_API_TOKEN` and `EXT_AIRTABLE_DISCOUNTS_ID` must
     be configured
-  - Behavior: Walks platform catalog authorizations, queries Adobe
+  - Behavior: Walks platform catalog authorizations, resolves the Adobe region
+    of each authorization owner's country
+    (`mpt_adobe_vipm_ef/data/region_country_mapping.json`), queries Adobe
     `GET /v3/flex-discounts` for each (authorization, market segment, country)
-    triple, and upserts open codes into Airtable. Enrichment fields are left
-    untouched for operations to curate.
+    triple of every country of that region, and upserts open codes into
+    Airtable. A region is expanded only once per run, so further
+    authorizations of an already synchronized region are skipped. Enrichment
+    fields are left untouched for operations to curate.
 
 Scheduled tasks are registered via the SDK's `ScheduleRouter` and can be
 monitored through platform task logs. See
