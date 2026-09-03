@@ -25,9 +25,15 @@ class FakeAdobeCall:
         self.returns = None
         self.error = None
         self.calls = []
+        self.answers = []
 
     def __call__(self, *call_args, **call_kwargs):
         self.calls.append((call_args, call_kwargs))
+        if self.answers:
+            answer = self.answers.pop(0)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
         if self.error is not None:
             raise self.error
         return self.returns

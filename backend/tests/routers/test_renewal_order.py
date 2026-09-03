@@ -3,6 +3,7 @@ import http
 import pytest
 from freezegun import freeze_time
 from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
+from mpt_extension_sdk.api import ErrorDetail
 from mpt_extension_sdk.api.auth.context import AccountType
 from mpt_extension_sdk.api.errors import (
     ForbiddenError,
@@ -35,6 +36,7 @@ from tests.routers.conftest import FakeAdobeCall, FakeAdobeNamespace
 
 _AGREEMENT_ID = "AGR-1234-5678"
 _SUBSCRIPTION_ID = "SUB-1234-5678"
+_SECOND_SUBSCRIPTION_ID = "SUB-8765-4321"
 _LINE_ID = "ALI-0001"
 _SKU = "65304470CA"
 _OFFER_ID = "65304470CA01A12"
@@ -78,7 +80,10 @@ def _agreement_payload(product_id="PRD-1111-1111", status="Active"):
         "product": {"id": product_id, "name": "Dummy Product"},
         "authorization": {"id": "AUT-123", "name": "Dummy Authorization", "currency": "USD"},
         "parameters": {"fulfillment": [{"externalId": CUSTOMER_ID_PARAM, "value": "CUST-001"}]},
-        "subscriptions": [{"id": _SUBSCRIPTION_ID, "name": "Renewing subscription"}],
+        "subscriptions": [
+            {"id": _SUBSCRIPTION_ID, "name": "Renewing subscription"},
+            {"id": _SECOND_SUBSCRIPTION_ID, "name": "Second renewing subscription"},
+        ],
         "lines": [_line_payload(_LINE_ID, _SKU, _CURRENT_QUANTITY)],
     }
 
@@ -1478,6 +1483,250 @@ async def test_preview_renewal_plan_maps_preview_call_errors(
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
 
     assert order_call.calls
+
+
+def _flex_error(code, reason=None, line=1, message=None):
+    detail = f"Line Item: {line}" if reason is None else f"Line Item: {line}, Reason: {reason}"
+    return AdobeAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        {
+            "code": code,
+            "message": message or "Customer is not qualified for the Flexible Discount",
+            "additionalDetails": [detail],
+        },
+    )
+
+
+@pytest.fixture
+def preview_call(fake_ctx, adobe_call):
+    """The PREVIEW_RENEWAL call on its own, past the offer-id resolution call."""
+    adobe_call.returns = {"items": []}
+    order_call = FakeAdobeCall()
+    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+    return order_call
+
+
+async def test_preview_renewal_plan_reports_a_rejected_code_against_its_line(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.answers = [
+        _flex_error("2141", reason="INELIGIBLE_COMMITMENT_STATUS"),
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["COMMIT15"]))
+
+    assert rejection.value.errors == [
+        ErrorDetail(pointer=_ADOBE_SUBSCRIPTION_ID, detail="INELIGIBLE_COMMITMENT_STATUS"),
+    ]
+
+
+async def test_preview_renewal_plan_reads_the_reason_from_the_message(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Adobe is expected to name the criterion, but not reliably in the same place."""
+    preview_call.answers = [
+        _flex_error("2141", message="SEAT_UPGRADE_PERCENTAGE_NOT_MET"),
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["SEATUPG25"]))
+
+    assert rejection.value.errors[0].detail == "SEAT_UPGRADE_PERCENTAGE_NOT_MET"
+
+
+async def test_preview_renewal_plan_falls_back_to_the_error_code(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """A refusal Adobe reports without a reason still resolves to copy of ours."""
+    preview_call.answers = [
+        _flex_error("2147", message="Only one code per line item"),
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["TWOCODES"]))
+
+    assert rejection.value.errors[0].detail == "2147"
+
+
+async def test_preview_renewal_plan_reports_a_code_refused_on_a_successful_quote(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Adobe marks the line rather than failing the call, and prices it undiscounted."""
+    preview_call.answers = [
+        {
+            "lineItems": [
+                {
+                    "extLineItemNumber": 1,
+                    "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                    "flexDiscounts": [{"code": "BADCODE", "result": "FAILURE"}],
+                },
+            ],
+        },
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["BADCODE"]))
+
+    assert rejection.value.errors == [
+        ErrorDetail(pointer=_ADOBE_SUBSCRIPTION_ID, detail="FAILURE"),
+    ]
+
+
+async def test_preview_renewal_plan_collects_every_rejected_code_in_one_request(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Adobe refuses one code at a time, so the codes are dropped and re-quoted.
+
+    Without that the customer would have to fix one code per wizard round-trip.
+    """
+    preview_call.answers = [
+        _flex_error("2141", reason="INELIGIBLE_COMMITMENT_STATUS", line=1),
+        _flex_error("2146", reason="NOT_FOUND", line=2),
+        {"lineItems": []},
+    ]
+    body = RenewalPreviewRequest.model_validate({
+        "subscriptions": [
+            {
+                "id": _SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": 7,
+                "flexDiscountCodes": ["COMMIT15"],
+            },
+            {
+                "id": _SECOND_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": 7,
+                "flexDiscountCodes": ["BADCODE"],
+            },
+        ],
+        "netNewItems": [],
+        "renewalPath": "anniversary",
+    })
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
+    assert [detail.detail for detail in rejection.value.errors] == [
+        "INELIGIBLE_COMMITMENT_STATUS",
+        "NOT_FOUND",
+    ]
+    assert len(preview_call.calls) == 3
+
+
+async def test_preview_renewal_plan_drops_the_refused_code_before_quoting_again(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.answers = [
+        _flex_error("2146", reason="NOT_FOUND"),
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["BADCODE"]))
+
+    retried_lines, _ = preview_call.calls[1]
+    assert "flexDiscountCodes" not in retried_lines[3][0]
+
+
+async def test_preview_renewal_plan_walks_every_code_on_one_line(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """One line can carry several codes, and each still gets its own quote."""
+    preview_call.answers = [
+        _flex_error("2146", reason="NOT_FOUND"),
+        _flex_error("2146", reason="NOT_FOUND"),
+        _flex_error("2146", reason="NOT_FOUND"),
+        {"lineItems": []},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(
+            _AGREEMENT_ID, fake_ctx, _preview_body(codes=["ONE", "TWO", "THREE"])
+        )
+
+    assert len(preview_call.calls) == 4
+    assert [detail.detail for detail in rejection.value.errors] == [
+        "NOT_FOUND",
+        "NOT_FOUND",
+        "NOT_FOUND",
+    ]
+
+
+async def test_preview_renewal_plan_reports_a_repeated_refusal_once(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Adobe refusing a line whose code is already gone must not repeat the message."""
+    preview_call.error = _flex_error("2146", reason="NOT_FOUND")
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["ONE"]))
+
+    assert len(rejection.value.errors) == 1
+    assert len(preview_call.calls) == 2
+
+
+async def test_preview_renewal_plan_keeps_the_rows_found_before_an_unnamed_refusal(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.answers = [
+        _flex_error("2141", reason="INELIGIBLE_COMMITMENT_STATUS"),
+        AdobeAPIError(
+            http.HTTPStatus.BAD_REQUEST,
+            {"code": "2147", "message": "Only one Flexible Discount Code is allowed per line item"},
+        ),
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["ONE", "TWO"]))
+
+    assert [detail.detail for detail in rejection.value.errors] == [
+        "INELIGIBLE_COMMITMENT_STATUS",
+    ]
+
+
+async def test_preview_renewal_plan_accepts_a_quote_whose_codes_all_applied(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.returns = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "status": "1000",
+                "flexDiscounts": [{"code": "GOODCODE", "result": "SUCCESS"}],
+            },
+        ],
+    }
+
+    result = await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["GOODCODE"]))
+
+    assert result.payload["eligibility"] == {_ADOBE_SUBSCRIPTION_ID: True}
+
+
+async def test_preview_renewal_plan_reports_a_refusal_that_names_no_line(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """A refusal with no row to sit against fails the plan with Adobe's message."""
+    preview_call.error = AdobeAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        {
+            "code": "2147",
+            "message": "Only one Flexible Discount Code is allowed per line item",
+            "additionalDetails": ["No line named here"],
+        },
+    )
+
+    with pytest.raises(ValidationError, match="Only one Flexible Discount Code") as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["TWOCODES"]))
+
+    assert not rejection.value.errors
 
 
 @pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
