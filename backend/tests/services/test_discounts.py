@@ -131,6 +131,39 @@ def test_find_code_queries_by_code_and_segment(api, table, store):
     )
 
 
+def test_list_open_codes_queries_the_non_retired_sync_owned_rows(api, table, store):
+    table.all.return_value = [{"id": "rec1", "fields": {"source": "API"}}]
+
+    result = store.list_open_codes()
+
+    assert result == [{"id": "rec1", "fields": {"source": "API"}}]
+    api.return_value.table.assert_called_once_with(_BASE_ID, CODES_TABLE)
+    table.all.assert_called_once_with(
+        formula=AND(
+            EQ(Field("source"), "API"),
+            EQ(Field("retired_at"), BLANK()),
+        )
+    )
+
+
+def test_retire_codes_stamps_retired_at_in_one_batch(table, store):
+    store.retire_codes(["rec1", "rec2"], "2026-09-03T00:00:00+00:00")  # act
+
+    table.batch_update.assert_called_once_with(
+        [
+            {"id": "rec1", "fields": {"retired_at": "2026-09-03T00:00:00+00:00"}},
+            {"id": "rec2", "fields": {"retired_at": "2026-09-03T00:00:00+00:00"}},
+        ],
+        typecast=True,
+    )
+
+
+def test_retire_codes_writes_nothing_without_records(table, store):
+    store.retire_codes([], "2026-09-03T00:00:00+00:00")  # act
+
+    table.batch_update.assert_not_called()
+
+
 def test_create_code_inserts_row_with_typecast(table, store):
     table.create.return_value = {"id": "rec1", "fields": {"Code": "SUMMER25"}}
 

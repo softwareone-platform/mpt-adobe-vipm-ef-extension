@@ -89,6 +89,27 @@ class DiscountStore:
         )
         return self._table(CODES_TABLE).first(formula=formula)
 
+    def list_open_codes(self) -> list[AirtableRecord]:
+        """Return the open (sync-owned) code rows still in scope.
+
+        Rows already retired are left out: the expiry pass only ever stamps
+        ``retired_at``, and un-retiring is the synchronization's own job.
+        """
+        formula = AND(
+            EQ(Field("source"), SOURCE_OPEN),
+            EQ(Field("retired_at"), BLANK()),
+        )
+        return self._table(CODES_TABLE).all(formula=formula)
+
+    def retire_codes(self, record_ids: list[str], retired_at: str) -> None:
+        """Stamp ``retired_at`` on the given code rows in Airtable batches."""
+        if not record_ids:
+            return
+        self._table(CODES_TABLE).batch_update(
+            [{"id": record_id, "fields": {"retired_at": retired_at}} for record_id in record_ids],
+            typecast=True,
+        )
+
     def create_code(self, fields: dict[str, Any]) -> AirtableRecord:
         """Insert a new code row."""
         return self._table(CODES_TABLE).create(fields, typecast=True)

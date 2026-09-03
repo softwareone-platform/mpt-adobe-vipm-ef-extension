@@ -129,6 +129,34 @@ def test_build_open_update_fields_stores_partial_skus_deduplicated(flex_discount
     assert result["qualifying_offer_ids"] == "11083117CA"
 
 
+def test_build_open_update_fields_unions_offer_ids_with_the_stored_ones(
+    flex_discount, code_record_factory
+):
+    existing = code_record_factory(
+        target_offer_ids="65304520CA,11083117CA", qualifying_offer_ids="65322651CA"
+    )
+    flex_discount["qualification"] = {
+        "baseOfferIds": ["65322651CA02A12", "65304520CA01A12"],
+        "qualifyingOfferIds": ["11083117CA01A12"],
+    }
+
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW, existing)
+
+    assert result["target_offer_ids"] == "65304520CA,11083117CA,65322651CA"
+    assert result["qualifying_offer_ids"] == "65322651CA,11083117CA"
+
+
+def test_build_open_update_fields_keeps_stored_offer_ids_adobe_omits(
+    flex_discount, code_record_factory
+):
+    existing = code_record_factory(target_offer_ids="65304520CA")
+    flex_discount["qualification"] = {}
+
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW, existing)
+
+    assert result["target_offer_ids"] == "65304520CA"
+
+
 def test_build_open_update_fields_maps_percentage_outcome_and_defaults():
     discount = {"outcomes": [{"type": "PERCENTAGE_DISCOUNT"}]}
 
@@ -138,6 +166,81 @@ def test_build_open_update_fields_maps_percentage_outcome_and_defaults():
     assert result["status"] == "ACTIVE"
     assert result["reusable"] is False
     assert result["discount_lock_end_date"] is None
+
+
+def test_build_open_update_fields_clears_the_retirement_of_a_usable_code(
+    flex_discount, code_record_factory
+):
+    existing = code_record_factory(retired_at="2026-07-01T00:00:00Z")
+
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW, existing)
+
+    assert result["retired_at"] is None
+
+
+def test_build_open_update_fields_keeps_the_retirement_of_an_expired_code(
+    flex_discount, code_record_factory
+):
+    existing = code_record_factory(retired_at="2026-07-01T00:00:00Z")
+    flex_discount["endDate"] = "2026-06-30T23:59:59Z"
+    flex_discount["discountLockEndDate"] = "2026-07-15T23:59:59Z"
+
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW, existing)
+
+    assert "retired_at" not in result
+
+
+def test_build_open_update_fields_leaves_retirement_alone_on_a_live_row(
+    flex_discount, code_record_factory
+):
+    result = discount_mapping.build_open_update_fields(flex_discount, _NOW, code_record_factory())
+
+    assert "retired_at" not in result
+
+
+def test_build_open_code_fields_never_retires_a_new_row(flex_discount):
+    flex_discount["endDate"] = "2026-06-30T23:59:59Z"
+    flex_discount["discountLockEndDate"] = None
+
+    result = discount_mapping.build_open_code_fields(flex_discount, "COM", _NOW)
+
+    assert "retired_at" not in result
+
+
+@pytest.mark.parametrize(
+    ("field_overrides", "expected"),
+    [
+        pytest.param({"end_date": "2026-08-31T23:59:59Z"}, False, id="inside-window"),
+        pytest.param({"end_date": "2026-07-01T00:00:00Z"}, True, id="past-end-date"),
+        pytest.param({"end_date": "2026-07-21T12:00:00Z"}, False, id="ends-right-now"),
+        pytest.param({"end_date": None}, False, id="no-end-date"),
+        pytest.param({"end_date": "not-a-date"}, False, id="unreadable-end-date"),
+        pytest.param(
+            {
+                "end_date": "2026-07-01T00:00:00Z",
+                "reusable": True,
+                "discount_lock_end_date": "2026-12-31T23:59:59Z",
+            },
+            False,
+            id="reusable-inside-lock",
+        ),
+        pytest.param(
+            {
+                "end_date": "2026-06-01T00:00:00Z",
+                "reusable": True,
+                "discount_lock_end_date": "2026-07-01T00:00:00Z",
+            },
+            True,
+            id="reusable-past-lock",
+        ),
+    ],
+)
+def test_is_expired_mirrors_the_usable_window(field_overrides, expected, code_record_factory):
+    fields = code_record_factory(**field_overrides)["fields"]
+
+    result = discount_mapping.is_expired(fields, _NOW)
+
+    assert result is expected
 
 
 def test_build_open_code_fields_stamps_sync_ownership(flex_discount):
