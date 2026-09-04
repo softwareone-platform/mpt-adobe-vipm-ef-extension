@@ -262,6 +262,127 @@ async def test_list_without_order_type_keeps_a_redeemed_code(
 
 
 @freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_only_codes_targeting_the_line_sku(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(Code="MATCH", target_offer_ids="65322651CA"),
+        code_record_factory(Code="MISS", target_offer_ids="99999999ZZ"),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(
+        agreement, query={"orderType": "RENEWAL", "offerId": "65322651CA02A12"}
+    )
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert [payload["code"] for payload in result.payload] == ["MATCH"]
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_without_offer_context_keeps_every_targeted_code(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(Code="MATCH", target_offer_ids="65322651CA"),
+        code_record_factory(Code="MISS", target_offer_ids="99999999ZZ"),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 2
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_a_code_whose_prerequisite_the_customer_owns(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(qualifying_offer_ids="11083117CA"),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(
+        agreement, query={"orderType": "RENEWAL", "ownedOfferIds": "11083117CA01A12"}
+    )
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_drops_a_code_the_commitment_does_not_support(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(supports_annual=True, supports_3yc=False),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL", "commitment": "THREE_YC"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 0
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_drops_a_code_not_offered_in_the_customer_country(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [code_record_factory()]
+    fake_store.list_values.return_value = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "CA"}},
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 0
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_skips_the_country_gate_when_the_country_is_unknown(
+    fake_store, code_record_factory
+):
+    payload = _agreement_payload()
+    payload["licensee"].pop("address")
+    agreement = Agreement.from_payload(payload)
+    fake_store.list_codes.return_value = [code_record_factory()]
+    fake_store.list_values.return_value = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "CA"}},
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_rejects_an_unsupported_commitment(agreement, fake_store):
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL", "commitment": "BOGUS"})
+
+    with pytest.raises(ValidationError):
+        await list_discount_codes(ctx=ctx)
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_treats_a_blank_commitment_as_absent(agreement, fake_store, code_record_factory):
+    fake_store.list_codes.return_value = [
+        code_record_factory(supports_annual=True, supports_3yc=False),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL", "commitment": "   "})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
 async def test_list_without_order_type_keeps_every_code(agreement, fake_store, code_record_factory):
     fake_store.list_codes.return_value = [
         code_record_factory(applicable_order_types=["NEW"]),

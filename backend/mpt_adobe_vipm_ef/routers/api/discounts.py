@@ -12,10 +12,15 @@ from mpt_extension_sdk.api import APIContext, APIResponse
 from mpt_extension_sdk.api.pagination import PaginatedResult
 from mpt_extension_sdk.routing import APIRouter
 
-from mpt_adobe_vipm_ef.models.discount import DiscountCodeCreateRequest, DiscountCodeUpdateRequest
+from mpt_adobe_vipm_ef.models.discount import (
+    DiscountCodeCreateRequest,
+    DiscountCodeUpdateRequest,
+    DiscountScope,
+)
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import (
     load_discount_scope,
+    read_eligibility_context,
     read_order_type_filter,
     require_editor_account,
 )
@@ -30,6 +35,7 @@ from mpt_adobe_vipm_ef.services.discount_codes import (
     store_call,
     value_entry,
 )
+from mpt_adobe_vipm_ef.services.discounts import AirtableRecord, DiscountStore
 
 discounts_router = APIRouter(prefix="/discount-codes")
 
@@ -40,26 +46,45 @@ async def list_discount_codes(ctx: APIContext) -> APIResponse:  # noqa: WPS210
     """List the discounts in scope for the agreement's customer (open + closed).
 
     The offer shortlist (an ``orderType`` is given, e.g. the renewal wizard)
-    also drops single-use codes the customer has already redeemed; the discounts
+    evaluates the full eligibility of each code against the current context — the
+    line's SKU, the customer's owned SKUs and country, and the commitment term —
+    and drops single-use codes the customer has already redeemed. The discounts
     tab (no ``orderType``) lists every code, redeemed ones included.
     """
     order_type = read_order_type_filter(ctx)
     scope = await load_discount_scope(ctx)
     store = build_store(ctx)
     stored = await store_call(store.list_codes, scope.market_segment, scope.customer_id)
-    records = discount_mapping.filter_offerable(stored, order_type)
+    context = read_eligibility_context(ctx) if order_type else None
+    records = discount_mapping.filter_offerable(stored, order_type, context)
     redemptions = None
     if order_type is not None:
         codes = [discount_mapping.record_code(record) for record in records]
         redemption_records = await store_call(store.list_redemptions, codes, scope.customer_id)
         redemptions = discount_mapping.redemptions_by_code(redemption_records)
         records = discount_mapping.exclude_redeemed(records, redemptions)
+        records = await _exclude_out_of_country(store, scope, records)
     pagination = ctx.request.pagination
     page = records[pagination.offset : pagination.offset + pagination.limit]
     payloads = await serialize_page(store, scope, page, redemptions)
     return APIResponse.paginated(
         PaginatedResult.from_pagination(pagination, payload=payloads, total=len(records)),
     )
+
+
+async def _exclude_out_of_country(
+    store: DiscountStore, scope: DiscountScope, records: list[AirtableRecord]
+) -> list[AirtableRecord]:
+    """Drop codes not offered in the customer's country, using the value rows.
+
+    The gate is skipped when the customer country is unknown: it would hide every
+    per-country code with no backstop, so the shortlist errs towards showing them.
+    """
+    if not scope.country:
+        return records
+    codes = [discount_mapping.record_code(record) for record in records]
+    value_records = await store_call(store.list_values, codes, scope.market_segment)
+    return discount_mapping.exclude_out_of_country(records, value_records, scope.country)
 
 
 @discounts_router.get(path="/{discount_id}", name="discount-codes-get")
