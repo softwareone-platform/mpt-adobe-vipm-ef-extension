@@ -254,8 +254,8 @@ Airtable discount store via the scheduled task defined in
    - Existing open codes are updated with fresh Adobe data; enrichment fields
      (applicable order types, annual/3YC support) are left untouched for
      operations to curate
-   - Closed codes (authored by vendor/operations) are never overwritten by the
-     sync
+   - Closed codes (`source = "Operations"` / `"Vendor"` / `"Client"`, or the
+     legacy `"Ops/Vendor"`) are never overwritten by the sync
    - Per-country discount values are replaced atomically (one row per country)
    - A stored `retired_at` is cleared when the dates Adobe now reports leave the
      code usable again, bringing a row an earlier expiry review had retired back
@@ -278,8 +278,10 @@ Airtable discount store via the scheduled task defined in
 Open codes are keyed by `(code, market_segment)` in the Airtable store and
 remain visible to all customers in that segment. Closed codes target a specific
 customer and are authored/curated manually through the discount management API;
-their `retired_at` belongs to that API's soft delete and the sync never writes
-it.
+their `source` records the authoring account type (`"Operations"` or
+`"Vendor"`; `"Client"` marks a client-sourced row this API never writes, and
+legacy rows carry `"Ops/Vendor"`), and their `retired_at` belongs to that API's
+soft delete — the sync never writes it.
 
 ## External integrations
 
