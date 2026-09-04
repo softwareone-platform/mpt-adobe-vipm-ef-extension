@@ -484,6 +484,26 @@
         "Title": "No items to discount",
         "Description": "Go back to the Renewal step and switch on Renew for the subscriptions you want to keep."
       },
+      "Rejected": {
+        "Title": "Adobe rejected the following discount codes:",
+        "Line": "{{code}} on {{item}}: {{reason}}",
+        "OWNED_ENTITLEMENT_NOT_MET": "This discount requires the customer to already own a qualifying product.",
+        "NEW_TO_PRODUCT_NOT_MET": "This discount applies only to products the customer does not already own.",
+        "CUSTOMER_SEGMENT_NOT_MET": "This discount is limited to a customer segment this customer is not in.",
+        "CUSTOMER_STATUS_NOT_MET": "This discount requires a customer history this customer does not have.",
+        "QUALIFICATION_EVENT_NOT_MET": "This discount does not apply to this type of order.",
+        "MUST_MAINTAIN_QUANTITY_NOT_MET": "This discount requires the renewal to keep the current seat count.",
+        "PURCHASE_QUANTITY_NOT_MET": "This discount requires a different order quantity.",
+        "CURRENT_LICENSE_QUANTITY_NOT_MET": "This discount applies only within a range of current seats.",
+        "RENEWAL_LICENSE_QUANTITY_NOT_MET": "This discount applies only within a range of renewal quantity.",
+        "NOT_FOUND": "This code is not known to Adobe.",
+        "INELIGIBLE_COMMITMENT_STATUS": "This discount requires a 3-year commitment this customer does not have.",
+        "INELIGIBLE_COMMITMENT_STATUS_OR_PERCENT_SEATS": "This discount requires a 3-year commitment and a larger share of seats than this renewal adds.",
+        "INELIGIBLE_COMMITMENT_STATUS_OR_COMMIT_QUANTITY": "This discount requires a 3-year commitment and a higher committed quantity than this customer has.",
+        "SEAT_UPGRADE_PERCENTAGE_NOT_MET": "This discount requires a larger share of seats to be upgraded.",
+        "2147": "Only one discount code can be applied to a line.",
+        "Fallback": "This discount is not valid for this line. Please review its conditions or contact your account manager."
+      },
       "Errors": {
         "Discounts could not be loaded": "Your discount codes could not be loaded."
       }

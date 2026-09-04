@@ -1,6 +1,7 @@
 import asyncio
 import logging
-from dataclasses import replace
+import re
+from dataclasses import dataclass, replace
 from http import HTTPStatus
 from typing import Any, cast
 
@@ -8,6 +9,7 @@ from mpt_api_client.exceptions import MPTHttpError
 from mpt_extension_sdk.api import (
     APIContext,
     APIResponse,
+    ErrorDetail,
     ForbiddenError,
     NotFoundError,
     UpstreamServiceError,
@@ -18,6 +20,11 @@ from mpt_extension_sdk.routing import APIRouter
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import (
+    FLEX_DISCOUNT_BARE_REASON_PATTERN,
+    FLEX_DISCOUNT_ERROR_CODES,
+    FLEX_DISCOUNT_LINE_PATTERN,
+    FLEX_DISCOUNT_REASON_PATTERN,
+    FLEX_DISCOUNT_SUCCESS_RESULT,
     SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
     SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
 )
@@ -92,6 +99,24 @@ logger = logging.getLogger(__name__)
 renewal_router = APIRouter(prefix="/agreements")
 
 _ADOBE_REQUEST_FAILED_DETAIL = "Adobe service request failed"
+_REJECTED_DISCOUNTS_DETAIL = "Adobe rejected one or more discount codes"
+
+
+@dataclass(frozen=True)
+class _RejectedCode:
+    """One discount code Adobe refused, and the row it was applied to.
+
+    The code is what the next quote has to drop; the reason is what the wizard
+    turns into copy, so both travel together until the response is built.
+    """
+
+    row: str
+    code: str
+    reason: str
+
+
+class _UnidentifiedRefusalError(Exception):
+    """Adobe refused a code without naming a line the plan holds."""
 
 
 @renewal_router.post(
@@ -730,6 +755,91 @@ async def _preview_renewal(
         return None
     authorization_id = await get_authorization_id(ctx, agreement_id)
     customer_id = await require_customer_id(ctx, agreement_id)
+    preview, rejections = await _quote_until_accepted(
+        ctx, authorization_id, customer_id, currency_code, line_items
+    )
+    if rejections:
+        raise ValidationError(
+            detail=_REJECTED_DISCOUNTS_DETAIL,
+            errors=[
+                ErrorDetail(pointer=rejection.row, detail=rejection.reason)
+                for rejection in rejections
+            ],
+        )
+    return preview
+
+
+async def _quote_until_accepted(
+    ctx: APIContext,
+    authorization_id: str,
+    customer_id: str,
+    currency_code: str,
+    line_items: list[Line],
+) -> tuple[dict[str, Any] | None, list[_RejectedCode]]:
+    """Quote the plan repeatedly until no line carries a refused discount code.
+
+    Adobe reports one refused code at a time — a whole-request rejection names
+    a single line, and a successful quote can still mark a line's code as
+    failed — so a plan with several bad codes would otherwise take one wizard
+    round-trip per code to uncover. Dropping the refused code and quoting again
+    walks the whole plan in one request, so the customer is told about every
+    rejected code at once instead of fixing them one by one. Every pass either
+    drops a code or stops, so the walk is bounded by the codes submitted.
+    """
+    quoted = [dict(line) for line in line_items]
+    rejections: list[_RejectedCode] = []
+    while True:
+        try:
+            refused, preview = await _quote_once(
+                ctx, authorization_id, customer_id, currency_code, quoted
+            )
+        except _UnidentifiedRefusalError as unnamed:
+            # A refusal naming no line has no row to sit against. It fails the
+            # plan on its own, but not at the cost of the rows already found.
+            if rejections:
+                return None, rejections
+            raise ValidationError(detail=str(unnamed))
+        if not refused:
+            return preview, rejections
+        if not _strip_rejected_codes(quoted, refused):
+            return None, rejections
+        rejections.extend(refused)
+
+
+async def _quote_once(
+    ctx: APIContext,
+    authorization_id: str,
+    customer_id: str,
+    currency_code: str,
+    line_items: list[Line],
+) -> tuple[list[_RejectedCode], dict[str, Any] | None]:
+    """Quote once, answering with the codes Adobe refused and the quote itself.
+
+    A refused code reaches us two ways — as a whole-request rejection naming
+    one line, or marked on a line of an otherwise successful quote — and both
+    are answered the same way so the caller can drop the code and quote again.
+    """
+    try:
+        preview = await _request_preview(
+            ctx, authorization_id, customer_id, currency_code, line_items
+        )
+    except AdobeAPIError as error:
+        if error.code not in FLEX_DISCOUNT_ERROR_CODES:
+            logger.warning("Adobe rejected the renewal preview: %s", error)
+            raise UpstreamServiceError(detail=str(error))
+        logger.warning("Adobe rejected a flexible discount code: %s", error)
+        return [_rejected_line_detail(error, line_items)], None
+    return _refused_discounts(preview), preview
+
+
+async def _request_preview(
+    ctx: APIContext,
+    authorization_id: str,
+    customer_id: str,
+    currency_code: str,
+    line_items: list[Line],
+) -> dict[str, Any]:
+    """Call Adobe's PREVIEW_RENEWAL, mapping transport failures to API errors."""
     try:
         return await asyncio.to_thread(
             adobe_client(ctx).order.preview_renewal_order,
@@ -738,9 +848,8 @@ async def _preview_renewal(
             currency_code,
             line_items,
         )
-    except AdobeAPIError as error:
-        logger.warning("Adobe rejected the renewal preview: %s", error)
-        raise UpstreamServiceError(detail=str(error))
+    except AdobeAPIError:
+        raise
     except AdobeHttpError as error:
         logger.warning(
             "Adobe HTTP error on renewal preview: status=%s body=%r",
@@ -751,6 +860,135 @@ async def _preview_renewal(
     except AdobeError as error:
         logger.warning("Adobe configuration error on renewal preview: %s", error)
         raise ValidationError(detail=str(error))
+
+
+def _refused_discounts(preview: dict[str, Any]) -> list[_RejectedCode]:
+    """Collect the codes a successful quote reports as refused.
+
+    Adobe answers the preview successfully even when it refused a code, marking
+    the outcome per line instead of failing the call, so the quote it returns is
+    priced without that discount and would otherwise read as if the code had
+    applied.
+    """
+    refused = []
+    for line in preview.get("lineItems") or []:
+        refused.extend(_refused_line_discounts(line))
+    return refused
+
+
+def _refused_line_discounts(line: Line) -> list[_RejectedCode]:
+    """Read one previewed line's refused codes."""
+    refused = []
+    for discount in line.get("flexDiscounts") or []:
+        if discount.get("result") != FLEX_DISCOUNT_SUCCESS_RESULT:
+            logger.warning("Adobe refused discount %s on a renewal preview line", discount)
+            refused.append(
+                _RejectedCode(
+                    row=_line_pointer(line),
+                    code=str(discount.get("code") or ""),
+                    reason=str(discount.get("result") or ""),
+                )
+            )
+    return refused
+
+
+def _rejected_line_detail(error: AdobeAPIError, line_items: list[Line]) -> _RejectedCode:
+    """Name the line Adobe refused a code on, from its ``additionalDetails``.
+
+    Adobe fails the entire preview when a line carries a code the customer
+    cannot use, naming the offending line in ``additionalDetails`` rather than
+    in the message. Reporting it against that line is what lets the wizard say
+    which subscription the code was refused for, instead of failing the plan
+    with one message that names nothing. The reason is Adobe's own error code
+    unless the payload names the criterion that failed.
+
+    A refusal whose line cannot be identified has no row to sit against, so it
+    fails the plan carrying Adobe's own message rather than reaching the wizard
+    as a rejection naming no code and no subscription.
+    """
+    rejected_line = _find_line(line_items, _parse_rejected_line_number(error.details))
+    if not rejected_line:
+        logger.warning("Adobe refused a discount code without naming a line: %s", error)
+        raise _UnidentifiedRefusalError(str(error))
+    codes = rejected_line.get("flexDiscountCodes") or [""]
+    return _RejectedCode(
+        row=_line_pointer(rejected_line),
+        code=str(codes[0]),
+        reason=_rejection_reason(error),
+    )
+
+
+def _rejection_reason(error: AdobeAPIError) -> str:
+    """Read the criterion Adobe named for a refusal, or fall back to its code.
+
+    Adobe names the criterion after ``Reason:`` in the same detail that names
+    the line, and only for the refusals that have one — a line carrying two
+    codes is reported without a reason at all. The error code is the fallback,
+    so every refusal still resolves to copy of ours.
+    """
+    for detail in error.details:
+        matched = re.search(FLEX_DISCOUNT_REASON_PATTERN, str(detail))
+        if matched:
+            return matched.group(1).strip()
+    if re.fullmatch(FLEX_DISCOUNT_BARE_REASON_PATTERN, error.message or ""):
+        return error.message
+    return str(error.code)
+
+
+def _strip_rejected_codes(line_items: list[Line], refused: list[_RejectedCode]) -> bool:
+    """Drop each refused code from the line Adobe refused it on.
+
+    Answers whether any line actually lost one: a refusal that leaves the plan
+    as it was would be quoted to the same answer and reported twice, so the
+    caller stops instead.
+    """
+    rejected_by_row = _rejected_codes_by_row(refused)
+    stripped = False
+    for line in line_items:
+        held = line.get("flexDiscountCodes") or []
+        codes = [
+            code for code in held if code not in rejected_by_row.get(_line_pointer(line), set())
+        ]
+        stripped = stripped or len(codes) != len(held)
+        if codes:
+            line["flexDiscountCodes"] = codes
+        else:
+            line.pop("flexDiscountCodes", None)
+    return stripped
+
+
+def _rejected_codes_by_row(refused: list[_RejectedCode]) -> dict[str, set[str]]:
+    """Group the refused codes by the row Adobe named, so only that line loses one.
+
+    Two rows can carry the same code and qualify differently, so dropping it
+    everywhere would hide the second row's refusal until the next submission.
+    """
+    by_row: dict[str, set[str]] = {}
+    for rejection in refused:
+        by_row.setdefault(rejection.row, set()).add(rejection.code)
+    return by_row
+
+
+def _line_pointer(line: Line) -> str:
+    """Identify the wizard row a line belongs to, by subscription or offer."""
+    return str(line.get("subscriptionId") or line.get("offerId") or "")
+
+
+def _parse_rejected_line_number(details: list[Any]) -> int | None:
+    """Read the line number out of Adobe's ``"Line Item: 2"`` detail."""
+    for detail in details:
+        matched = re.search(FLEX_DISCOUNT_LINE_PATTERN, str(detail))
+        if matched:
+            return int(matched.group(1))
+    return None
+
+
+def _find_line(line_items: list[Line], line_number: int | None) -> Line:
+    """Find the previewed line Adobe rejected, or an empty one when unnamed."""
+    return next(
+        (line for line in line_items if line["extLineItemNumber"] == line_number),
+        {},
+    )
 
 
 async def _create_change_order(

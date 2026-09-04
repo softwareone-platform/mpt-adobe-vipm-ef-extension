@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-import { toErrorMessage } from '../../utils/apiError';
+import { toErrorMessage, toRejectedFields } from '../../utils/apiError';
 import { INITIAL_REQUEST_STATE } from '../constants';
 import type { RequestState } from '../constants';
 
@@ -32,13 +32,17 @@ export function useGuardedRequest(fallbackErrorKey: string) {
 
       try {
         const result = await task(controller.signal);
-        setState({ error: '', status: 'success' });
+        setState({ error: '', rejectedFields: [], status: 'success' });
         return result;
       } catch (requestError) {
         setState(
           controller.signal.aborted
             ? INITIAL_REQUEST_STATE
-            : { error: toErrorMessage(requestError, fallbackErrorKey), status: 'error' },
+            : {
+                error: toErrorMessage(requestError, fallbackErrorKey),
+                rejectedFields: toRejectedFields(requestError),
+                status: 'error',
+              },
         );
         return false;
       } finally {

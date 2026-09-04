@@ -503,5 +503,63 @@ describe('PromotionsStep', () => {
         '3132 - Ineligible product for orderType',
       );
     });
+
+    it('names every rejected code against its own line, and stays on the step', async () => {
+      mockPost.mockRejectedValue({
+        response: {
+          data: {
+            detail: 'Adobe rejected one or more discount codes',
+            errors: [
+              { pointer: 'SUB-1', detail: 'NOT_FOUND' },
+              { pointer: 'SUB-2', detail: 'INELIGIBLE_COMMITMENT_STATUS' },
+            ],
+          },
+        },
+      });
+      const { findByTestId } = await renderStep({
+        path: 'now',
+        selections: { 'SUB-1': true, 'SUB-2': true },
+        discountSelections: { 'SUB-1': 'CODE-ONE', 'SUB-2': 'CODE-TWO' },
+      });
+      await findByTestId('grid');
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!(NAVIGATION);
+      });
+
+      expect(nextIndex).toBe(NAVIGATION.currentStepIndex);
+      const rejected = await findByTestId('promotions-step-rejected-codes');
+      const lines = Array.from(rejected.querySelectorAll('li')).map((line) => line.textContent);
+      expect(lines).toEqual([
+        'CODE-ONE on Item One: This code is not known to Adobe.',
+        'CODE-TWO on Item Two: This discount requires a 3-year commitment this customer does not have.',
+      ]);
+    });
+
+    it('falls back to the generic message for a reason it does not know', async () => {
+      mockPost.mockRejectedValue({
+        response: {
+          data: {
+            detail: 'Adobe rejected one or more discount codes',
+            errors: [{ pointer: 'SUB-1', detail: 'SOMETHING_ADOBE_ADDED_LATER' }],
+          },
+        },
+      });
+      const { findByTestId } = await renderStep({
+        path: 'now',
+        selections: { 'SUB-1': true },
+        discountSelections: { 'SUB-1': 'CODE-ONE' },
+      });
+      await findByTestId('grid');
+
+      await act(async () => {
+        await registeredOnNext!(NAVIGATION);
+      });
+
+      expect((await findByTestId('promotions-step-rejected-codes')).textContent).toContain(
+        'not valid for this line',
+      );
+    });
   });
 });
