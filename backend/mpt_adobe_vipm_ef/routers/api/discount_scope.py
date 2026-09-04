@@ -118,8 +118,13 @@ def _read_owned_partial_skus(raw_offer_ids: str | None) -> frozenset[str]:
 
 
 def _read_commitment(raw_commitment: str | None) -> Commitment | None:
-    """Parse the optional ``commitment`` filter, rejecting an unknown value."""
-    if not raw_commitment:
+    """Parse the optional ``commitment`` filter, rejecting an unknown value.
+
+    A missing or whitespace-only value is treated as absent (returns ``None``),
+    mirroring :func:`_read_partial_sku`, so the asymmetry rule keeps the code
+    rather than rejecting the request.
+    """
+    if not raw_commitment or not raw_commitment.strip():
         return None
     try:
         return Commitment(raw_commitment.strip().upper())

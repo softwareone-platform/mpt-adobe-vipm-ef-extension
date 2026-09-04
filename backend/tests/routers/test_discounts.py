@@ -370,6 +370,19 @@ async def test_list_rejects_an_unsupported_commitment(agreement, fake_store):
 
 
 @freeze_time("2026-07-21T12:00:00Z")
+async def test_list_treats_a_blank_commitment_as_absent(agreement, fake_store, code_record_factory):
+    fake_store.list_codes.return_value = [
+        code_record_factory(supports_annual=True, supports_3yc=False),
+    ]
+    fake_store.list_values.return_value = []
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL", "commitment": "   "})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
 async def test_list_without_order_type_keeps_every_code(agreement, fake_store, code_record_factory):
     fake_store.list_codes.return_value = [
         code_record_factory(applicable_order_types=["NEW"]),
