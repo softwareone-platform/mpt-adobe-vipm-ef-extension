@@ -74,6 +74,7 @@ export function ValidityStep({
               name="startDate"
               onChange={(startDate: string) => editField({ startDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
+              popoverCssPosition="fixed"
               testId="discount-start-date"
               value={draft.startDate}
               variant={errors.startDate ? "error" : "default"}
@@ -86,6 +87,7 @@ export function ValidityStep({
               name="endDate"
               onChange={(endDate: string) => editField({ endDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
+              popoverCssPosition="fixed"
               testId="discount-end-date"
               value={draft.endDate}
               variant={errors.endDate ? "error" : "default"}
@@ -122,6 +124,7 @@ export function ValidityStep({
               name="discountLockEndDate"
               onChange={(discountLockEndDate: string) => editField({ discountLockEndDate })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
+              popoverCssPosition="fixed"
               testId="discount-lock-end-date"
               variant={errors.discountLockEndDate ? "error" : "default"}
               value={draft.discountLockEndDate}
