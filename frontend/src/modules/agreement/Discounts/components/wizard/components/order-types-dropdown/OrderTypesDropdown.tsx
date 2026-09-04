@@ -1,5 +1,4 @@
 import { Checkbox } from "@softwareone-platform/sdk-react-ui-v0/checkbox";
-import { Divider } from "@softwareone-platform/sdk-react-ui-v0/divider";
 import { Dropdown } from "@softwareone-platform/sdk-react-ui-v0/dropdown";
 import { Icon } from "@softwareone-platform/sdk-react-ui-v0/icon";
 import { RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
@@ -58,11 +57,7 @@ export function OrderTypesDropdown({ value, onChange }: OrderTypesDropdownProps)
   const renderOption = useCallback(
     ({ option, selectedValue }: DropdownListOptionProps<OrderTypeSelection>) => {
       if ("type" in option) {
-        return (
-          <li className="order-types__divider">
-            <Divider type="full" />
-          </li>
-        );
+        return <li className="order-types__divider" />;
       }
       return (
         <li
