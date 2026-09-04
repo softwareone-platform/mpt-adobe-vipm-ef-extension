@@ -6,6 +6,7 @@ store needs are derived from it (they are read-only in the API, per the TDR).
 """
 
 import logging
+from types import MappingProxyType
 from typing import cast
 
 from mpt_extension_sdk.api import (
@@ -14,6 +15,7 @@ from mpt_extension_sdk.api import (
     ForbiddenError,
     ValidationError,
 )
+from mpt_extension_sdk.api.auth import AccountType
 from mpt_extension_sdk.models import Agreement
 
 from mpt_adobe_vipm_ef.models.discount import (
@@ -23,6 +25,7 @@ from mpt_adobe_vipm_ef.models.discount import (
     EligibilityContext,
 )
 from mpt_adobe_vipm_ef.routers.api.customer import load_agreement, require_customer_id
+from mpt_adobe_vipm_ef.services.discounts import SOURCE_OPERATIONS, SOURCE_VENDOR
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.settings import ExtensionSettings
 
@@ -35,6 +38,12 @@ OWNED_OFFER_IDS_QUERY_PARAM = "ownedOfferIds"
 COMMITMENT_QUERY_PARAM = "commitment"
 
 _OFFER_ID_SEPARATOR = ","
+_EDITOR_ACCOUNT_REQUIRED = "Managing discount codes requires a vendor or operations account."
+# The ``source`` a closed code is stored with, per authoring account type.
+_CLOSED_SOURCES = MappingProxyType({
+    AccountType.OPERATIONS: SOURCE_OPERATIONS,
+    AccountType.VENDOR: SOURCE_VENDOR,
+})
 _SUPPORTED_ORDER_TYPES = ", ".join(order_type.value for order_type in DiscountOrderType)
 _SUPPORTED_COMMITMENTS = ", ".join(commitment.value for commitment in Commitment)
 
@@ -42,9 +51,20 @@ _SUPPORTED_COMMITMENTS = ", ".join(commitment.value for commitment in Commitment
 def require_editor_account(ctx: APIContext) -> None:
     """Allow only vendor and operations accounts to author or curate codes."""
     if ctx.auth.account.is_client():
-        raise ForbiddenError(
-            detail="Managing discount codes requires a vendor or operations account.",
-        )
+        raise ForbiddenError(detail=_EDITOR_ACCOUNT_REQUIRED)
+
+
+def resolve_closed_source(ctx: APIContext) -> str:
+    """Return the ``source`` a code authored by this caller is stored with.
+
+    Closed codes record their authoring actor: an operations account stores
+    "Operations", a vendor account "Vendor". Any other account type cannot
+    author codes at all, so it is rejected like :func:`require_editor_account`.
+    """
+    source = _CLOSED_SOURCES.get(ctx.auth.account.type)
+    if source is None:
+        raise ForbiddenError(detail=_EDITOR_ACCOUNT_REQUIRED)
+    return source
 
 
 async def load_discount_scope(ctx: APIContext) -> DiscountScope:

@@ -52,7 +52,7 @@ def code_record_factory():
             "Code": "SUMMER25",
             "name": "Summer 2025",
             "description": "20% off for renewals",
-            "source": "Ops/Vendor",
+            "source": "Operations",
             "category": "STANDARD",
             "status": "ACTIVE",
             "discount_type": "PERCENTAGE",
