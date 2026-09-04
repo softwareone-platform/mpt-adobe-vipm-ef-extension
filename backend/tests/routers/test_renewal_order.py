@@ -24,6 +24,7 @@ from mpt_adobe_vipm_ef.models.renewal import (
 from mpt_adobe_vipm_ef.routers.api.renewal import (
     check_renewal_order_three_yc,
     create_renewal_order,
+    get_inherited_discounts,
     get_renewal_auto_renew_support,
     get_renewal_path_state,
     get_renewal_state,
@@ -1597,3 +1598,99 @@ async def test_get_renewal_auto_renew_support_rejects_non_client_account(
 
     with pytest.raises(ForbiddenError):
         await get_renewal_auto_renew_support(_AGREEMENT_ID, fake_ctx, body)
+
+
+# --- GET /agreements/{id}/renewal-order/inherited-discounts ---
+
+
+def _held_flex_discount(*, code="BLACK_FRIDAY", result="SUCCESS"):
+    catalogue_entry = {
+        "id": "adobe-discount-1",
+        "code": code,
+        "name": "Black Friday",
+        "description": f"{code} description",
+        "status": "REUSABLE",
+        "discountLockEndDate": "2028-03-31T23:59:59Z",
+        "outcomes": [
+            {"type": "FIXED_DISCOUNT", "discountValues": [{"currency": "USD", "value": 10}]}
+        ],
+    }
+    automated_preview = {
+        "orderType": "PREVIEW_RENEWAL",
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "offerId": _OFFER_ID,
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "flexDiscounts": [{"id": "adobe-discount-1", "code": code, "result": result}],
+            }
+        ],
+    }
+    return automated_preview, catalogue_entry
+
+
+def _stub_inherited_calls(fake_ctx, automated_preview, catalogue):
+    """Route the automated preview and the held-catalogue reads to their own stubs."""
+    order_call = FakeAdobeCall()
+    order_call.returns = automated_preview
+    discount_call = FakeAdobeCall()
+    discount_call.returns = catalogue
+    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+    fake_ctx.adobe_client.discount = FakeAdobeNamespace(discount_call)
+    return order_call, discount_call
+
+
+async def test_get_inherited_discounts_returns_the_held_reusables(fake_ctx, renewal_agreement):
+    automated_preview, catalogue_entry = _held_flex_discount()
+    _stub_inherited_calls(fake_ctx, automated_preview, [catalogue_entry])
+
+    result = await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {
+        "inheritedDiscounts": [
+            {
+                "offerId": _OFFER_ID,
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "code": "BLACK_FRIDAY",
+                "adobeId": "adobe-discount-1",
+                "eligible": True,
+                "name": "Black Friday",
+                "description": "BLACK_FRIDAY description",
+                "discountLockEndDate": "2028-03-31T23:59:59Z",
+                "discountValues": [{"currency": "USD", "value": 10}],
+            }
+        ]
+    }
+
+
+async def test_get_inherited_discounts_flags_an_ineligible_reusable(fake_ctx, renewal_agreement):
+    automated_preview, catalogue_entry = _held_flex_discount(result="FAILURE")
+    _stub_inherited_calls(fake_ctx, automated_preview, [catalogue_entry])
+
+    result = await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["inheritedDiscounts"][0]["eligible"] is False
+
+
+async def test_get_inherited_discounts_is_empty_when_the_customer_has_no_auto_renewals(
+    fake_ctx, renewal_agreement
+):
+    """Adobe rejects the automated preview with no auto-renewing subscriptions; that is no error."""
+    order_call = FakeAdobeCall()
+    order_call.error = _ADOBE_API_ERROR
+    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+
+    result = await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload == {"inheritedDiscounts": []}
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_get_inherited_discounts_rejects_non_client_account(
+    fake_ctx, renewal_agreement, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)

@@ -1,6 +1,7 @@
 import {
   appliesToOffer,
   appliesToRenewal,
+  buildInheritedDiscountSelections,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
   canRenewAtAnniversary,
@@ -12,6 +13,8 @@ import {
   getRemainingQuantity,
   getRenewalQuantity,
   getRenewalState,
+  ineligibleInheritedCodes,
+  inheritedCodesBySku,
   isDiscountAvailable,
   isEarlyRenewable,
   isIncreaseAllowed,
@@ -19,7 +22,7 @@ import {
   isRenewing,
   normalizeDiscountCode,
 } from './model';
-import type { Discount, Subscription } from '../shared/model';
+import type { Discount, InheritedDiscount, Subscription } from '../shared/model';
 
 describe('isRenewedByDefault', () => {
   it('renews a subscription whose autoRenewal preference is on', () => {
@@ -445,6 +448,85 @@ describe('findDiscountByCode', () => {
 
   it('returns nothing for a code the store does not hold', () => {
     expect(findDiscountByCode('CODE-TWO', discounts)).toBeUndefined();
+  });
+});
+
+const inherited = (overrides: Partial<InheritedDiscount> = {}): InheritedDiscount => ({
+  offerId: '65304470CA01A12',
+  subscriptionId: '',
+  code: 'black_friday',
+  adobeId: 'adobe-1',
+  eligible: true,
+  name: 'Black Friday',
+  description: '',
+  discountLockEndDate: '',
+  discountValues: [],
+  ...overrides,
+});
+
+describe('inheritedCodesBySku', () => {
+  it('keys the eligible codes by partial SKU, normalized', () => {
+    const map = inheritedCodesBySku([inherited()]);
+
+    expect(map.get('65304470CA')).toBe('BLACK_FRIDAY');
+  });
+
+  it('leaves out an ineligible code', () => {
+    const map = inheritedCodesBySku([inherited({ eligible: false })]);
+
+    expect(map.size).toBe(0);
+  });
+
+  it('keeps the first eligible code for a SKU', () => {
+    const map = inheritedCodesBySku([
+      inherited({ code: 'FIRST' }),
+      inherited({ code: 'SECOND' }),
+    ]);
+
+    expect(map.get('65304470CA')).toBe('FIRST');
+  });
+});
+
+describe('ineligibleInheritedCodes', () => {
+  it('returns only the reusables that no longer qualify', () => {
+    const result = ineligibleInheritedCodes([
+      inherited({ code: 'KEEP' }),
+      inherited({ code: 'DROP', eligible: false }),
+    ]);
+
+    expect(result.map((discount) => discount.code)).toEqual(['DROP']);
+  });
+});
+
+describe('buildInheritedDiscountSelections', () => {
+  const subscriptions: Subscription[] = [
+    {
+      id: 'SUB-1',
+      name: 'Subscription One',
+      lines: [{ id: 'ALI-1', quantity: 5, item: { id: 'ITM-1', name: 'Item One', externalIds: { vendor: '65304470CA' } } }],
+    },
+  ];
+
+  it('seeds a renewing line with the eligible reusable it holds', () => {
+    const selections = buildInheritedDiscountSelections(subscriptions, [inherited()]);
+
+    expect(selections).toEqual({ 'SUB-1': 'BLACK_FRIDAY' });
+  });
+
+  it('seeds nothing when no held reusable matches the line SKU', () => {
+    const selections = buildInheritedDiscountSelections(subscriptions, [
+      inherited({ offerId: '99999999CA01A12' }),
+    ]);
+
+    expect(selections).toEqual({});
+  });
+
+  it('seeds nothing for an ineligible reusable', () => {
+    const selections = buildInheritedDiscountSelections(subscriptions, [
+      inherited({ eligible: false }),
+    ]);
+
+    expect(selections).toEqual({});
   });
 });
 
