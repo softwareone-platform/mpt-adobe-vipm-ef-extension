@@ -55,8 +55,9 @@ async def require_visible_record(
 ) -> AirtableRecord:
     """Load a code row, hiding anything out of the caller's scope as a 404.
 
-    With ``closed_only`` the row must also be a closed (Ops/Vendor-authored)
-    code: open codes belong to the Adobe synchronization and reject writes.
+    With ``closed_only`` the row must also be a closed (operations- or
+    vendor-authored) code: open codes belong to the Adobe synchronization and
+    reject writes.
     """
     record = cast(AirtableRecord | None, await store_call(store.get_code, discount_id))
     in_scope = record is not None and discount_mapping.is_visible(

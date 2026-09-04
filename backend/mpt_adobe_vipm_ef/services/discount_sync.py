@@ -13,8 +13,9 @@ enrichment fields stay untouched for operations to curate.
 Every run closes with an expiry review of the stored open rows: a code whose
 usable window has passed is retired (``retired_at`` stamped with the run time),
 and conversely a row Adobe reports as usable again is un-retired while it is
-upserted. Closed (``Ops/Vendor``) rows are never touched: their retirement is
-the discount management API's soft delete.
+upserted. Closed rows (``source`` = ``Operations``/``Vendor``/``Client``, or
+the legacy ``Ops/Vendor``) are never touched: their retirement is the discount
+management API's soft delete.
 """
 
 import asyncio
