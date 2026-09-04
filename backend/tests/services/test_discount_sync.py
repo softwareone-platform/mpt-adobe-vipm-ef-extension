@@ -201,10 +201,11 @@ async def test_sync_updates_existing_open_rows(ctx, store, adobe_client, code_re
     assert updated_fields["synchronized_at"] is not None
 
 
+@pytest.mark.parametrize("closed_source", ["Operations", "Vendor", "Client", "Ops/Vendor"])
 async def test_sync_never_touches_closed_rows_sharing_the_code(
-    ctx, store, adobe_client, code_record_factory
+    ctx, store, adobe_client, code_record_factory, closed_source
 ):
-    store.find_code.return_value = code_record_factory(source="Ops/Vendor")
+    store.find_code.return_value = code_record_factory(source=closed_source)
 
     await discount_sync.sync_open_discounts(ctx)
 

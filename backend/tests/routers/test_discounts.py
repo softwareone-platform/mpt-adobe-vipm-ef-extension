@@ -470,10 +470,24 @@ async def test_create_stores_code_and_value_row(agreement, fake_store):
         "market_segment": "COM",
         "value": 20,
     }
-    assert created_fields["source"] == "Ops/Vendor"
     assert created_fields["market_segment"] == "COM"
     assert created_fields["target_customer_id"] == _CUSTOMER_ID
     fake_store.replace_value.assert_called_once_with("SUMMER25", "COM", expected_value_fields)
+
+
+@pytest.mark.parametrize(
+    ("account_type", "expected_source"),
+    [(AccountType.OPERATIONS, "Operations"), (AccountType.VENDOR, "Vendor")],
+)
+async def test_create_stamps_the_authoring_account_as_source(
+    agreement, fake_store, account_type, expected_source
+):
+    ctx = FakeDiscountContext(agreement, account_type=account_type)
+
+    await create_discount_code(ctx=ctx, body=_create_body())
+
+    created_fields = fake_store.create_code.call_args.args[0]
+    assert created_fields["source"] == expected_source
 
 
 async def test_update_rejects_open_codes_for_operations(agreement, fake_store, code_record_factory):
@@ -490,6 +504,19 @@ async def test_update_rejects_open_codes_for_vendors(agreement, fake_store, code
 
     with pytest.raises(ValidationError):
         await update_discount_code(discount_id=_RECORD_ID, ctx=ctx, body=_update_body())
+
+
+@pytest.mark.parametrize("closed_source", ["Operations", "Vendor", "Client", "Ops/Vendor"])
+async def test_update_accepts_every_closed_source(
+    agreement, fake_store, code_record_factory, closed_source
+):
+    ctx = FakeDiscountContext(agreement)
+    fake_store.get_code.return_value = code_record_factory(source=closed_source)
+
+    result = await update_discount_code(discount_id=_RECORD_ID, ctx=ctx, body=_update_body())
+
+    assert result.status_code == http.HTTPStatus.OK
+    fake_store.update_code.assert_called_once()
 
 
 async def test_update_rewrites_code_and_value_rows(agreement, fake_store):
