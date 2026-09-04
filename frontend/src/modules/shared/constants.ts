@@ -1,5 +1,6 @@
 import type { DesignSystemOptions } from '@softwareone-platform/sdk-react-ui-v0/utils';
 
+import type { RejectedField } from '../utils/apiError';
 import type { Status } from './model';
 
 export const SCREEN_HEIGHT_FACTOR = 0.8;
@@ -25,11 +26,13 @@ export const ADOBE_ERROR_CODE_PATTERN = /^(\d{4})\s*-/;
 
 export interface RequestState {
   error: string;
+  rejectedFields?: RejectedField[];
   status: Status;
 }
 
 export const INITIAL_REQUEST_STATE: RequestState = {
   error: '',
+  rejectedFields: [],
   status: 'idle',
 };
 

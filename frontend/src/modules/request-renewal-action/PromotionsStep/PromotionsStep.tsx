@@ -39,6 +39,7 @@ import type {
   Subscription,
 } from '../../shared/model';
 import { toDiscountErrorMessage } from '../../utils/adobeError';
+import { toRejectionMessage } from '../../utils/discountRejection';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { getPartialSku } from '../../utils/sku';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
@@ -80,6 +81,7 @@ export interface PromotionsStepProps {
 interface Row {
   id: string;
   kind: 'subscription' | 'net-new';
+  vendorId: string;
   itemId: string;
   itemName: string;
   sku: string;
@@ -119,6 +121,7 @@ function toSubscriptionRows(
       return {
         id: subscription.id,
         kind: 'subscription' as const,
+        vendorId: subscription.externalIds?.vendor ?? '',
         itemId: line?.item.id ?? '',
         itemName: line?.item.name ?? '',
         sku,
@@ -144,6 +147,7 @@ function toNetNewRows(netNewItems: NetNewItem[], discountSelections: DiscountSel
     return {
       id: item.itemId,
       kind: 'net-new' as const,
+      vendorId: item.sku,
       itemId: item.itemId,
       itemName: item.itemName,
       sku: item.sku,
@@ -358,6 +362,7 @@ export function PromotionsStep({
   const { registerOnNextCallback } = useStepActions();
   const {
     error: discountValidationError,
+    rejectedFields,
     status: discountValidationStatus,
     validateDiscounts,
     cancel: cancelDiscountValidation,
@@ -415,6 +420,20 @@ export function PromotionsStep({
   }, [discountSelections, renewalDiscounts]);
 
   const validationMessage = toDiscountErrorMessage(discountValidationError, unknownCode);
+
+  const rejectionMessages = useMemo(
+    () =>
+      (rejectedFields ?? []).map((rejection) => {
+        const row = rejection.pointer
+          ? rows.find(
+              (candidate) =>
+                candidate.vendorId === rejection.pointer || candidate.id === rejection.pointer,
+            )
+          : undefined;
+        return toRejectionMessage(rejection, row?.itemName ?? '', row?.code ?? '');
+      }),
+    [rejectedFields, rows],
+  );
 
   // Any discount edit invalidates the previous validation outcome.
   useEffect(() => {
@@ -503,7 +522,22 @@ export function PromotionsStep({
             </InlineNotification>
           </div>
         )}
-        {discountValidationError && (
+        {rejectionMessages.length > 0 && (
+          <div
+            className="promotions-step__validation"
+            data-testid="promotions-step-rejected-codes"
+          >
+            <InlineNotification status="error">
+              {t('Renewal:Promotions:Rejected:Title')}
+              <ul>
+                {rejectionMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </InlineNotification>
+          </div>
+        )}
+        {rejectionMessages.length === 0 && discountValidationError && (
           <div
             className="promotions-step__validation"
             data-testid="promotions-step-validation-error"
