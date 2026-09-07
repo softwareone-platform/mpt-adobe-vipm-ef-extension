@@ -16,10 +16,10 @@ from mpt_adobe_vipm_ef.models.discount import (
 )
 from mpt_adobe_vipm_ef.services.discounts import (
     ACTIVE_STATUS,
+    CLOSED_SOURCES,
     CODE_FIELD,
     ENRICHMENT_COMPLETE,
     ENRICHMENT_PENDING,
-    SOURCE_CLOSED,
     SOURCE_OPEN,
     AirtableRecord,
 )
@@ -41,7 +41,13 @@ class Redemption:
     order_id: Any
 
 
-_SOURCE_LABELS = MappingProxyType({SOURCE_OPEN: "Open", SOURCE_CLOSED: "Closed"})
+# The API reports the discount kind, not the stored actor: every closed source
+# value ("Operations", "Vendor", "Client" and the legacy "Ops/Vendor") labels
+# as "Closed".
+_SOURCE_LABELS = MappingProxyType({
+    SOURCE_OPEN: "Open",
+    **dict.fromkeys(CLOSED_SOURCES, "Closed"),
+})
 _CSV_SEPARATOR = ","
 
 # Adobe's flex-discount outcome types keyed to the discount types the store uses.
@@ -64,8 +70,8 @@ def record_code(record: AirtableRecord) -> str:
 
 
 def is_closed(record: AirtableRecord) -> bool:
-    """Return whether the row is a closed (Ops/Vendor-authored) code."""
-    return bool(_fields(record).get("source") == SOURCE_CLOSED)
+    """Return whether the row is a closed code (any of the authoring actors)."""
+    return str(_fields(record).get("source", "")) in CLOSED_SOURCES
 
 
 def is_reusable(record: AirtableRecord) -> bool:
@@ -263,12 +269,17 @@ def build_closed_code_fields(
     market_segment: str,
     customer_id: str,
     now: dt.datetime,
+    source: str,
 ) -> dict[str, Any]:
-    """Build the Airtable fields for a newly authored closed code."""
+    """Build the Airtable fields for a newly authored closed code.
+
+    ``source`` records which actor authored the code ("Operations" or
+    "Vendor"), resolved from the caller's account type.
+    """
     fields = build_update_fields(body, now)
     fields.update({
         CODE_FIELD: body.code,
-        "source": SOURCE_CLOSED,
+        "source": source,
         "status": ACTIVE_STATUS,
         "market_segment": market_segment,
         "target_customer_id": customer_id,

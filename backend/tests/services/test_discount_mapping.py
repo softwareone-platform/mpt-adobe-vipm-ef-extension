@@ -32,8 +32,9 @@ def create_body():
     })
 
 
-def test_build_closed_code_fields_stamps_authoring_metadata(create_body):
-    result = discount_mapping.build_closed_code_fields(create_body, "COM", "CUST-001", _NOW)
+@pytest.mark.parametrize("source", ["Operations", "Vendor"])
+def test_build_closed_code_fields_stamps_authoring_metadata(create_body, source):
+    result = discount_mapping.build_closed_code_fields(create_body, "COM", "CUST-001", _NOW, source)
 
     authoring_keys = (
         "Code",
@@ -46,7 +47,7 @@ def test_build_closed_code_fields_stamps_authoring_metadata(create_body):
     )
     assert {key: result[key] for key in authoring_keys} == {
         "Code": "SUMMER25",
-        "source": "Ops/Vendor",
+        "source": source,
         "status": "ACTIVE",
         "market_segment": "COM",
         "target_customer_id": "CUST-001",
@@ -347,6 +348,15 @@ def test_to_api_payload_maps_tdr_representation(code_record_factory):
         "supportsAnnual": True,
         "supports3yc": False,
     }
+
+
+@pytest.mark.parametrize("stored_source", ["Operations", "Vendor", "Client", "Ops/Vendor"])
+def test_to_api_payload_labels_every_closed_source(code_record_factory, stored_source):
+    record = code_record_factory(source=stored_source)
+
+    result = discount_mapping.to_api_payload(record, [], None)
+
+    assert result["source"] == "Closed"
 
 
 def test_to_api_payload_labels_open_source(code_record_factory):

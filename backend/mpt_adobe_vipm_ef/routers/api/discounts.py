@@ -23,6 +23,7 @@ from mpt_adobe_vipm_ef.routers.api.discount_scope import (
     read_eligibility_context,
     read_order_type_filter,
     require_editor_account,
+    resolve_closed_source,
 )
 from mpt_adobe_vipm_ef.services import discount_mapping
 from mpt_adobe_vipm_ef.services.discount_codes import (
@@ -105,8 +106,12 @@ async def get_discount_code(discount_id: str, ctx: APIContext) -> APIResponse:
 async def create_discount_code(  # noqa: WPS210
     ctx: APIContext, body: DiscountCodeCreateRequest
 ) -> APIResponse:
-    """Create a closed discount code authored by a vendor or operations actor."""
-    require_editor_account(ctx)
+    """Create a closed discount code authored by a vendor or operations actor.
+
+    The row records its author in ``source``, resolved from the caller's
+    account type: "Operations" or "Vendor".
+    """
+    source = resolve_closed_source(ctx)
     scope = await load_discount_scope(ctx)
     store = build_store(ctx)
     async with guard_code_creation(scope, body.code):
@@ -116,7 +121,7 @@ async def create_discount_code(  # noqa: WPS210
         record = await store_call(
             store.create_code,
             discount_mapping.build_closed_code_fields(
-                body, scope.market_segment, scope.customer_id, now
+                body, scope.market_segment, scope.customer_id, now, source
             ),
         )
         await store_call(store.replace_value, body.code, scope.market_segment, value_fields)

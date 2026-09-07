@@ -26,7 +26,22 @@ REDEMPTIONS_TABLE = "Discount Redemptions"
 
 CODE_FIELD = "Code"
 SOURCE_OPEN = "API"
-SOURCE_CLOSED = "Ops/Vendor"
+SOURCE_OPERATIONS = "Operations"
+SOURCE_VENDOR = "Vendor"
+# Closed rows marked as client-sourced. The discount management API never
+# writes it (client accounts cannot author codes); it is read like any other
+# closed source.
+SOURCE_CLIENT = "Client"
+# Closed codes authored before ``source`` recorded the authoring actor.
+SOURCE_CLOSED_LEGACY = "Ops/Vendor"
+# Every value ``source`` takes on a closed code: the authoring actor is stamped
+# on creation, and older rows still carry the legacy value.
+CLOSED_SOURCES = frozenset((
+    SOURCE_OPERATIONS,
+    SOURCE_VENDOR,
+    SOURCE_CLIENT,
+    SOURCE_CLOSED_LEGACY,
+))
 ACTIVE_STATUS = "ACTIVE"
 ENRICHMENT_COMPLETE = "COMPLETE"
 ENRICHMENT_PENDING = "PENDING"

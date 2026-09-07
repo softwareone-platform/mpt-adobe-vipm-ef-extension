@@ -62,7 +62,9 @@ codes atomically:
 1. New codes are inserted with the attributes Adobe reports
 2. Existing open codes are updated with fresh Adobe data; enrichment fields stay
    untouched
-3. Closed codes (`source = "Ops/Vendor"`) are never overwritten by the sync
+3. Closed codes (`source = "Operations"`, `"Vendor"` or `"Client"`, or the
+   legacy `"Ops/Vendor"` on rows authored before the split) are never
+   overwritten by the sync
 4. Per-country values are replaced atomically (one row per country)
 
 Every run then closes with an expiry review of the stored open rows, so the
@@ -85,9 +87,15 @@ the open catalogue altogether:
   only ever touches `source = "API"` rows
 
 Closed codes are authored manually through the discount management API
-(`/api/v2/discount-codes`) by vendor or operations accounts. They target a
-specific customer and are not visible to other customers in the segment. Their
-`retired_at` is owned by that API's soft delete, never by the sync.
+(`/api/v2/discount-codes`) by vendor or operations accounts. The row records its
+author in `source`: an operations account stores `"Operations"`, a vendor
+account `"Vendor"` (rows authored before the split carry `"Ops/Vendor"`).
+`"Client"` marks a client-sourced closed row, which this API never writes:
+client accounts cannot author codes. Every one of these values is a closed code
+and the API reports them all as `source = "Closed"`. They
+target a specific customer and are not visible to other customers in the
+segment. Their `retired_at` is owned by that API's soft delete, never by the
+sync.
 
 The discount management API scopes all operations to an agreement (passed as the
 `agreement` query parameter), deriving the customer ID and market segment from
