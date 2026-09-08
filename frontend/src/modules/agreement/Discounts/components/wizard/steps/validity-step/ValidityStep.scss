@@ -32,4 +32,10 @@
     flex: 1 1 auto;
     min-width: 0;
   }
+
+  [class*="date-picker"]
+    [class*="input__box"]:not([class*="--disabled"])
+    [class*="input__right"] {
+    cursor: pointer;
+  }
 }
