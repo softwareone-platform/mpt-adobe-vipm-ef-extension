@@ -5,6 +5,8 @@
     display: grid;
     grid-template-columns: max-content auto;
     gap: $var-spacing-2;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
 
     &__item {
       &__title {
