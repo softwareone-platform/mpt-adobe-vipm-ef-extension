@@ -96,3 +96,36 @@ class OrderClient:
                 "lineItems": line_items,
             },
         )
+
+    @wrap_http_error
+    def preview_automated_renewal_order(
+        self, authorization_id: str, customer_id: str, currency_code: str
+    ) -> dict[str, Any]:
+        """Request the automated PREVIEW_RENEWAL Adobe would run at the anniversary.
+
+        A PREVIEW_RENEWAL with no line items asks Adobe what the customer's
+        standing auto-renewal preferences would renew: each renewing line comes
+        back carrying the flexible discounts Adobe auto-applies to it (the
+        reusables already held on the subscription), each validated with a
+        ``result`` of ``SUCCESS`` or ``FAILURE``. Adobe owns the precedence
+        between several held reusables and the extended lock window, so this is
+        the authoritative source for the inherited discount set the renewal
+        wizard surfaces. Adobe returns an error when the customer has no
+        auto-renewal-enabled subscriptions; the caller reads that as no
+        inherited discounts.
+        """
+        logger.info(
+            "preview_automated_renewal_order: customer=%s authorization=%s",
+            customer_id,
+            authorization_id,
+        )
+        authorization = self._transport.settings.get_authorization(authorization_id)
+        return self._transport.request(
+            "POST",
+            authorization,
+            f"/v3/customers/{customer_id}/orders?fetch-price=true",
+            json={
+                "orderType": AdobeOrderType.PREVIEW_RENEWAL.value,
+                "currencyCode": currency_code,
+            },
+        )

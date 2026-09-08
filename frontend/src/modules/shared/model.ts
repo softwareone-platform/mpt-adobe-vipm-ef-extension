@@ -691,3 +691,24 @@ export interface DiscountsPage {
   data: Discount[];
   total: number;
 }
+
+/**
+ * A reusable discount the customer already holds that Adobe auto-applies to a
+ * renewing line, as returned by the inherited-discounts endpoint.
+ *
+ * `offerId` is the full Adobe offer id of the line it applies to and `eligible`
+ * is Adobe's own verdict from the automated renewal preview: an ineligible one
+ * previously touched the subscription but no longer qualifies, so the wizard
+ * warns rather than auto-applying it.
+ */
+export interface InheritedDiscount {
+  offerId: string;
+  subscriptionId: string;
+  code: string;
+  adobeId: string;
+  eligible: boolean;
+  name: string;
+  description: string;
+  discountLockEndDate: string;
+  discountValues: DiscountValueEntry[];
+}

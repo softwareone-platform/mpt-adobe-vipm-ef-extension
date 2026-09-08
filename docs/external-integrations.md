@@ -45,6 +45,27 @@ Open discounts are mirrored into the Airtable discount store with
 (applicable order types, annual/3YC support) are curated by operations and left
 untouched by the sync.
 
+## Adobe held-reusable discounts at renewal
+
+Separately from the daily catalogue sync, the renewal wizard reads the reusable
+discounts a customer already holds, live from Adobe, to surface and auto-apply
+them as *inherited* discounts:
+
+- `GET /v3/customers/{customerId}/flex-discounts` returns the customer's held
+  reusables in the ACTIVE or REUSABLE state (code, name, values, discount lock
+  end date), walked page by page. It supplies the display detail.
+- An *automated* `PREVIEW_RENEWAL` — `POST /v3/customers/{customerId}/orders`
+  with `orderType = PREVIEW_RENEWAL` and no line items — returns, per renewing
+  line, the flexible discounts Adobe auto-applies and whether each still
+  qualifies (`SUCCESS`/`FAILURE`). Adobe owns the precedence between several
+  held reusables and the extended lock window, so this is the source of truth
+  for the inherited set. Adobe errors when the customer has no auto-renewal
+  subscriptions, which the extension reads as no inherited discounts.
+
+The lookup is advisory: Adobe re-validates every applied code on the real
+`PREVIEW_RENEWAL` (with line items) and at submit, so a failure of either read
+degrades to no inherited discounts rather than blocking the renewal.
+
 ## Airtable discount-store synchronization
 
 The Airtable discount store (`EXT_AIRTABLE_DISCOUNTS_ID`) holds three tables:

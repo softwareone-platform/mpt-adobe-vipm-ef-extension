@@ -294,6 +294,7 @@
     "LoadAutoRenewSupport": "Failed to load which products can renew at the anniversary date.",
     "LoadRenewalState": "Failed to load how much of each subscription is already renewed.",
     "LoadRenewalPathState": "Failed to load whether a renewal can be planned for this agreement.",
+    "LoadInheritedDiscounts": "Failed to load the discounts you already hold.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated."
   },
@@ -479,6 +480,8 @@
       "Redeemed code": "{{code}} (already redeemed)",
       "Custom code": "Discount code",
       "Add code": "Add code",
+      "Inherited": "Inherited",
+      "Ineligible inherited": "Reusable discounts you already hold no longer qualify for this renewal and were not applied: {{codes}}.",
       "Unknown code": "The code you have entered, {{code}}, is not known. You can ask your sales team to add it as a known code or submit the order anyway. Any invalid codes will cause the order to fail.",
       "Empty": {
         "Title": "No items to discount",

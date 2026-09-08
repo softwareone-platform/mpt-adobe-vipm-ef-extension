@@ -31,10 +31,17 @@ import {
 } from '../../shared/constants';
 import { useAllDiscounts } from '../../shared/hooks/useAllDiscounts';
 import { useRenewalDiscountValidation } from '../../shared/hooks/useRenewalDiscountValidation';
-import type { Agreement, Discount, RenewalPreview, Subscription } from '../../shared/model';
+import type {
+  Agreement,
+  Discount,
+  InheritedDiscount,
+  RenewalPreview,
+  Subscription,
+} from '../../shared/model';
 import { toDiscountErrorMessage } from '../../utils/adobeError';
 import { toRejectionMessage } from '../../utils/discountRejection';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
+import { getPartialSku } from '../../utils/sku';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import {
   appliesToOffer,
@@ -42,6 +49,8 @@ import {
   buildRenewalPlanRequest,
   getDiscountLabel,
   getRenewalQuantity,
+  ineligibleInheritedCodes,
+  inheritedCodesBySku,
   isDiscountAvailable,
   isRenewing,
   normalizeDiscountCode,
@@ -61,6 +70,8 @@ export interface PromotionsStepProps {
   quantities: RenewalQuantities;
   netNewItems: NetNewItem[];
   discountSelections: DiscountSelections;
+  /** The reusables the customer already holds, auto-applied per renewing line. */
+  inheritedDiscounts: InheritedDiscount[];
   /** The path picked on the first step; the early one gates Next on Adobe's preview. */
   path: RenewalPath;
   onDiscountChange: (rowId: string, code: string) => void;
@@ -82,6 +93,7 @@ interface Row {
   quantity: number | null;
   unitSP: number | null;
   code: string;
+  isInherited: boolean;
   spxM: number | null;
   spxY: number | null;
 }
@@ -95,12 +107,15 @@ function toSubscriptionRows(
   selections: RenewalSelections,
   quantities: RenewalQuantities,
   discountSelections: DiscountSelections,
+  inheritedBySku: Map<string, string>,
 ): Row[] {
   return subscriptions
     .filter((subscription) => isRenewing(subscription, selections))
     .map((subscription) => {
       const line = subscription.lines?.[0];
+      const sku = line?.item.externalIds?.vendor ?? '';
       const code = discountSelections[subscription.id] ?? '';
+      const inheritedCode = inheritedBySku.get(getPartialSku(sku));
       const quantity = getRenewalQuantity(subscription, quantities);
       const unitSP = line?.price?.unitSP ?? null;
       return {
@@ -109,7 +124,7 @@ function toSubscriptionRows(
         vendorId: subscription.externalIds?.vendor ?? '',
         itemId: line?.item.id ?? '',
         itemName: line?.item.name ?? '',
-        sku: line?.item.externalIds?.vendor ?? '',
+        sku,
         subscriptionId: subscription.id,
         subscriptionName: subscription.name ?? '',
         billingModel: BILLING_MODEL_LABELS[subscription.terms?.model ?? ''] ?? '—',
@@ -118,6 +133,7 @@ function toSubscriptionRows(
         quantity,
         unitSP: line?.price?.unitSP ?? null,
         code,
+        isInherited: Boolean(inheritedCode) && normalizeDiscountCode(code) === inheritedCode,
         spxM: totalPrice(unitSP, quantity, 12),
         spxY: totalPrice(unitSP, quantity, 1),
       };
@@ -143,6 +159,7 @@ function toNetNewRows(netNewItems: NetNewItem[], discountSelections: DiscountSel
       quantity: item.quantity,
       unitSP: item.unitSP,
       code,
+      isInherited: false,
       spxM: totalPrice(unitSP, item.quantity, 12),
       spxY: totalPrice(unitSP, item.quantity, 1),
     };
@@ -193,6 +210,13 @@ function DiscountCodeCell({ row }: { row: Row }) {
         onChange={(code: string) => onDiscountChange(row.id, code)}
         testId={`discount-code-${row.id}`}
       />
+      {row.isInherited && (
+        <span data-testid={`inherited-${row.id}`}>
+          <RegularText as="span" size={1} color="grey-4">
+            {i18n.t('Renewal:Promotions:Inherited')}
+          </RegularText>
+        </span>
+      )}
     </GridCellSimple>
   );
 }
@@ -328,6 +352,7 @@ export function PromotionsStep({
   quantities,
   netNewItems,
   discountSelections,
+  inheritedDiscounts,
   path,
   onDiscountChange,
   onPreview,
@@ -347,12 +372,21 @@ export function PromotionsStep({
   // A code that cannot apply to a renewal is never offered on this step.
   const renewalDiscounts = useMemo(() => discounts.data.filter(appliesToRenewal), [discounts.data]);
 
+  const inheritedBySku = useMemo(
+    () => inheritedCodesBySku(inheritedDiscounts),
+    [inheritedDiscounts],
+  );
+  const ineligibleInherited = useMemo(
+    () => ineligibleInheritedCodes(inheritedDiscounts),
+    [inheritedDiscounts],
+  );
+
   const rows = useMemo(
     () => [
-      ...toSubscriptionRows(subscriptions, selections, quantities, discountSelections),
+      ...toSubscriptionRows(subscriptions, selections, quantities, discountSelections, inheritedBySku),
       ...toNetNewRows(netNewItems, discountSelections),
     ],
-    [subscriptions, selections, quantities, netNewItems, discountSelections],
+    [subscriptions, selections, quantities, netNewItems, discountSelections, inheritedBySku],
   );
 
   const getOptions = useMemo(() => {
@@ -466,6 +500,15 @@ export function PromotionsStep({
           <div data-testid="promotions-step-error">
             <InlineNotification status="error">
               {discounts.error || t('Renewal:Promotions:Errors:Discounts could not be loaded')}
+            </InlineNotification>
+          </div>
+        )}
+        {ineligibleInherited.length > 0 && (
+          <div data-testid="promotions-step-ineligible-inherited">
+            <InlineNotification status="warning">
+              {t('Renewal:Promotions:Ineligible inherited', {
+                codes: ineligibleInherited.map((discount) => discount.code).join(', '),
+              })}
             </InlineNotification>
           </div>
         )}
