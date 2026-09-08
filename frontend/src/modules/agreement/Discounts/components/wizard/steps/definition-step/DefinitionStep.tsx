@@ -148,6 +148,7 @@ export function DefinitionStep({
 
         <Select
           controlLabel={t("Agreement:Discounts:Wizard:Fields:Category")}
+          cssPosition="fixed"
           errorMessage={errors.category}
           name="category"
           onChange={(value: string) => editField({ category: value as DiscountCategory })}
@@ -161,6 +162,7 @@ export function DefinitionStep({
           <Select
             className="definition-step__discount-type"
             controlLabel={t("Agreement:Discounts:Wizard:Fields:DiscountType")}
+            cssPosition="fixed"
             errorMessage={errors.discountType}
             name="discountType"
             onChange={(value: string) => editField({ discountType: value as DiscountType })}
