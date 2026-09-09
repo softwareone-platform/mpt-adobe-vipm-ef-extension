@@ -94,6 +94,23 @@ describe('CodeCombobox', () => {
     expect(getAllByRole('listitem')).toHaveLength(1);
   });
 
+  it('opens the list on the closed field and keeps the character typed there', () => {
+    const { getByTestId } = renderCombobox();
+
+    fireEvent.keyDown(getByTestId('code-combobox'), { key: 'c' });
+
+    expect((getByTestId('code-combobox__search') as HTMLInputElement).value).toBe('c');
+  });
+
+  it('keeps every character typed on the closed field, not just the last', () => {
+    const { getByTestId } = renderCombobox();
+
+    fireEvent.keyDown(getByTestId('code-combobox'), { key: 'f' });
+    fireEvent.keyDown(getByTestId('code-combobox'), { key: 's' });
+
+    expect((getByTestId('code-combobox__search') as HTMLInputElement).value).toBe('fs');
+  });
+
   it('yields the code a customer picks from the list', () => {
     const { getByTestId, getByText, onChange } = renderCombobox();
 

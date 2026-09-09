@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from 'react';
 
 import { Dropdown } from '@softwareone-platform/sdk-react-ui-v0/dropdown';
 import { Input } from '@softwareone-platform/sdk-react-ui-v0/input';
@@ -26,6 +33,13 @@ export function CodeCombobox({
 }: CodeComboboxProps) {
   const [isOpen, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const host = document.querySelector(`[data-testid="${testId}__search"]`);
+    const field = host instanceof HTMLInputElement ? host : host?.querySelector('input');
+    field?.focus();
+  }, [isOpen, testId]);
 
   const listed = useMemo(() => {
     const typed = search.trim().toLowerCase();
@@ -88,6 +102,12 @@ export function CodeCombobox({
         placeholder={placeholder}
         isReadOnly
         isPreventAutocomplete
+        onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+          if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+            setSearch((typed) => (isOpen ? typed + event.key : event.key));
+            setOpen(true);
+          }
+        }}
         testId={testId}
       />
     </Dropdown>
