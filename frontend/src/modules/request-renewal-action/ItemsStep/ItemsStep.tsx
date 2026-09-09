@@ -36,6 +36,7 @@ import { getPartialSku } from '../../utils/sku';
 import { SelectItemsDialog } from '../components/select-items-dialog/SelectItemsDialog';
 import {
   buildRenewalPlanRequest,
+  canAddNetNewItems,
   getDefaultRenewalQuantity,
   findRenewAndAddConflict,
   getHeldSkus,
@@ -568,11 +569,11 @@ export function ItemsStep({
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
-  const addItemsButton = (
+  const addItemsButton = canAddNetNewItems(subscriptions, renewalStates, path) ? (
     <Button isDisabled={!listingId} onClick={() => setDialogOpen(true)} testId="add-items">
       {t('Renewal:Items:Add items')}
     </Button>
-  );
+  ) : null;
 
   return (
     <div className="items-step">
@@ -603,7 +604,7 @@ export function ItemsStep({
       />
       {rows.length === 0 ? (
         <>
-          <div className="items-step__toolbar">{addItemsButton}</div>
+          {addItemsButton && <div className="items-step__toolbar">{addItemsButton}</div>}
           <NoDataCard
             title={t('Renewal:Items:Empty:Title')}
             description={t('Renewal:Items:Empty:Description')}
@@ -613,7 +614,7 @@ export function ItemsStep({
         <>
           <div className="items-step__grid">
             <Grid {...gridProps}>
-              <Grid.Actions>{addItemsButton}</Grid.Actions>
+              {addItemsButton && <Grid.Actions>{addItemsButton}</Grid.Actions>}
             </Grid>
           </div>
           <RegularText as="p" size={1} color="grey-4" className="items-step__disclaimer">

@@ -125,6 +125,18 @@ export function isIncreaseAllowed(
   return path === 'now' && getRenewalState(subscription, states)?.increaseAllowed === true;
 }
 
+/** Whether the Items step offers net-new products: early renewal adds them in a later order. */
+export function canAddNetNewItems(
+  subscriptions: Subscription[],
+  states: RenewalStates,
+  path: RenewalPath,
+): boolean {
+  return (
+    path !== 'now' ||
+    subscriptions.some((subscription) => isIncreaseAllowed(subscription, states, path))
+  );
+}
+
 /** One Items-step line as the renew-and-add check reads it. */
 export interface RenewalLine {
   /** The line's position in the grid, which the guidance names. */

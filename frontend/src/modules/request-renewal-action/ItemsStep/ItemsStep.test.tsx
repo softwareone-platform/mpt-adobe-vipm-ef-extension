@@ -519,6 +519,30 @@ describe('ItemsStep', () => {
     expect(capturedConfig.sort).toEqual([]);
   });
 
+  it('hides adding items on a first early renewal', () => {
+    const { queryByTestId } = renderStep({ path: 'now' });
+
+    expect(queryByTestId('add-items')).toBeNull();
+  });
+
+  it('offers adding items once a line is fully early-renewed', () => {
+    const { getByTestId } = renderStep({
+      path: 'now',
+      renewalStates: {
+        [ADOBE_SUBSCRIPTION_ID]: {
+          currentQuantity: 37,
+          renewedQuantity: 37,
+          state: 'fullyRenewed',
+          remainingQuantity: 0,
+          earlyRenewable: true,
+          increaseAllowed: true,
+        },
+      },
+    });
+
+    expect(getByTestId('add-items')).toBeTruthy();
+  });
+
   it('keeps held and already added SKUs out of the picker', () => {
     renderStep({ netNewItems: [NET_NEW_ITEM] });
 

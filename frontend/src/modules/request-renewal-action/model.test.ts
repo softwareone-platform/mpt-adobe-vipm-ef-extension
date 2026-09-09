@@ -4,6 +4,7 @@ import {
   buildInheritedDiscountSelections,
   buildInitialRenewalSelections,
   buildRenewalPlanRequest,
+  canAddNetNewItems,
   canRenewAtAnniversary,
   findDiscountByCode,
   findRenewAndAddConflict,
@@ -254,6 +255,14 @@ describe('renewal state helpers', () => {
     expect(isIncreaseAllowed(subscription, renewed, 'anniversary')).toBe(false);
     expect(isIncreaseAllowed(subscription, states, 'now')).toBe(false);
     expect(isIncreaseAllowed(subscription, {}, 'now')).toBe(false);
+  });
+
+  it('offers net-new items only once the early path can increase a line', () => {
+    const renewed = { [ADOBE_ID]: { ...partial, increaseAllowed: true } };
+    expect(canAddNetNewItems([subscription], renewed, 'now')).toBe(true);
+    expect(canAddNetNewItems([subscription], states, 'now')).toBe(false);
+    expect(canAddNetNewItems([subscription], {}, 'now')).toBe(false);
+    expect(canAddNetNewItems([subscription], {}, 'anniversary')).toBe(true);
   });
 });
 
