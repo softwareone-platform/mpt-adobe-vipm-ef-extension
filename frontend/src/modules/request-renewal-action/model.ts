@@ -8,6 +8,16 @@ import type {
   Terms,
 } from '../shared/model';
 import { getPartialSku } from '../utils/sku';
+import {
+  appliesToOrderType,
+  getDiscountLabel,
+  isDiscountAvailable,
+  normalizeDiscountCode,
+} from '../utils/discount';
+
+// The discount-code helpers are shared with the mid-term upgrade wizard; the
+// renewal steps keep reading them from here.
+export { getDiscountLabel, isDiscountAvailable, normalizeDiscountCode };
 
 // The wizard's steps read the path from here, next to the rest of the plan
 // state, while the endpoint bodies that carry it live in the shared model.
@@ -252,27 +262,9 @@ export interface OrderDetails {
   notes: string;
 }
 
-/** Codes are matched case-insensitively; Adobe records them in upper case. */
-export function normalizeDiscountCode(code: string): string {
-  return code.trim().toUpperCase();
-}
-
-/**
- * Whether the customer can still apply the discount.
- *
- * A single-use code can be redeemed once per customer, so a redemption
- * recorded against this customer takes it out of play. A reusable code stays
- * selectable after its redemption — its discount lock is what limits how long
- * it can be applied, and the listing already drops it once the lock runs out.
- */
-export function isDiscountAvailable(discount: Discount): boolean {
-  return Boolean(discount.reusable) || !discount.redeemedAt;
-}
-
 /** Whether the discount applies to a renewal; an unrestricted code applies to any order. */
 export function appliesToRenewal(discount: Discount): boolean {
-  const orderTypes = discount.applicableOrderTypes;
-  return !orderTypes?.length || orderTypes.includes('RENEWAL');
+  return appliesToOrderType(discount, 'RENEWAL');
 }
 
 /**
@@ -297,11 +289,6 @@ function getTargetOfferIds(discount: Discount): string[] {
     .filter(Boolean);
 }
 
-/** How a code reads in the picker: its name in brackets when the code carries one. */
-export function getDiscountLabel(discount: Discount): string {
-  const name = discount.name?.trim();
-  return name ? `${discount.code} (${name})` : discount.code;
-}
 
 /** The discount code applied to each renewal line, keyed by subscription or item id. */
 export type DiscountSelections = Record<string, string>;

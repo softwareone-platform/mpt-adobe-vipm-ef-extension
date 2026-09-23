@@ -29,14 +29,18 @@ class OrderClient:
         line_items: list[dict[str, Any]],
         cancelling_items: list[dict[str, Any]],
         recommendation_tracker_id: str = "",
+        *,
+        fetch_price: bool = False,
     ) -> dict[str, Any]:
         """Request a PREVIEW_SWITCH quote validating a mid-term upgrade before ordering.
 
-        Adobe validates the switch (path validity, quantities, single-item rule)
-        and returns pro-rated pricing without placing an order. When the
-        selection came from Adobe's recommendations, the tracker id is forwarded
-        as the ``x-recommendation-tracker-id`` header so Adobe can attribute the
-        order to the recommendation.
+        Adobe validates the switch (path validity, quantities, single-item rule
+        and any flexible discount codes carried on the target line items)
+        without placing an order. When the selection came from Adobe's
+        recommendations, the tracker id is forwarded as the
+        ``x-recommendation-tracker-id`` header so Adobe can attribute the order
+        to the recommendation. ``fetch_price`` asks Adobe to price the quote,
+        which the wizard needs to show the discounted price before ordering.
         """
         logger.info(
             "preview_switch_order: customer=%s authorization=%s targets=%d",
@@ -50,10 +54,11 @@ class OrderClient:
             else None
         )
         authorization = self._transport.settings.get_authorization(authorization_id)
+        query = "?fetch-price=true" if fetch_price else ""
         return self._transport.request(
             "POST",
             authorization,
-            f"/v3/customers/{customer_id}/orders",
+            f"/v3/customers/{customer_id}/orders{query}",
             extra_headers=extra_headers,
             json={
                 "orderType": AdobeOrderType.PREVIEW_SWITCH.value,

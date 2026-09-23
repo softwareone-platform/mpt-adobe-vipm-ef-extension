@@ -13,8 +13,8 @@ from mpt_extension_sdk.models import Agreement, Subscription
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
-from mpt_adobe_vipm_ef.models.switch import UpgradeOrderRequest
-from mpt_adobe_vipm_ef.routers.api.upgrade import create_upgrade_order
+from mpt_adobe_vipm_ef.models.switch import UpgradeOrderRequest, UpgradePreviewRequest
+from mpt_adobe_vipm_ef.routers.api.upgrade import create_upgrade_order, preview_upgrade_order
 from mpt_adobe_vipm_ef.services.switch_order import ExistingTargetLine
 
 _AGREEMENT_ID = "AGR-1234-5678"
@@ -71,14 +71,48 @@ def _subscription_payload(vendor=_ADOBE_SUBSCRIPTION_ID, lines=None):
     }
 
 
-def _body(quantity=6, tracker_id="TRACKER-1", notes="", client_external_id=""):
+def _body(quantity=6, tracker_id="TRACKER-1", notes="", client_external_id="", codes=None):
     return UpgradeOrderRequest.model_validate({
         "targetOfferId": _TARGET_OFFER_ID,
         "quantity": quantity,
         "recommendationTrackerId": tracker_id,
         "notes": notes,
         "externalIds": {"client": client_external_id},
+        "flexDiscountCodes": codes or [],
     })
+
+
+def _preview_body(quantity=6, codes=None):
+    return UpgradePreviewRequest.model_validate({
+        "targetOfferId": _TARGET_OFFER_ID,
+        "quantity": quantity,
+        "recommendationTrackerId": "TRACKER-1",
+        "flexDiscountCodes": codes or [],
+    })
+
+
+def _quote(code=None, result="SUCCESS"):
+    line = {
+        "extLineItemNumber": 1,
+        "offerId": _TARGET_OFFER_ID,
+        "quantity": 6,
+        "pricing": {"partnerPrice": 230.64, "discountedPartnerPrice": 207.58},
+    }
+    if code:
+        line["flexDiscountCodes"] = [code]
+        line["flexDiscounts"] = [{"code": code, "result": result}]
+    return {"orderType": "PREVIEW_SWITCH", "lineItems": [line]}
+
+
+def _discount_refusal(reason="NEW_TO_PRODUCT_NOT_MET"):
+    return AdobeAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        {
+            "code": "2146",
+            "message": "Flex discount code does not qualify",
+            "additionalDetails": ["Line Item: 1", f"Reason: {reason}"],
+        },
+    )
 
 
 @pytest.fixture
@@ -130,10 +164,19 @@ def create_order_mock(mocker):
 
 
 @pytest.fixture
+def accepted_quote(adobe_call):
+    adobe_call.returns = _quote()
+    return adobe_call
+
+
+@pytest.fixture
+def preview_deps(upgrade_agreement, source_subscription, resolve_target_item, accepted_quote):
+    """Bundle the happy-path collaborators for the preview endpoint."""
+
+
+@pytest.fixture
 def submit_deps(  # noqa: WPS211
-    upgrade_agreement,
-    source_subscription,
-    resolve_target_item,
+    preview_deps,
     existing_target_line,
     caller_client,
     create_order_mock,
@@ -198,13 +241,15 @@ async def test_create_upgrade_order_fails_when_the_target_line_lookup_fails(
 async def test_create_upgrade_order_previews_the_switch_snapshot(fake_ctx, submit_deps, adobe_call):
     await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))  # act
 
-    call_args, _ = adobe_call.calls[0]
+    call_args, call_kwargs = adobe_call.calls[0]
     assert call_args == (
         "AUT-123",
         "CUST-001",
         "USD",
         [{"extLineItemNumber": 1, "offerId": _TARGET_OFFER_ID, "quantity": 6}],
-        [
+    )
+    assert call_kwargs == {
+        "cancelling_items": [
             {
                 "extLineItemNumber": 1,
                 "referenceLineItemNumber": 1,
@@ -212,8 +257,9 @@ async def test_create_upgrade_order_previews_the_switch_snapshot(fake_ctx, submi
                 "quantity": 6,
             },
         ],
-        "TRACKER-1",
-    )
+        "recommendation_tracker_id": "TRACKER-1",
+        "fetch_price": False,
+    }
 
 
 async def test_create_upgrade_order_passes_switch_payload_with_tracker(
@@ -391,3 +437,157 @@ async def test_create_upgrade_order_raises_forbidden_when_product_not_allowed(
 
     with pytest.raises(ForbiddenError):
         await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+
+async def test_create_upgrade_order_carries_the_discount_code_on_the_target_line_only(
+    fake_ctx, submit_deps, adobe_call, create_order_mock
+):
+    adobe_call.returns = _quote("UPGRADE10")
+    body = _body(6, codes=[" upgrade10 "])
+
+    await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, body)  # act
+
+    preview_args, preview_kwargs = adobe_call.calls[0]
+    assert preview_args[3][0]["flexDiscountCodes"] == ["UPGRADE10"]
+    assert "flexDiscountCodes" not in preview_kwargs["cancelling_items"][0]
+    call_args, _ = create_order_mock.await_args
+    payload = call_args[3].to_dict()
+    assert payload["lineItems"][0]["flexDiscountCodes"] == ["UPGRADE10"]
+    assert "flexDiscountCodes" not in payload["cancellingItems"][0]
+
+
+async def test_create_upgrade_order_omits_discount_codes_when_none_applied(
+    fake_ctx, submit_deps, create_order_mock
+):
+    await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert "flexDiscountCodes" not in call_args[3].to_dict()["lineItems"][0]
+
+
+async def test_create_upgrade_order_rejects_a_refused_code_and_skips_order(
+    fake_ctx, submit_deps, adobe_call, create_order_mock
+):
+    adobe_call.answers = [_discount_refusal(), _quote()]
+
+    with pytest.raises(ValidationError) as exc_info:
+        await create_upgrade_order(
+            _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6, codes=["UPGRADE10"])
+        )
+
+    assert [(error.pointer, error.detail) for error in exc_info.value.errors] == [
+        (f"{_TARGET_OFFER_ID}/flexDiscountCodes/UPGRADE10", "NEW_TO_PRODUCT_NOT_MET"),
+    ]
+    create_order_mock.assert_not_awaited()
+
+
+async def test_preview_upgrade_order_returns_the_priced_quote(fake_ctx, preview_deps, adobe_call):
+    adobe_call.returns = _quote("UPGRADE10")
+
+    result = await preview_upgrade_order(
+        _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(codes=["UPGRADE10"])
+    )
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {"preview": _quote("UPGRADE10")}
+    call_args, call_kwargs = adobe_call.calls[0]
+    assert call_args[3] == [
+        {
+            "extLineItemNumber": 1,
+            "offerId": _TARGET_OFFER_ID,
+            "quantity": 6,
+            "flexDiscountCodes": ["UPGRADE10"],
+        },
+    ]
+    assert call_kwargs == {
+        "cancelling_items": [
+            {
+                "extLineItemNumber": 1,
+                "referenceLineItemNumber": 1,
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "quantity": 6,
+            },
+        ],
+        "recommendation_tracker_id": "TRACKER-1",
+        "fetch_price": True,
+    }
+
+
+async def test_preview_upgrade_order_reports_a_whole_request_refusal(
+    fake_ctx, preview_deps, adobe_call
+):
+    adobe_call.answers = [_discount_refusal(), _quote()]
+
+    with pytest.raises(ValidationError) as exc_info:
+        await preview_upgrade_order(
+            _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(codes=["UPGRADE10"])
+        )
+
+    assert exc_info.value.detail == "Adobe rejected one or more discount codes"
+    assert [(error.pointer, error.detail) for error in exc_info.value.errors] == [
+        (f"{_TARGET_OFFER_ID}/flexDiscountCodes/UPGRADE10", "NEW_TO_PRODUCT_NOT_MET"),
+    ]
+    retried_args, retried_kwargs = adobe_call.calls[1]
+    assert "flexDiscountCodes" not in retried_args[3][0]
+    assert retried_kwargs == adobe_call.calls[0][1]
+
+
+async def test_preview_upgrade_order_reports_a_code_refused_on_a_successful_quote(
+    fake_ctx, preview_deps, adobe_call
+):
+    adobe_call.answers = [_quote("UPGRADE10", result="CUSTOMER_SEGMENT_NOT_MET"), _quote()]
+
+    with pytest.raises(ValidationError) as exc_info:
+        await preview_upgrade_order(
+            _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(codes=["UPGRADE10"])
+        )
+
+    assert [(error.pointer, error.detail) for error in exc_info.value.errors] == [
+        (f"{_TARGET_OFFER_ID}/flexDiscountCodes/UPGRADE10", "CUSTOMER_SEGMENT_NOT_MET"),
+    ]
+
+
+async def test_preview_upgrade_order_fails_a_refusal_naming_no_line(
+    fake_ctx, preview_deps, adobe_call
+):
+    adobe_call.error = AdobeAPIError(
+        http.HTTPStatus.BAD_REQUEST,
+        {"code": "2146", "message": "Flex discount code does not qualify"},
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        await preview_upgrade_order(
+            _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(codes=["UPGRADE10"])
+        )
+
+    assert not exc_info.value.errors
+
+
+async def test_preview_upgrade_order_maps_other_adobe_rejections(
+    fake_ctx, preview_deps, adobe_call
+):
+    adobe_call.error = _ADOBE_API_ERROR
+
+    with pytest.raises(UpstreamServiceError):
+        await preview_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body())
+
+
+async def test_preview_upgrade_order_rejects_quantity_above_source(
+    fake_ctx, preview_deps, adobe_call
+):
+    with pytest.raises(ValidationError):
+        await preview_upgrade_order(
+            _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(_QUANTITY_ABOVE_SOURCE)
+        )
+
+    assert not adobe_call.calls
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_preview_upgrade_order_rejects_non_client_account(
+    fake_ctx, preview_deps, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await preview_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body())

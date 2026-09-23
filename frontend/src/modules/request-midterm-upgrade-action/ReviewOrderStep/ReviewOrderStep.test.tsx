@@ -210,6 +210,7 @@ describe('ReviewOrderStep', () => {
       'subscription',
       'terms',
       'delta',
+      'discountCode',
       'unitSP',
       'spxM',
       'spxY',

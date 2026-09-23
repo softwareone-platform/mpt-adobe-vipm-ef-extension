@@ -52,4 +52,6 @@ export type TargetSubscription = {
   commitmentDate?: string | null;
   subscriptionTerms?: Terms;
   audit?: Audit;
+  /** The flexible discount code applied to the target line on the Promotions step. */
+  discountCode?: string;
 }

@@ -153,6 +153,18 @@ function getColumns(
         ),
     },
     {
+      name: 'discountCode',
+      title: i18n.t('MidtermUpgrade:Grid:Discount code'),
+      fields: ['discountCode'],
+      initialWidth: 140,
+      cell: (item) =>
+        item.isSummary ? (
+          <GridCellSimple></GridCellSimple>
+        ) : (
+          <TextCell text={item.discountCode || '—'} />
+        ),
+    },
+    {
       name: 'unitSP',
       title: i18n.t('MidtermUpgrade:Grid:Unit SP'),
       fields: ['unitSP'],
@@ -190,6 +202,7 @@ const fields: GridFieldDefinition[] = [
   { name: 'terms', title: i18n.t('MidtermUpgrade:Grid:Terms') },
   { name: 'commitment', title: i18n.t('Common:Commitment') },
   { name: 'delta', title: i18n.t('MidtermUpgrade:Grid:Qty') },
+  { name: 'discountCode', title: i18n.t('MidtermUpgrade:Grid:Discount code') },
   { name: 'unitSP', title: i18n.t('MidtermUpgrade:Grid:Unit SP') },
   { name: 'spxM', title: i18n.t('MidtermUpgrade:Grid:SPxM') },
   { name: 'spxY', title: i18n.t('MidtermUpgrade:Grid:SPxY') },
