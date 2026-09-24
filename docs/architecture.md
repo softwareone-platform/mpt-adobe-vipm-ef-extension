@@ -101,10 +101,15 @@ frontend/                    TypeScript plug UI (esbuild)
     days before the anniversary, and only for a customer holding an active
     subscription — and which path is already established: `lockedPath` is `now`
     once an early renewal has rolled the customer's `cotermDate` past the
-    subscriptions' `renewalDate`, and `anniversary` once deferred auto-renewal
-    preferences are staged on an active subscription (set to lapse, or to renew
-    at a quantity other than the one it holds), since an at-anniversary renewal
-    moves no date and bills nothing now. The wizard's first step presents the
+    active subscriptions' `renewalDate` (an inactive subscription keeps the
+    `renewalDate` of the term it lapsed in, so it is ignored), and
+    `anniversary` once a renewal is staged for the anniversary, since an
+    at-anniversary renewal moves no date and bills nothing now. A staged renewal
+    is read from the subscriptions renewing on the `cotermDate`: a scheduled
+    net-new subscription still armed to activate, or an active subscription
+    still set to auto-renew with more seats than it holds. A disabled
+    auto-renewal or a lower renewal quantity does not lock the path, because
+    both exist without any renewal set up. The wizard's first step presents the
     established path as confirmed state and offers no other. The submit route
     repeats that lock check and rejects a plan on the closed-off path, because
     the wizard's gate is a display, not the boundary. `path-state` also
