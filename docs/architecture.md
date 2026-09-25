@@ -133,11 +133,14 @@ frontend/                    TypeScript plug UI (esbuild)
     context's own `renewalPayload` parameter, on either path: its subscriptions
     set only the AutoRenew flags, so the plan's discount codes, and on the `now`
     path the decision to renew now, reach fulfilment through the snapshot
-    alone. At the
-    anniversary a plan that
-    changes nothing at all is rejected upfront (the order would have no
-    content); renewing now is itself the change, so the same plan is accepted
-    there and becomes a change order whose single line is the catalog's
+    alone. At the anniversary a plan that changes nothing at all is rejected
+    (the order would have no content); a discount code the subscription does
+    not already hold counts as a change, compared against Adobe's
+    `autoRenewal.flexDiscountCodes` at submission (a renewing subscription
+    that requests codes but is missing from Adobe is rejected, since there is
+    nothing to compare against), and renewing now is itself the change. A plan whose only change is such a code, or an early renewal
+    that repeats the current quantities and AutoRenew decisions, becomes a
+    change order whose single line is the catalog's
     `adobe-early-renewal-no-change` placeholder item, with fulfilment executing
     the plan from the snapshot alone
   - `events/order.py` — order event router (fulfilment)

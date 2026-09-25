@@ -37,6 +37,11 @@ class PlanSubscription:
     now") path, where it is the baseline ``renewal_delta`` subtracts from; at
     the anniversary it stays at zero so every quantity keeps its plain total
     reading.
+
+    ``current_flex_discount_codes`` are the codes the Adobe subscription already
+    carries for its next renewal (``autoRenewal.flexDiscountCodes``), stamped
+    at submission so a plan whose only change is a discount code can be told
+    apart from a no-op.
     """
 
     selection: RenewalSubscriptionSelection
@@ -46,6 +51,7 @@ class PlanSubscription:
     offer_id: str
     subscription: Subscription
     renewed_quantity: int = 0
+    current_flex_discount_codes: tuple[str, ...] = ()
 
 
 def renewal_delta(plan: PlanSubscription) -> int:
@@ -90,15 +96,18 @@ def require_renewal_changes(
     plan_subscriptions: list[PlanSubscription],
     net_new_lines: list[NetNewLine],
 ) -> None:
-    """Reject an at-anniversary plan that would create neither order type.
+    """Reject an at-anniversary plan that cannot change anything.
 
     At the anniversary the order *is* the plan, so it has to carry something:
-    the platform accepts a Change order only when at least one line's quantity
-    actually moves (a renewing subscription's renewal quantity differs from
-    its current quantity) or a net-new product is added, and a Configuration
-    order only when at least one subscription's renew decision differs from
-    its standing AutoRenew preference. A plan with none of these is a pure
-    no-op the wizard should never have let through.
+    a renewing subscription's renewal quantity that differs from its current
+    quantity, a net-new product, a renew decision that differs from the
+    standing AutoRenew preference, or a discount code. A plan with none of
+    these is a pure no-op the wizard should never have let through.
+
+    Whether a requested code actually differs from the one Adobe already holds
+    is only known once the customer's Adobe subscriptions are loaded, so a plan
+    whose only candidate change is a code passes here and is settled by
+    ``require_discount_code_change`` at submission.
 
     An early renewal ("Renew now") is never a no-op: renewing before the
     anniversary is itself the change the customer asked for, and fulfilment
@@ -109,6 +118,52 @@ def require_renewal_changes(
     """
     if request.renewal_path is RenewalPath.NOW:
         return
+    requests_codes = any(
+        plan.selection.renew and plan.selection.flex_discount_codes for plan in plan_subscriptions
+    )
+    if not (_has_order_change(plan_subscriptions, net_new_lines) or requests_codes):
+        raise ValidationError(
+            detail="The renewal plan has no changes to submit.",
+        )
+
+
+def require_discount_code_change(
+    request: RenewalPlanRequest,
+    plan_subscriptions: list[PlanSubscription],
+    net_new_lines: list[NetNewLine],
+) -> None:
+    """Reject an at-anniversary plan whose only change is codes Adobe already holds.
+
+    Runs once the plan carries each subscription's current Adobe codes
+    (``current_flex_discount_codes``). When nothing else changes, at least one
+    renewing subscription must request a code set different from the one it
+    already holds; otherwise the plan is a no-op after all. The comparison
+    matches fulfilment's: an empty request leaves the stored codes untouched,
+    so it is never a change.
+    """
+    if request.renewal_path is RenewalPath.NOW:
+        return
+    if _has_order_change(plan_subscriptions, net_new_lines):
+        return
+    if not has_discount_code_change(plan_subscriptions):
+        raise ValidationError(
+            detail="The renewal plan has no changes to submit.",
+        )
+
+
+def has_discount_code_change(plan_subscriptions: list[PlanSubscription]) -> bool:
+    """Whether a renewing subscription requests codes other than those it already holds."""
+    return any(
+        plan.selection.renew
+        and plan.selection.flex_discount_codes
+        and set(plan.selection.flex_discount_codes) != set(plan.current_flex_discount_codes)
+        for plan in plan_subscriptions
+    )
+
+
+def _has_order_change(
+    plan_subscriptions: list[PlanSubscription], net_new_lines: list[NetNewLine]
+) -> bool:
     has_quantity_change = any(
         plan.selection.renew and plan.selection.renewal_quantity != plan.current_quantity
         for plan in plan_subscriptions
@@ -116,10 +171,7 @@ def require_renewal_changes(
     has_autorenew_change = any(
         plan.selection.renew != bool(plan.subscription.auto_renew) for plan in plan_subscriptions
     )
-    if not (has_quantity_change or has_autorenew_change or net_new_lines):
-        raise ValidationError(
-            detail="The renewal plan has no changes to submit.",
-        )
+    return has_quantity_change or has_autorenew_change or bool(net_new_lines)
 
 
 def require_no_renewed_seat_reduction(plan_subscriptions: list[PlanSubscription]) -> None:
@@ -162,16 +214,18 @@ def has_renewed_removal(plan_subscriptions: list[PlanSubscription]) -> bool:
 
 
 async def resolve_no_change_line(ctx: APIContext, agreement: Agreement) -> Line:
-    """Resolve the platform's early-renewal placeholder item into the order's only line.
+    """Resolve the platform's no-change placeholder item into the order's only line.
 
-    An early renewal ("Renew now") that repeats the current quantities and
-    AutoRenew decisions produces neither order type on its own: the platform
+    A plan that moves no quantity, adds no net-new product and flips no
+    AutoRenew decision produces neither order type on its own: the platform
     rejects a Change order whose lines carry no quantity delta and a
-    Configuration order whose subscriptions keep their AutoRenew value. The
-    plan still has to become an order — renewing before the anniversary is
-    itself the change — so it is submitted as a Change order whose single line
-    is the ``adobe-early-renewal-no-change`` catalog item; the line only
-    exists to satisfy the platform, and fulfilment executes the plan from the
+    Configuration order whose subscriptions keep their AutoRenew value. Two
+    such plans still have to become an order: an early renewal ("Renew now"),
+    where renewing before the anniversary is itself the change, and an
+    at-anniversary plan whose only change is a discount code. Both are
+    submitted as a Change order whose single line is the
+    ``adobe-early-renewal-no-change`` catalog item; the line only exists to
+    satisfy the platform, and fulfilment executes the plan from the
     ``renewalPayload`` snapshot the order carries.
     """
     product_items = await resolve_items_by_sku(
@@ -180,12 +234,12 @@ async def resolve_no_change_line(ctx: APIContext, agreement: Agreement) -> Line:
     product_item = product_items.get(EARLY_RENEWAL_NO_CHANGE_ITEM)
     if product_item is None or not product_item.get("id"):
         logger.warning(
-            "Early-renewal placeholder item %s not found on product %s",
+            "Renewal placeholder item %s not found on product %s",
             EARLY_RENEWAL_NO_CHANGE_ITEM,
             agreement.product.id,
         )
         raise UpstreamServiceError(
-            detail="The early-renewal placeholder item is not available in the product catalog.",
+            detail="The renewal placeholder item is not available in the product catalog.",
         )
     return {"item": {"id": product_item["id"]}, "quantity": _NO_CHANGE_ITEM_QUANTITY}
 
