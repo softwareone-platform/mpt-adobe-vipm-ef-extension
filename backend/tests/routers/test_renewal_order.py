@@ -356,9 +356,9 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
 ):
     """Renewing now with the quantities untouched still has to reach fulfilment.
 
-    The order carries no line-quantity delta, so it is a Configuration order —
-    but the early renewal is executed against Adobe as soon as it processes,
-    so the plan snapshot rides on it too, unlike at the anniversary.
+    The order carries no line-quantity delta, so it is a Configuration order,
+    and the plan snapshot rides on it so fulfilment executes the early renewal
+    against Adobe as soon as it processes.
     """
     fake_subscriptions.subscription = Subscription.from_payload(
         _subscription_payload(auto_renew=False)
@@ -386,16 +386,34 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
     }
 
 
-async def test_create_renewal_order_leaves_an_anniversary_configuration_order_without_a_payload(
-    fake_ctx, submit_deps, create_configuration_order_mock
+async def test_create_renewal_order_carries_the_payload_on_an_anniversary_configuration_order(
+    fake_ctx, submit_deps, fake_subscriptions, create_configuration_order_mock
 ):
-    """At the anniversary the AutoRenew decisions the order carries are the whole plan."""
-    body = _body(renew=False, quantity=0)  # renewing_subscription defaults autoRenew=True
+    """The order's subscriptions set only AutoRenew, so the codes ride on the snapshot."""
+    fake_subscriptions.subscription = Subscription.from_payload(
+        _subscription_payload(auto_renew=False)
+    )
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
     call_args, _ = create_configuration_order_mock.await_args
-    assert call_args[4] is None
+    assert call_args[4].to_dict() == {
+        "renewalPath": "anniversary",
+        "recommendationTrackerId": "TRACKER-1",
+        "currencyCode": "USD",
+        "subscriptions": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "renew": True,
+                "renewalQuantity": _CURRENT_QUANTITY,
+                "renewedQuantity": 0,
+                "flexDiscountCodes": ["CODE-1"],
+            },
+        ],
+        "netNewItems": [],
+    }
 
 
 async def test_create_renewal_order_rejects_a_plan_with_no_changes(
