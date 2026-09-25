@@ -129,9 +129,11 @@ frontend/                    TypeScript plug UI (esbuild)
     product cannot be a change order, so it is submitted as a configuration
     order carrying only the AutoRenew-changed subscriptions (the platform
     rejects a subscription whose AutoRenew value does not change, on either
-    path); on the `now` path that order also carries the same snapshot on the
-    Configuration context's own `renewalPayload` parameter, because an early
-    renewal is executed against Adobe whether or not a quantity moved. At the
+    path). That order also carries the same snapshot on the Configuration
+    context's own `renewalPayload` parameter, on either path: its subscriptions
+    set only the AutoRenew flags, so the plan's discount codes, and on the `now`
+    path the decision to renew now, reach fulfilment through the snapshot
+    alone. At the
     anniversary a plan that
     changes nothing at all is rejected upfront (the order would have no
     content); renewing now is itself the change, so the same plan is accepted

@@ -391,10 +391,11 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     what tells fulfillment whether to renew at the anniversary or now.
     Otherwise it is submitted as a Configuration order carrying only the
     AutoRenew-changed subscriptions (the platform rejects a subscription whose
-    AutoRenew value does not change) — plus, on the early-renewal path alone,
-    the same plan snapshot on that context's own ``renewalPayload`` parameter,
-    since renewing now is executed against Adobe whether or not a quantity
-    moved. At the anniversary the platform accepts neither order type for a
+    AutoRenew value does not change) plus the same plan snapshot on that
+    context's own ``renewalPayload`` parameter, on either path: the order's
+    subscriptions set only the AutoRenew flags, so the discount codes and the
+    early path's decision to renew now reach fulfilment through the snapshot
+    alone. At the anniversary the platform accepts neither order type for a
     plan with no real change, so that case is rejected upfront; renewing now
     is always a change, so a plan that repeats the current quantities and
     AutoRenew decisions still becomes a Change order carrying the platform's
@@ -444,10 +445,10 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
         order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
     else:
         configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
-        early_payload = _early_renewal_payload(agreement, plan_subscriptions, body)
-        if configuration_subscriptions or early_payload is None:
+        renewal_payload = _configuration_renewal_payload(agreement, plan_subscriptions, body)
+        if configuration_subscriptions or body.renewal_path is not RenewalPath.NOW:
             order = await _create_configuration_order(
-                ctx, agreement_id, configuration_subscriptions, body, early_payload
+                ctx, agreement_id, configuration_subscriptions, body, renewal_payload
             )
         else:
             # An unchanged early renewal: neither order type stands on its own,
@@ -455,7 +456,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
             # fulfilment executes the plan from the renewalPayload snapshot.
             no_change_line = await resolve_no_change_line(ctx, agreement)
             order = await _create_change_order(
-                ctx, agreement_id, [no_change_line], early_payload, body
+                ctx, agreement_id, [no_change_line], renewal_payload, body
             )
     return APIResponse.created(payload=order)
 
@@ -1094,25 +1095,22 @@ async def _create_change_order(
         raise UpstreamServiceError(detail=mpt_order_error_detail(error))
 
 
-def _early_renewal_payload(
+def _configuration_renewal_payload(
     agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     body: RenewalOrderRequest,
-) -> RenewalPayload | None:
-    """Build the plan snapshot a quantity-less early renewal still has to carry.
+) -> RenewalPayload:
+    """Build the plan snapshot a quantity-less renewal plan still has to carry.
 
-    An early renewal ("Renew now") is executed against Adobe as soon as the
-    order processes, so fulfilment needs the plan even when nothing moved a
-    quantity and the submission is a Configuration order: without it the order
-    would only carry the AutoRenew decisions and the ``now`` path would be
-    invisible. The plan arrives already stamped with its full Adobe offer ids
-    and renewed quantities (the endpoint resolves both from one Adobe
-    subscriptions load), so the snapshot's deltas are ready to build. At the
-    anniversary the configuration order is the whole plan already, so there is
-    no snapshot to attach.
+    When nothing moves a quantity the submission carries no order lines, and
+    the Configuration order's subscriptions set only the AutoRenew flags. The
+    rest of the plan (discount codes, renewal quantities, the recommendation
+    tracker id and, on the early path, the decision to renew now) reaches
+    fulfilment only through this snapshot, so it rides on either path. The plan
+    arrives already stamped with its full Adobe offer ids and, on the early
+    path, renewed quantities (the endpoint resolves both from one Adobe
+    subscriptions load), so the snapshot is ready to build.
     """
-    if body.renewal_path is not RenewalPath.NOW:
-        return None
     currency_code = agreement.authorization.currency if agreement.authorization else ""
     return build_renewal_payload(plan_subscriptions, [], body, currency_code or "")
 
@@ -1122,7 +1120,7 @@ async def _create_configuration_order(
     agreement_id: str,
     subscriptions: list[Line],
     body: RenewalOrderRequest,
-    renewal_payload: RenewalPayload | None,
+    renewal_payload: RenewalPayload,
 ) -> dict[str, object]:
     """Create the AutoRenew-only configuration order acting as the caller (client actor)."""
     client = build_caller_client(ctx)
