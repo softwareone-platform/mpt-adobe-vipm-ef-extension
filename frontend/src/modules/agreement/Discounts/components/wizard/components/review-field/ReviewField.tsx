@@ -12,7 +12,7 @@ export interface ReviewFieldProps {
 export function ReviewField({ label, value }: ReviewFieldProps) {
   return (
     <div className="review-field">
-      <RegularText as="span" size={1} color="grey-5" className="review-field__label">
+      <RegularText as="span" size={2} color="grey-5" className="review-field__label">
         {label}
       </RegularText>
       <MediumText as="span" size={2} className="review-field__value">
@@ -34,7 +34,7 @@ export function ReviewBooleanField({ label, value }: ReviewBooleanFieldProps) {
 
   return (
     <div className="review-field">
-      <RegularText as="span" size={1} color="grey-5" className="review-field__label">
+      <RegularText as="span" size={2} color="grey-5" className="review-field__label">
         {label}
       </RegularText>
       <span className={`review-field__value ${modifier}`}>

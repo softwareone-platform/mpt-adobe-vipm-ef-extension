@@ -1,10 +1,10 @@
 import { Input } from "@softwareone-platform/sdk-react-ui-v0/input";
-import { Select } from "@softwareone-platform/sdk-react-ui-v0/select";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SingleSelectDropdown } from "../../components/single-select-dropdown/SingleSelectDropdown";
 import { i18n } from "../../../../../../../i18n/translations";
 import { MAX_TEXT_LENGTH, validateDefinitionFields } from "../../discountValidation";
 import { useFieldErrors } from "../../useFieldErrors";
@@ -146,9 +146,8 @@ export function DefinitionStep({
           value={draft.description}
         />
 
-        <Select
+        <SingleSelectDropdown
           controlLabel={t("Agreement:Discounts:Wizard:Fields:Category")}
-          cssPosition="fixed"
           errorMessage={errors.category}
           name="category"
           onChange={(value: string) => editField({ category: value as DiscountCategory })}
@@ -159,10 +158,9 @@ export function DefinitionStep({
         />
 
         <div className="definition-step__value-row">
-          <Select
+          <SingleSelectDropdown
             className="definition-step__discount-type"
             controlLabel={t("Agreement:Discounts:Wizard:Fields:DiscountType")}
-            cssPosition="fixed"
             errorMessage={errors.discountType}
             name="discountType"
             onChange={(value: string) => editField({ discountType: value as DiscountType })}
