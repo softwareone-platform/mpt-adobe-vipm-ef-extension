@@ -161,6 +161,21 @@ def _customer_payload(benefits=None, coterm=_COTERM_IN_WINDOW):
     return {"cotermDate": coterm, "benefits": benefits or []}
 
 
+def _customer_holding_the_subscription(codes=()):
+    """The customer payload plus the renewing subscription, holding ``codes`` for the renewal."""
+    return {
+        **_customer_payload(),
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "status": "1000",
+                "renewalDate": _COTERM_IN_WINDOW,
+                "autoRenewal": {"enabled": True, "flexDiscountCodes": list(codes)},
+            },
+        ],
+    }
+
+
 def _three_yc_benefit(  # noqa: WPS211
     *,
     status="COMMITTED",
@@ -352,7 +367,7 @@ async def test_create_renewal_order_creates_a_configuration_order_for_an_autoren
 
 
 async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_configuration_order(
-    fake_ctx, submit_deps, fake_subscriptions, create_configuration_order_mock
+    fake_ctx, submit_deps, fake_subscriptions, adobe_call, create_configuration_order_mock
 ):
     """Renewing now with the quantities untouched still has to reach fulfilment.
 
@@ -363,6 +378,7 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
     fake_subscriptions.subscription = Subscription.from_payload(
         _subscription_payload(auto_renew=False)
     )
+    adobe_call.returns = _customer_holding_the_subscription()
     body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"], path="now")
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
@@ -387,12 +403,13 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
 
 
 async def test_create_renewal_order_carries_the_payload_on_an_anniversary_configuration_order(
-    fake_ctx, submit_deps, fake_subscriptions, create_configuration_order_mock
+    fake_ctx, submit_deps, fake_subscriptions, adobe_call, create_configuration_order_mock
 ):
     """The order's subscriptions set only AutoRenew, so the codes ride on the snapshot."""
     fake_subscriptions.subscription = Subscription.from_payload(
         _subscription_payload(auto_renew=False)
     )
+    adobe_call.returns = _customer_holding_the_subscription()
     body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
@@ -485,6 +502,63 @@ async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_chan
     assert call_args[3].to_dict()["renewalPath"] == "now"
 
 
+async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_change_order(  # noqa: WPS211
+    fake_ctx,
+    submit_deps,
+    resolve_net_new_item,
+    adobe_call,
+    create_order_mock,
+    create_configuration_order_mock,
+):
+    """A discount code is the plan's only change, so it rides on the placeholder item."""
+    resolve_net_new_item.return_value = {
+        EARLY_RENEWAL_NO_CHANGE_ITEM: {
+            "id": _NO_CHANGE_ITEM_ID,
+            "name": "Early renewal (no changes)",
+            "externalId": EARLY_RENEWAL_NO_CHANGE_ITEM,
+        },
+    }
+    adobe_call.returns = _customer_holding_the_subscription(codes=["CODE-0"])
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])
+
+    result = await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload == {"id": "ORD-0001", "status": "Processing"}
+    create_configuration_order_mock.assert_not_awaited()
+    call_args, _ = create_order_mock.await_args
+    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
+    payload = call_args[3].to_dict()
+    assert payload["renewalPath"] == "anniversary"
+    assert payload["subscriptions"][0]["flexDiscountCodes"] == ["CODE-1"]
+
+
+async def test_create_renewal_order_rejects_a_code_the_subscription_already_holds(
+    fake_ctx, submit_deps, adobe_call, create_order_mock, create_configuration_order_mock
+):
+    """Requesting the code Adobe already applies at the anniversary changes nothing."""
+    adobe_call.returns = _customer_holding_the_subscription(codes=["CODE-1"])
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])
+
+    with pytest.raises(ValidationError, match="no changes to submit"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+    create_configuration_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_rejects_codes_for_a_subscription_missing_from_adobe(
+    fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock
+):
+    """Without the Adobe subscription there is nothing to compare the codes against."""
+    body = _body(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])
+
+    with pytest.raises(ValidationError, match="was not found in Adobe"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+    create_configuration_order_mock.assert_not_awaited()
+
+
 async def test_create_renewal_order_fails_an_unchanged_early_renewal_without_the_item(
     fake_ctx, submit_deps, resolve_net_new_item, create_order_mock, create_configuration_order_mock
 ):
@@ -500,8 +574,10 @@ async def test_create_renewal_order_fails_an_unchanged_early_renewal_without_the
 
 
 async def test_create_renewal_order_passes_the_renewal_payload(
-    fake_ctx, submit_deps, create_order_mock
+    fake_ctx, submit_deps, adobe_call, create_order_mock
 ):
+    adobe_call.returns = _customer_holding_the_subscription()
+
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(codes=["CODE-1"]))  # act
 
     call_args, _ = create_order_mock.await_args

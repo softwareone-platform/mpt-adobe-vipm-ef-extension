@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+from collections.abc import Collection
 from dataclasses import dataclass, replace
 from http import HTTPStatus
 from typing import Any, cast
@@ -78,6 +79,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     build_preview_renewal_line_items,
     build_renewal_payload,
     has_renewed_removal,
+    require_discount_code_change,
     require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
@@ -395,12 +397,14 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     context's own ``renewalPayload`` parameter, on either path: the order's
     subscriptions set only the AutoRenew flags, so the discount codes and the
     early path's decision to renew now reach fulfilment through the snapshot
-    alone. At the anniversary the platform accepts neither order type for a
-    plan with no real change, so that case is rejected upfront; renewing now
-    is always a change, so a plan that repeats the current quantities and
-    AutoRenew decisions still becomes a Change order carrying the platform's
-    ``adobe-early-renewal-no-change`` placeholder item as its single line,
-    with fulfillment executing the plan from the snapshot alone.
+    alone. At the anniversary a plan with no real change is rejected upfront;
+    a discount code the subscription does not already hold counts as a change,
+    and renewing now is always one. A plan whose only change is a code, or an
+    early renewal that repeats the current quantities and AutoRenew decisions,
+    produces neither order type on its own, so it becomes a Change order
+    carrying the platform's ``adobe-early-renewal-no-change`` placeholder item
+    as its single line, with fulfillment executing the plan from the snapshot
+    alone.
 
     Because the early path can be ordered more than once, its snapshot
     quantities are deltas against Adobe's live ``renewedQuantity`` — what this
@@ -432,6 +436,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     plan_subscriptions = await _resolve_submission_plan(
         ctx, agreement_id, plan_subscriptions, body.renewal_path, coterm_date
     )
+    require_discount_code_change(body, plan_subscriptions, net_new_lines)
 
     lines = build_renewal_order_lines(plan_subscriptions, net_new_lines)
     if lines:
@@ -446,12 +451,13 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     else:
         configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
         renewal_payload = _configuration_renewal_payload(agreement, plan_subscriptions, body)
-        if configuration_subscriptions or body.renewal_path is not RenewalPath.NOW:
+        if configuration_subscriptions:
             order = await _create_configuration_order(
                 ctx, agreement_id, configuration_subscriptions, body, renewal_payload
             )
         else:
-            # An unchanged early renewal: neither order type stands on its own,
+            # An unchanged early renewal, or an at-anniversary plan whose only
+            # change is a discount code: neither order type stands on its own,
             # so the Change order rides on the catalog's placeholder item and
             # fulfilment executes the plan from the renewalPayload snapshot.
             no_change_line = await resolve_no_change_line(ctx, agreement)
@@ -632,13 +638,16 @@ async def _resolve_submission_plan(
 ) -> list[PlanSubscription]:
     """Check the path lock and stamp the plan for submission, off one Adobe load.
 
-    The same subscriptions load serves the path lock, the full offer ids and —
-    on the early path — the renewed quantities behind the snapshot's deltas,
-    with the plan rejected right here if it asks to take renewed seats back.
+    The same subscriptions load serves the path lock, the full offer ids, the
+    discount codes each subscription already holds (which tell a code-only
+    plan apart from a no-op) and — on the early path — the renewed quantities
+    behind the snapshot's deltas, with the plan rejected right here if it asks
+    to take renewed seats back.
     """
     adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
     require_unlocked_path(renewal_path, coterm_date, adobe_subscriptions)
     plan_subscriptions = _resolve_renewal_offer_ids(plan_subscriptions, adobe_subscriptions)
+    plan_subscriptions = _resolve_current_discount_codes(plan_subscriptions, adobe_subscriptions)
     if renewal_path is RenewalPath.NOW:
         plan_subscriptions = _resolve_renewed_quantities(plan_subscriptions, adobe_subscriptions)
         require_no_renewed_seat_reduction(plan_subscriptions)
@@ -726,6 +735,48 @@ def _resolve_renewed_quantities(
         )
         for plan in plan_subscriptions
     ]
+
+
+def _resolve_current_discount_codes(
+    plan_subscriptions: list[PlanSubscription], adobe_subscriptions: dict[str, object]
+) -> list[PlanSubscription]:
+    """Stamp each plan entry with the discount codes its Adobe subscription already holds.
+
+    The codes are read from ``autoRenewal.flexDiscountCodes``, the ones Adobe
+    applies at the next renewal, so the submission can tell a plan whose only
+    change is a code from one that repeats what is already in place. A
+    renewing subscription that requests codes but is missing from Adobe is
+    rejected: with nothing to compare against, any code would read as new.
+    """
+    codes_by_subscription = {
+        str(subscription_item["subscriptionId"]): _renewal_discount_codes(subscription_item)
+        for subscription_item in _adobe_subscription_items(adobe_subscriptions)
+        if subscription_item.get("subscriptionId")
+    }
+    _require_adobe_subscriptions_for_codes(plan_subscriptions, codes_by_subscription.keys())
+    return [
+        replace(
+            plan,
+            current_flex_discount_codes=codes_by_subscription.get(plan.adobe_subscription_id, ()),
+        )
+        for plan in plan_subscriptions
+    ]
+
+
+def _require_adobe_subscriptions_for_codes(
+    plan_subscriptions: list[PlanSubscription], adobe_subscription_ids: Collection[str]
+) -> None:
+    for plan_subscription in plan_subscriptions:
+        selection = plan_subscription.selection
+        requests_codes = selection.renew and selection.flex_discount_codes
+        if requests_codes and plan_subscription.adobe_subscription_id not in adobe_subscription_ids:
+            logger.warning("Subscription %s is missing from the Adobe subscriptions", selection.id)
+            raise ValidationError(detail=f"Subscription {selection.id} was not found in Adobe.")
+
+
+def _renewal_discount_codes(subscription_item: dict[str, Any]) -> tuple[str, ...]:
+    auto_renewal = subscription_item.get("autoRenewal") or {}
+    return tuple(str(code) for code in auto_renewal.get("flexDiscountCodes") or ())
 
 
 def _adobe_subscription_items(adobe_subscriptions: dict[str, object]) -> list[dict[str, Any]]:
