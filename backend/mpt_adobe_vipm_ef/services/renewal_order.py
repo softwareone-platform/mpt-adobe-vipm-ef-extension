@@ -127,7 +127,7 @@ async def create_renewal_configuration_order(
     agreement_id: str,
     subscriptions: list[Line],
     request: RenewalOrderRequest,
-    renewal_payload: RenewalPayload | None = None,
+    renewal_payload: RenewalPayload,
 ) -> dict[str, Any]:
     """Create the AutoRenew-only configuration order on the marketplace.
 
@@ -136,26 +136,23 @@ async def create_renewal_configuration_order(
     delta, so such a plan is submitted as a Configuration order instead,
     carrying only the subscriptions whose renew decision actually changed.
 
-    ``renewal_payload`` is attached — on the Configuration context's own
-    ``renewalPayload`` parameter, a parameter definition being bound to one
-    order context — only on the early-renewal ("Renew now") path, where the
-    plan is executed against Adobe immediately and fulfilment therefore needs
-    the snapshot. At the anniversary nothing is executed now and the standing
-    AutoRenew preferences the order itself carries are the whole plan, so no
-    payload rides along.
+    ``renewal_payload`` is always attached, on the Configuration context's own
+    ``renewalPayload`` parameter (a parameter definition is bound to one order
+    context). The subscriptions the order carries set only the AutoRenew flags;
+    the plan's discount codes, renewal quantities and recommendation tracker id
+    reach fulfilment through the snapshot alone, on either renewal path.
     """
     order_payload: dict[str, Any] = {
         "status": PROCESSING_ORDER_STATUS,
         "type": CONFIGURATION_ORDER_TYPE,
         "agreement": {"id": agreement_id},
         "subscriptions": subscriptions,
-    }
-    if renewal_payload is not None:
-        order_payload["parameters"] = {
+        "parameters": {
             "ordering": [
                 {"externalId": RENEWAL_PAYLOAD_PARAM, "value": renewal_payload.to_dict()},
             ],
-        }
+        },
+    }
     return await _create_renewal_order(
         client, order_payload, agreement_id, request, "configuration"
     )

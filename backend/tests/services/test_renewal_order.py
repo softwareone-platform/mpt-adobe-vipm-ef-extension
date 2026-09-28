@@ -241,37 +241,20 @@ async def test_create_renewal_change_order_carries_the_customer_details(mocker, 
     assert call_args[0]["externalIds"] == {"client": "234234234"}
 
 
-async def test_create_renewal_configuration_order_creates_in_processing_status(
-    mocker, orders_service
+@pytest.mark.parametrize("renewal_path", ["anniversary", "now"])
+async def test_create_renewal_configuration_order_creates_in_processing_status_with_the_payload(
+    mocker, orders_service, renewal_path
 ):
     client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
-    request = _request(subscriptions=[_selection(renew=False)])
-    subscriptions = [{"id": _SUBSCRIPTION_ID, "AutoRenew": False, "lines": []}]
-
-    result = await create_renewal_configuration_order(client, _AGREEMENT_ID, subscriptions, request)
-
-    assert result == {"id": "ORD-0001", "status": "Processing"}
-    orders_service.create.assert_awaited_once_with({
-        "status": "Processing",
-        "type": "Configuration",
-        "agreement": {"id": _AGREEMENT_ID},
-        "subscriptions": subscriptions,
-    })
-    orders_service.process.assert_not_awaited()
-
-
-async def test_create_renewal_configuration_order_carries_the_early_renewal_payload(
-    mocker, orders_service
-):
-    client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
-    request = _request(subscriptions=[_selection(renew=False)], renewalPath="now")
+    request = _request(subscriptions=[_selection(renew=False)], renewalPath=renewal_path)
     renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
     subscriptions = [{"id": _SUBSCRIPTION_ID, "AutoRenew": False, "lines": []}]
 
-    await create_renewal_configuration_order(
+    result = await create_renewal_configuration_order(
         client, _AGREEMENT_ID, subscriptions, request, renewal_payload
     )
 
+    assert result == {"id": "ORD-0001", "status": "Processing"}
     orders_service.create.assert_awaited_once_with({
         "status": "Processing",
         "type": "Configuration",
@@ -281,6 +264,7 @@ async def test_create_renewal_configuration_order_carries_the_early_renewal_payl
             "ordering": [{"externalId": "renewalPayload", "value": renewal_payload.to_dict()}],
         },
     })
+    orders_service.process.assert_not_awaited()
 
 
 async def test_create_renewal_configuration_order_carries_the_customer_details(
@@ -293,9 +277,12 @@ async def test_create_renewal_configuration_order_carries_the_customer_details(
         externalIds={"client": "234234234"},
     )
 
-    await create_renewal_configuration_order(client, _AGREEMENT_ID, [], request)  # act
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+
+    await create_renewal_configuration_order(  # act
+        client, _AGREEMENT_ID, [], request, renewal_payload
+    )
 
     call_args, _kwargs = orders_service.create.await_args
     assert call_args[0]["notes"] == "AutoRenew opt-out"
     assert call_args[0]["externalIds"] == {"client": "234234234"}
-    assert "parameters" not in call_args[0]
