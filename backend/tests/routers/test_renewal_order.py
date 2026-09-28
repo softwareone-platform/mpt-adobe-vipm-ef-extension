@@ -418,7 +418,13 @@ async def test_create_renewal_order_rejects_an_anniversary_plan_once_the_path_is
     """An early renewal has rolled the anniversary, so it can no longer be renewed at."""
     adobe_call.returns = {
         "cotermDate": "2027-08-20",
-        "items": [{"subscriptionId": _ADOBE_SUBSCRIPTION_ID, "renewalDate": _COTERM_IN_WINDOW}],
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "status": "1000",
+                "renewalDate": _COTERM_IN_WINDOW,
+            },
+        ],
     }
 
     with pytest.raises(ValidationError, match="already moved the anniversary date forward"):

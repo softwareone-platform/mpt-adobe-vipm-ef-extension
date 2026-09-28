@@ -30,7 +30,7 @@ def staged_subscriptions():
                 "status": "1000",
                 "renewalDate": "2026-08-01",
                 "currentQuantity": 10,
-                "autoRenewal": {"enabled": True, "renewalQuantity": 8},
+                "autoRenewal": {"enabled": True, "renewalQuantity": 12},
             },
         ],
     }
@@ -111,12 +111,69 @@ def test_locked_path_when_preferences_are_staged(staged_subscriptions):
     assert result is RenewalPath.ANNIVERSARY
 
 
-def test_locked_path_when_a_subscription_is_set_to_lapse(adobe_subscriptions):
+def test_no_locked_path_when_a_subscription_is_set_to_lapse(adobe_subscriptions):
     adobe_subscriptions["items"][0]["autoRenewal"] = {"enabled": False}
 
     result = resolve_locked_path("2026-08-01", adobe_subscriptions)
 
-    assert result is RenewalPath.ANNIVERSARY
+    assert result is None
+
+
+def test_no_locked_path_when_a_subscription_renews_fewer_seats(staged_subscriptions):
+    staged_subscriptions["items"][0]["autoRenewal"]["renewalQuantity"] = 8
+
+    result = resolve_locked_path("2026-08-01", staged_subscriptions)
+
+    assert result is None
+
+
+def test_no_now_lock_from_an_inactive_subscription_renewal_date(adobe_subscriptions):
+    adobe_subscriptions["items"].append(
+        {"subscriptionId": "a-sub-old", "status": "1004", "renewalDate": "2024-08-01"},
+    )
+
+    result = resolve_locked_path("2026-08-01", adobe_subscriptions)
+
+    assert result is None
+
+
+@pytest.mark.parametrize(
+    ("auto_renewal_enabled", "expected"),
+    [
+        (True, RenewalPath.ANNIVERSARY),
+        (False, None),
+    ],
+)
+def test_locked_path_from_a_scheduled_subscription(
+    adobe_subscriptions, auto_renewal_enabled, expected
+):
+    adobe_subscriptions["items"].append({
+        "subscriptionId": "a-sub-new",
+        "status": "1009",
+        "renewalDate": "2026-08-01",
+        "currentQuantity": 0,
+        "autoRenewal": {"enabled": auto_renewal_enabled, "renewalQuantity": 5},
+    })
+
+    result = resolve_locked_path("2026-08-01", adobe_subscriptions)
+
+    assert result is expected
+
+
+def test_no_locked_path_when_an_upsized_subscription_is_set_to_lapse(staged_subscriptions):
+    staged_subscriptions["items"][0]["autoRenewal"]["enabled"] = False
+
+    result = resolve_locked_path("2026-08-01", staged_subscriptions)
+
+    assert result is None
+
+
+def test_staged_preferences_ignored_off_the_anniversary(staged_subscriptions):
+    staged_subscriptions["items"][0]["renewalDate"] = "2026-09-15"
+
+    result = resolve_locked_path("2026-08-01", staged_subscriptions)
+
+    assert result is None
 
 
 def test_no_locked_path_when_preferences_repeat_the_holding(adobe_subscriptions):
