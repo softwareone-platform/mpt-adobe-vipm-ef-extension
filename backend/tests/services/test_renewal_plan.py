@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 from mpt_extension_sdk.api import UpstreamServiceError, ValidationError
 from mpt_extension_sdk.models import Subscription
@@ -10,7 +12,9 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     PlanSubscription,
     build_preview_renewal_line_items,
     build_renewal_payload,
+    has_discount_code_change,
     has_renewed_removal,
+    require_discount_code_change,
     require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
@@ -437,6 +441,77 @@ def test_require_renewal_changes_rejects_a_pure_no_op_plan():
 
     with pytest.raises(ValidationError, match="no changes to submit"):
         require_renewal_changes(request, _plan(request, auto_renew=True), [])
+
+
+def test_require_renewal_changes_defers_a_code_only_plan():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])]
+    )
+
+    require_renewal_changes(request, _plan(request, auto_renew=True), [])  # act
+
+
+def test_require_discount_code_change_accepts_a_new_code():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])]
+    )
+
+    require_discount_code_change(request, _plan(request, auto_renew=True), [])  # act
+
+
+def test_require_discount_code_change_rejects_a_code_already_held():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])]
+    )
+    plan = [
+        replace(plan_subscription, current_flex_discount_codes=("CODE-1",))
+        for plan_subscription in _plan(request, auto_renew=True)
+    ]
+
+    with pytest.raises(ValidationError, match="no changes to submit"):
+        require_discount_code_change(request, plan, [])
+
+
+def test_require_discount_code_change_accepts_a_plan_with_another_change():
+    selection = _selection(quantity=_CURRENT_QUANTITY + 1, codes=["CODE-1"])
+    request = _request(subscriptions=[selection])
+    plan = [
+        replace(plan_subscription, current_flex_discount_codes=("CODE-1",))
+        for plan_subscription in _plan(request)
+    ]
+
+    require_discount_code_change(request, plan, [])  # act
+
+
+def test_require_discount_code_change_accepts_an_early_renewal():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY)],
+        renewalPath="now",
+    )
+
+    require_discount_code_change(request, _plan(request, auto_renew=True), [])  # act
+
+
+@pytest.mark.parametrize(
+    ("renew", "codes", "held", "expected"),
+    [
+        (True, ["CODE-1"], (), True),
+        (True, ["CODE-2"], ("CODE-1",), True),
+        (True, ["CODE-1"], ("CODE-1",), False),
+        (True, [], ("CODE-1",), False),
+        (False, ["CODE-1"], (), False),
+    ],
+)
+def test_has_discount_code_change(renew, codes, held, expected):
+    request = _request(subscriptions=[_selection(renew=renew, codes=codes)])
+    plan = [
+        replace(plan_subscription, current_flex_discount_codes=held)
+        for plan_subscription in _plan(request)
+    ]
+
+    result = has_discount_code_change(plan)
+
+    assert result is expected
 
 
 def test_require_renewal_changes_accepts_an_unchanged_early_renewal():
