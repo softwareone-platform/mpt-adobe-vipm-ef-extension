@@ -167,6 +167,30 @@ describe('buildRenewalPlanRequest', () => {
     expect(plan.netNewItems[0].flexDiscountCodes).toEqual(['CODE-NET-NEW']);
   });
 
+  it('marks a renewing line whose code the customer removed', () => {
+    const plan = buildRenewalPlanRequest(
+      subscriptions,
+      { 'SUB-2': false },
+      {},
+      [],
+      'anniversary',
+      // Undo leaves an empty selection; a line never touched has none.
+      { 'SUB-1': '', 'SUB-2': '' },
+    );
+
+    expect(plan.subscriptions[0]).toMatchObject({ flexDiscountCodes: [], clearFlexDiscountCodes: true });
+    expect(plan.subscriptions[1]).not.toHaveProperty('clearFlexDiscountCodes');
+  });
+
+  it('does not mark a line the customer never touched', () => {
+    const plan = buildRenewalPlanRequest(subscriptions, {}, {}, [], 'anniversary', {
+      'SUB-1': 'CODE-ONE',
+    });
+
+    expect(plan.subscriptions[0]).not.toHaveProperty('clearFlexDiscountCodes');
+    expect(plan.subscriptions[1]).not.toHaveProperty('clearFlexDiscountCodes');
+  });
+
   it('keeps a code off a lapsing subscription', () => {
     const plan = buildRenewalPlanRequest(subscriptions, { 'SUB-1': false }, {}, [], 'anniversary', {
       'SUB-1': 'CODE-ONE',

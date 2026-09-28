@@ -43,6 +43,9 @@ class RenewalSubscriptionSelection(BaseSchema):
     ``flexDiscountCodes`` are the flexible discount codes the customer applied
     to this subscription's line on the Promotions step — codes are picked per
     line, so they ride the selection they belong to rather than the plan.
+    ``clearFlexDiscountCodes`` marks a line whose code the customer removed
+    (Undo): an empty ``flexDiscountCodes`` alone means "no code chosen", which
+    leaves the codes the subscription holds untouched.
     """
 
     id: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
@@ -50,6 +53,7 @@ class RenewalSubscriptionSelection(BaseSchema):
     renew: bool
     renewal_quantity: int = Field(default=0, ge=0, alias="renewalQuantity")
     flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
+    clear_flex_discount_codes: bool = Field(default=False, alias="clearFlexDiscountCodes")
 
     @model_validator(mode="after")
     def _require_a_renewal_quantity_when_renewing(self) -> Self:
@@ -153,7 +157,9 @@ class RenewalPayloadSubscription(APIBaseModel):
     order was placed (always zero at the anniversary): on a removed
     subscription (``renew`` off) a positive value is the customer taking back
     an early renewal placed by mistake, which fulfilment executes as a RETURN
-    order of those seats instead of a plain lapse.
+    order of those seats instead of a plain lapse. ``clearFlexDiscountCodes``
+    tells fulfilment the customer removed the line's code in the wizard, so the
+    codes stored on the subscription are cleared rather than left untouched.
     """
 
     subscription_id: str = Field(alias="subscriptionId")
@@ -162,6 +168,7 @@ class RenewalPayloadSubscription(APIBaseModel):
     renewal_quantity: int = Field(alias="renewalQuantity")
     renewed_quantity: int = Field(default=0, alias="renewedQuantity")
     flex_discount_codes: list[str] = Field(default_factory=list, alias="flexDiscountCodes")
+    clear_flex_discount_codes: bool = Field(default=False, alias="clearFlexDiscountCodes")
 
 
 class RenewalPayloadNetNewItem(APIBaseModel):
