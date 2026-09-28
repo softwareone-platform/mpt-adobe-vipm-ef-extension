@@ -453,7 +453,7 @@ export default function App() {
           onActiveStepIndexChange={changeStep}
           onClose={onClose}
           onSave={viewOrder}
-          isToDisableSideNavigation={Boolean(order?.id)}
+          isToDisableSideNavigation
         >
           <Wizard.Header>
             {t('Renewal:Header', { product: agreement.product?.name ?? '' })}
