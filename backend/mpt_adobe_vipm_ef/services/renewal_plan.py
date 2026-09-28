@@ -101,13 +101,14 @@ def require_renewal_changes(
     At the anniversary the order *is* the plan, so it has to carry something:
     a renewing subscription's renewal quantity that differs from its current
     quantity, a net-new product, a renew decision that differs from the
-    standing AutoRenew preference, or a discount code. A plan with none of
-    these is a pure no-op the wizard should never have let through.
+    standing AutoRenew preference, a discount code, or a removed code (Undo).
+    A plan with none of these is a pure no-op the wizard should never have let
+    through.
 
-    Whether a requested code actually differs from the one Adobe already holds
-    is only known once the customer's Adobe subscriptions are loaded, so a plan
-    whose only candidate change is a code passes here and is settled by
-    ``require_discount_code_change`` at submission.
+    Whether a requested or removed code actually differs from what Adobe
+    already holds is only known once the customer's Adobe subscriptions are
+    loaded, so a plan whose only candidate change is a code passes here and is
+    settled by ``require_discount_code_change`` at submission.
 
     An early renewal ("Renew now") is never a no-op: renewing before the
     anniversary is itself the change the customer asked for, and fulfilment
@@ -119,7 +120,9 @@ def require_renewal_changes(
     if request.renewal_path is RenewalPath.NOW:
         return
     requests_codes = any(
-        plan.selection.renew and plan.selection.flex_discount_codes for plan in plan_subscriptions
+        plan.selection.renew
+        and (plan.selection.flex_discount_codes or plan.selection.clear_flex_discount_codes)
+        for plan in plan_subscriptions
     )
     if not (_has_order_change(plan_subscriptions, net_new_lines) or requests_codes):
         raise ValidationError(
@@ -137,9 +140,10 @@ def require_discount_code_change(
     Runs once the plan carries each subscription's current Adobe codes
     (``current_flex_discount_codes``). When nothing else changes, at least one
     renewing subscription must request a code set different from the one it
-    already holds; otherwise the plan is a no-op after all. The comparison
-    matches fulfilment's: an empty request leaves the stored codes untouched,
-    so it is never a change.
+    already holds, or remove (Undo) codes it holds; otherwise the plan is a
+    no-op after all. The comparison matches fulfilment's: an empty request
+    without a removal leaves the stored codes untouched, so it is never a
+    change.
     """
     if request.renewal_path is RenewalPath.NOW:
         return
@@ -152,13 +156,17 @@ def require_discount_code_change(
 
 
 def has_discount_code_change(plan_subscriptions: list[PlanSubscription]) -> bool:
-    """Whether a renewing subscription requests codes other than those it already holds."""
+    """Whether a renewing subscription changes the codes it holds: new codes, or a removal."""
     return any(
-        plan.selection.renew
-        and plan.selection.flex_discount_codes
-        and set(plan.selection.flex_discount_codes) != set(plan.current_flex_discount_codes)
-        for plan in plan_subscriptions
+        plan.selection.renew and _changes_discount_codes(plan) for plan in plan_subscriptions
     )
+
+
+def _changes_discount_codes(plan: PlanSubscription) -> bool:
+    requested = set(plan.selection.flex_discount_codes)
+    if requested:
+        return requested != set(plan.current_flex_discount_codes)
+    return plan.selection.clear_flex_discount_codes and bool(plan.current_flex_discount_codes)
 
 
 def _has_order_change(
@@ -373,7 +381,8 @@ def build_renewal_payload(
     and that baseline is what tells fulfilment to execute the removal as a
     RETURN order — and how large it is — rather than as a plain lapse.
     Each renewing entry rides only the flexible discount codes the customer
-    applied to that line, matching Adobe's auto-renewal preference object; a
+    applied to that line, matching Adobe's auto-renewal preference object, and
+    ``clearFlexDiscountCodes`` when the customer removed the line's code; a
     net-new entry carries its own codes the same way, so fulfilment applies
     each code to the line it was picked for and nothing else. The net-new
     products carry their full offer ids (resolved from the Airtable SKU
@@ -393,6 +402,11 @@ def build_renewal_payload(
                 "renewedQuantity": plan.renewed_quantity,
                 "flexDiscountCodes": (
                     list(plan.selection.flex_discount_codes) if plan.selection.renew else []
+                ),
+                "clearFlexDiscountCodes": (
+                    plan.selection.renew
+                    and plan.selection.clear_flex_discount_codes
+                    and not plan.selection.flex_discount_codes
                 ),
             }
             for plan in plan_subscriptions

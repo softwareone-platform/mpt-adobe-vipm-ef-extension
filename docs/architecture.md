@@ -123,7 +123,8 @@ frontend/                    TypeScript plug UI (esbuild)
     fully-renewed line can carry. The
     submit route repeats every gate and creates the
     change order carrying the plan snapshot (the renewal path, renew decisions,
-    quantities, discount codes and the recommendation tracker id) on the hidden
+    quantities, discount codes, a per-line flag marking a held code the
+    customer removed with Undo, and the recommendation tracker id) on the hidden
     `renewalPayload` order parameter, the discriminator fulfilment reads to pick
     the execution flow. A plan that moves no quantity and adds no net-new
     product cannot be a change order, so it is submitted as a configuration
