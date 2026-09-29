@@ -14,7 +14,11 @@ from mpt_extension_sdk.models import Agreement, Subscription
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import CUSTOMER_ID_PARAM
 from mpt_adobe_vipm_ef.models.switch import UpgradeOrderRequest
-from mpt_adobe_vipm_ef.routers.api.upgrade import create_upgrade_order
+from mpt_adobe_vipm_ef.routers.api.upgrade import (
+    create_upgrade_order,
+    get_upgrade_renewal_in_place,
+)
+from mpt_adobe_vipm_ef.services.renewal_in_place import RenewalInPlace
 from mpt_adobe_vipm_ef.services.switch_order import ExistingTargetLine
 
 _AGREEMENT_ID = "AGR-1234-5678"
@@ -81,6 +85,12 @@ def _body(quantity=6, tracker_id="TRACKER-1", notes="", client_external_id=""):
     })
 
 
+_RENEWALS_IN_PLACE = (
+    (RenewalInPlace.EARLY, "An early renewal has already been placed"),
+    (RenewalInPlace.STAGED, "A renewal has been staged"),
+)
+
+
 @pytest.fixture
 def upgrade_agreement(patch_agreement):
     return patch_agreement(Agreement.from_payload(_agreement_payload()))
@@ -130,6 +140,15 @@ def create_order_mock(mocker):
 
 
 @pytest.fixture
+def renewal_in_place(mocker):
+    """Patch the renewal-in-place read, no renewal in place by default."""
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.upgrade.load_renewal_in_place",
+        mocker.AsyncMock(return_value=None),
+    )
+
+
+@pytest.fixture
 def submit_deps(  # noqa: WPS211
     upgrade_agreement,
     source_subscription,
@@ -137,6 +156,7 @@ def submit_deps(  # noqa: WPS211
     existing_target_line,
     caller_client,
     create_order_mock,
+    renewal_in_place,
 ):
     """Bundle the happy-path collaborators for the submit endpoint."""
 
@@ -391,3 +411,43 @@ async def test_create_upgrade_order_raises_forbidden_when_product_not_allowed(
 
     with pytest.raises(ForbiddenError):
         await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+
+@pytest.mark.parametrize(("in_place", "detail"), _RENEWALS_IN_PLACE)
+async def test_create_upgrade_order_refuses_while_a_renewal_is_in_place(  # noqa: WPS211
+    fake_ctx, submit_deps, renewal_in_place, create_order_mock, adobe_call, in_place, detail
+):
+    renewal_in_place.return_value = in_place
+
+    with pytest.raises(ValidationError, match=detail):
+        await create_upgrade_order(_AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _body(6))
+
+    renewal_in_place.assert_awaited_once_with(fake_ctx, "AUT-123", "CUST-001")
+    assert not adobe_call.calls
+    create_order_mock.assert_not_awaited()
+
+
+@pytest.mark.parametrize("in_place", [RenewalInPlace.EARLY, RenewalInPlace.STAGED, None])
+async def test_get_upgrade_renewal_in_place_reports_the_renewal(
+    fake_ctx, upgrade_agreement, renewal_in_place, in_place
+):
+    renewal_in_place.return_value = in_place
+
+    expected = in_place.value if in_place else None
+
+    result = await get_upgrade_renewal_in_place(_AGREEMENT_ID, fake_ctx)
+
+    assert result.status_code == http.HTTPStatus.OK
+    assert result.payload == {"renewalInPlace": expected}
+
+
+@pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])
+async def test_get_upgrade_renewal_in_place_rejects_non_client_account(
+    fake_ctx, upgrade_agreement, renewal_in_place, auth_context_factory, account_type
+):
+    fake_ctx.auth = auth_context_factory(account_type)
+
+    with pytest.raises(ForbiddenError):
+        await get_upgrade_renewal_in_place(_AGREEMENT_ID, fake_ctx)
+
+    renewal_in_place.assert_not_awaited()

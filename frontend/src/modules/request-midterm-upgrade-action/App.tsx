@@ -15,6 +15,7 @@ import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
 import { useUpgradeOrderRequest } from '../shared/hooks/useUpgradeOrderRequest';
+import { useUpgradeRenewalInPlace } from '../shared/hooks/useUpgradeRenewalInPlace';
 import { getPlaceOrderValidationError } from './placeOrderValidation';
 import { Wizard } from '@softwareone-platform/sdk-react-ui-v0/wizard';
 import type { StepProps } from '@softwareone-platform/sdk-react-ui-v0/wizard';
@@ -67,6 +68,10 @@ export default function App() {
     sourceSku,
     sourceQuantity,
   );
+  // A renewal in place owns the subscriptions an upgrade would move, so the
+  // wizard stops on its first step until the check answers that there is none.
+  const renewalCheck = useUpgradeRenewalInPlace(subscription?.agreement?.id ?? '');
+  const isBlockedByRenewal = renewalCheck.status !== 'success' || renewalCheck.data !== null;
   const hasSplit = subscription?.splitStatus === 'Active';
   const split = subscription?.split ?? null;
   const agreementSplit = subscription?.agreement?.split ?? null;
@@ -292,7 +297,14 @@ export default function App() {
   const wizardSteps: (StepProps & { render: () => ReactNode })[] = [
     {
       title: t('MidtermUpgrade:Steps:Upgrade from'),
-      render: () => <UpgradeFromStep subscription={subscription} />,
+      nextButton: { isDisabled: isBlockedByRenewal },
+      render: () => (
+        <UpgradeFromStep
+          subscription={subscription}
+          renewalInPlace={renewalCheck.data}
+          renewalCheckError={renewalCheck.error}
+        />
+      ),
     },
     {
       title: t('MidtermUpgrade:Steps:Upgrade to'),

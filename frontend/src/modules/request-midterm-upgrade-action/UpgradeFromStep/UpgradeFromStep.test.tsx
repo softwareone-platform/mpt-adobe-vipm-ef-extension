@@ -36,4 +36,32 @@ describe('UpgradeFromStep', () => {
 
     expect(getByText(/These estimated prices/)).toBeTruthy();
   });
+
+  it.each([
+    ['early', /early renewal has already been placed/],
+    ['staged', /renewal has been set up/],
+  ] as const)('explains a %s renewal in place', (renewalInPlace, message) => {
+    const { getByTestId } = render(
+      <UpgradeFromStep subscription={{ id: 'SUB-1' }} renewalInPlace={renewalInPlace} />,
+    );
+
+    expect(getByTestId('upgrade-from-step-renewal-in-place').textContent).toMatch(message);
+  });
+
+  it('shows no renewal notice when none is in place', () => {
+    const { queryByTestId } = render(<UpgradeFromStep subscription={{ id: 'SUB-1' }} />);
+
+    expect(queryByTestId('upgrade-from-step-renewal-in-place')).toBeNull();
+    expect(queryByTestId('upgrade-from-step-renewal-check-error')).toBeNull();
+  });
+
+  it('shows a failed renewal check', () => {
+    const { getByTestId } = render(
+      <UpgradeFromStep subscription={{ id: 'SUB-1' }} renewalCheckError="Adobe service request failed" />,
+    );
+
+    expect(getByTestId('upgrade-from-step-renewal-check-error').textContent).toBe(
+      'Adobe service request failed',
+    );
+  });
 });
