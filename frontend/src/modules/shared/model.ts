@@ -359,6 +359,8 @@ export interface Order {
  *
  * ``flexDiscountCodes`` are the codes the customer applied to this line on the
  * Promotions step: codes are picked per line, so each selection carries its own.
+ * ``clearFlexDiscountCodes`` marks a line whose code the customer removed (Undo),
+ * so the codes stored on the subscription are cleared, not left untouched.
  */
 export interface RenewalPlanSubscriptionSelection {
   id: string;
@@ -366,6 +368,7 @@ export interface RenewalPlanSubscriptionSelection {
   renew: boolean;
   renewalQuantity: number;
   flexDiscountCodes?: string[];
+  clearFlexDiscountCodes?: boolean;
 }
 
 /** A net-new product selection as the renewal endpoints expect it. */

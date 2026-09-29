@@ -322,6 +322,24 @@ function getLineDiscountCodes(
 }
 
 /**
+ * Whether the customer removed the line's code on the Promotions step (Undo).
+ *
+ * Undo leaves the line's selection empty, while a line the customer never
+ * touched has no selection at all. Only the first tells fulfilment to clear the
+ * codes stored on the subscription; the second leaves them as they are.
+ */
+function isLineDiscountCleared(
+  discountSelections: DiscountSelections | undefined,
+  rowId: string,
+): boolean {
+  return (
+    discountSelections !== undefined &&
+    rowId in discountSelections &&
+    getLineDiscountCodes(discountSelections, rowId).length === 0
+  );
+}
+
+/**
  * The eligible inherited code the customer holds for each renewing line's SKU.
  *
  * Adobe's automated preview resolves which reusable auto-applies to a line
@@ -387,6 +405,8 @@ export function findDiscountByCode(code: string, discounts: Discount[]): Discoun
  * to it on the Promotions step, so a code only ever reaches the line it was
  * picked for; the steps before Promotions build the plan without it. A
  * lapsing subscription never carries a code — there is no line to apply it to.
+ * A renewing line whose code the customer removed carries
+ * ``clearFlexDiscountCodes`` instead.
  */
 export function buildRenewalPlanRequest(
   subscriptions: Subscription[],
@@ -409,6 +429,9 @@ export function buildRenewalPlanRequest(
           renew,
           renewalQuantity: renew ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0,
           flexDiscountCodes: renew ? getLineDiscountCodes(discountSelections, subscription.id) : [],
+          ...(renew && isLineDiscountCleared(discountSelections, subscription.id)
+            ? { clearFlexDiscountCodes: true }
+            : {}),
         },
       ];
     }),

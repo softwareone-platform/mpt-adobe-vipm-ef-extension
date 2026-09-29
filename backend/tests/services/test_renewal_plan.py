@@ -40,13 +40,16 @@ def _request(subscriptions=None, net_new_items=None, **extra):  # noqa: WPS432
     })
 
 
-def _selection(*, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID, codes=None):  # noqa: WPS432
+def _selection(  # noqa: WPS432
+    *, renew=True, quantity=7, subscription_id=_SUBSCRIPTION_ID, codes=None, clear=False
+):
     return {
         "id": subscription_id,
         "offerId": _OFFER_ID,
         "renew": renew,
         "renewalQuantity": quantity,
         "flexDiscountCodes": [] if codes is None else codes,
+        "clearFlexDiscountCodes": clear,
     }
 
 
@@ -259,6 +262,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "renewalQuantity": 7,
                 "renewedQuantity": 0,
                 "flexDiscountCodes": ["BLACK_FRIDAY"],
+                "clearFlexDiscountCodes": False,
             },
             {
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
@@ -267,6 +271,7 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
                 "renewalQuantity": 0,
                 "renewedQuantity": 0,
                 "flexDiscountCodes": [],
+                "clearFlexDiscountCodes": False,
             },
         ],
         "netNewItems": [
@@ -287,6 +292,25 @@ def test_build_renewal_payload_keeps_codes_off_lapsing_subscriptions():
     result = build_renewal_payload(_plan(request), [], request, "USD")
 
     assert result.subscriptions[0].flex_discount_codes == []
+
+
+def test_build_renewal_payload_snapshots_a_removed_code():
+    request = _request(
+        subscriptions=[
+            _selection(clear=True),
+            # A code chosen again after Undo wins; a lapsing line has nothing to clear.
+            _selection(codes=["CODE-1"], clear=True, subscription_id="SUB-9999-0001"),
+            _selection(renew=False, quantity=0, clear=True, subscription_id="SUB-9999-0002"),
+        ],
+    )
+
+    result = build_renewal_payload(_plan(request), [], request, "USD")
+
+    assert [entry.clear_flex_discount_codes for entry in result.subscriptions] == [
+        True,
+        False,
+        False,
+    ]
 
 
 def test_build_renewal_payload_defaults_the_optional_fields():
@@ -451,6 +475,26 @@ def test_require_renewal_changes_defers_a_code_only_plan():
     require_renewal_changes(request, _plan(request, auto_renew=True), [])  # act
 
 
+def test_require_renewal_changes_defers_a_removal_only_plan():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, clear=True)]
+    )
+
+    require_renewal_changes(request, _plan(request, auto_renew=True), [])  # act
+
+
+def test_require_discount_code_change_accepts_removing_a_held_code():
+    request = _request(
+        subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, clear=True)]
+    )
+    plan = [
+        replace(plan_subscription, current_flex_discount_codes=("CODE-1",))
+        for plan_subscription in _plan(request, auto_renew=True)
+    ]
+
+    require_discount_code_change(request, plan, [])  # act
+
+
 def test_require_discount_code_change_accepts_a_new_code():
     request = _request(
         subscriptions=[_selection(renew=True, quantity=_CURRENT_QUANTITY, codes=["CODE-1"])]
@@ -493,17 +537,21 @@ def test_require_discount_code_change_accepts_an_early_renewal():
 
 
 @pytest.mark.parametrize(
-    ("renew", "codes", "held", "expected"),
+    ("selection", "held", "expected"),
     [
-        (True, ["CODE-1"], (), True),
-        (True, ["CODE-2"], ("CODE-1",), True),
-        (True, ["CODE-1"], ("CODE-1",), False),
-        (True, [], ("CODE-1",), False),
-        (False, ["CODE-1"], (), False),
+        ({"codes": ["CODE-1"]}, (), True),
+        ({"codes": ["CODE-2"]}, ("CODE-1",), True),
+        ({"codes": ["CODE-1"]}, ("CODE-1",), False),
+        ({"codes": []}, ("CODE-1",), False),
+        ({"renew": False, "codes": ["CODE-1"]}, (), False),
+        # Undo of a held code is a change; Undo with nothing held is not.
+        ({"clear": True}, ("CODE-1",), True),
+        ({"clear": True}, (), False),
+        ({"renew": False, "clear": True}, ("CODE-1",), False),
     ],
 )
-def test_has_discount_code_change(renew, codes, held, expected):
-    request = _request(subscriptions=[_selection(renew=renew, codes=codes)])
+def test_has_discount_code_change(selection, held, expected):
+    request = _request(subscriptions=[_selection(**selection)])
     plan = [
         replace(plan_subscription, current_flex_discount_codes=held)
         for plan_subscription in _plan(request)
