@@ -1306,17 +1306,23 @@ async def test_get_renewal_path_state_rejects_non_client_account(
 async def test_preview_renewal_plan_returns_the_adobe_quote(
     fake_ctx, renewal_agreement, renewing_subscription, adobe_call
 ):
-    adobe_call.returns = {"lineItems": [{"extLineItemNumber": 1, "pricing": {}}]}
+    quote = {
+        "lineItems": [
+            {
+                "extLineItemNumber": 1,
+                "pricing": {},
+                "flexDiscounts": [{"code": "ABCD-XV54-HG34-78YT", "result": "SUCCESS"}],
+            },
+        ],
+    }
+    adobe_call.returns = quote
 
     result = await preview_renewal_plan(
         _AGREEMENT_ID, fake_ctx, _preview_body(codes=["ABCD-XV54-HG34-78YT"])
     )
 
     assert result.status_code == http.HTTPStatus.OK
-    assert result.payload == {
-        "preview": {"lineItems": [{"extLineItemNumber": 1, "pricing": {}}]},
-        "eligibility": {},
-    }
+    assert result.payload == {"preview": quote, "eligibility": {}}
     # calls[0] resolves the full offer id from Adobe's live subscriptions;
     # calls[1] is the PREVIEW_RENEWAL quote itself.
     call_args, _ = adobe_call.calls[1]
@@ -1621,7 +1627,10 @@ async def test_preview_renewal_plan_reports_a_rejected_code_against_its_line(
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["COMMIT15"]))
 
     assert rejection.value.errors == [
-        ErrorDetail(pointer=_ADOBE_SUBSCRIPTION_ID, detail="INELIGIBLE_COMMITMENT_STATUS"),
+        ErrorDetail(
+            pointer=f"{_ADOBE_SUBSCRIPTION_ID}/flexDiscountCodes/COMMIT15",
+            detail="INELIGIBLE_COMMITMENT_STATUS",
+        ),
     ]
 
 
@@ -1676,7 +1685,9 @@ async def test_preview_renewal_plan_reports_a_code_refused_on_a_successful_quote
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["BADCODE"]))
 
     assert rejection.value.errors == [
-        ErrorDetail(pointer=_ADOBE_SUBSCRIPTION_ID, detail="FAILURE"),
+        ErrorDetail(
+            pointer=f"{_ADOBE_SUBSCRIPTION_ID}/flexDiscountCodes/BADCODE", detail="FAILURE"
+        ),
     ]
 
 
@@ -1830,6 +1841,164 @@ async def test_preview_renewal_plan_reports_a_refusal_that_names_no_line(
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["TWOCODES"]))
 
     assert not rejection.value.errors
+
+
+def _answered_line(flex_discounts=None, *, line=1, offer_id=_OFFER_ID, subscription_id=""):
+    """One answered preview line, echoing whatever Adobe chose to echo."""
+    answered = {"extLineItemNumber": line, "offerId": offer_id, "subscriptionId": subscription_id}
+    if flex_discounts is not None:
+        answered["flexDiscounts"] = flex_discounts
+    return answered
+
+
+async def test_preview_renewal_plan_matches_an_answered_line_by_its_number(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Adobe can change the offer level and leave the subscription id empty."""
+    preview_call.answers = [
+        {
+            "lineItems": [
+                _answered_line(
+                    [{"code": "BADCODE", "result": "FAILURE"}], offer_id="65304470CA14A12"
+                ),
+            ],
+        },
+        {"lineItems": [_answered_line(offer_id="65304470CA14A12")]},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["BADCODE"]))
+
+    assert rejection.value.errors == [
+        ErrorDetail(
+            pointer=f"{_ADOBE_SUBSCRIPTION_ID}/flexDiscountCodes/BADCODE", detail="FAILURE"
+        ),
+    ]
+
+
+async def test_preview_renewal_plan_accepts_a_confirmed_code_under_another_offer_level(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.returns = {
+        "lineItems": [
+            _answered_line([{"code": "GOODCODE", "result": "SUCCESS"}], offer_id="65304470CA14A12"),
+        ],
+    }
+
+    result = await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["GOODCODE"]))
+
+    assert result.status_code == http.HTTPStatus.OK
+
+
+@pytest.mark.parametrize(
+    "flex_discounts",
+    [
+        [{"code": "GOODCODE"}],
+        [],
+        None,
+    ],
+)
+async def test_preview_renewal_plan_does_not_count_an_unconfirmed_code_as_applied(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call, flex_discounts
+):
+    """Only an explicit SUCCESS confirms a code; a missing result or entry does not."""
+    preview_call.answers = [
+        {"lineItems": [_answered_line(flex_discounts)]},
+        {"lineItems": [_answered_line()]},
+    ]
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["GOODCODE"]))
+
+    assert rejection.value.errors == [
+        ErrorDetail(pointer=f"{_ADOBE_SUBSCRIPTION_ID}/flexDiscountCodes/GOODCODE", detail=""),
+    ]
+
+
+async def test_preview_renewal_plan_ignores_a_refused_code_the_line_did_not_send(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """A held reusable code Adobe refused is not the customer's choice."""
+    preview_call.returns = {
+        "lineItems": [_answered_line([{"code": "HELD-REUSABLE", "result": "FAILURE"}])],
+    }
+
+    result = await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+    assert result.payload["preview"] == preview_call.returns
+    assert len(preview_call.calls) == 1
+
+
+async def test_preview_renewal_plan_reports_a_refusal_on_a_line_that_sent_no_code(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """Nothing can be dropped, so the walk stops, but the refusal is still reported."""
+    preview_call.error = _flex_error("2141", reason="INELIGIBLE_COMMITMENT_STATUS")
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+    assert rejection.value.errors == [
+        ErrorDetail(pointer=_ADOBE_SUBSCRIPTION_ID, detail="INELIGIBLE_COMMITMENT_STATUS"),
+    ]
+    assert len(preview_call.calls) == 1
+
+
+async def test_preview_renewal_plan_fails_on_a_line_number_it_did_not_send(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.returns = {
+        "lineItems": [_answered_line(), _answered_line(line=2, offer_id=_NET_NEW_OFFER_ID)],
+    }
+
+    with pytest.raises(UpstreamServiceError, match="line 2, which the request did not send"):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
+
+
+async def test_preview_renewal_plan_fails_on_a_conflicting_subscription(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    preview_call.returns = {
+        "lineItems": [
+            _answered_line(
+                [{"code": "GOODCODE", "result": "SUCCESS"}], subscription_id="adobe-sub-other"
+            ),
+        ],
+    }
+
+    with pytest.raises(UpstreamServiceError, match="another subscription"):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body(codes=["GOODCODE"]))
+
+
+@pytest.mark.usefixtures("resolve_net_new_item", "net_new_sku_mapping")
+async def test_preview_renewal_plan_reports_a_new_product_refusal_against_its_row(
+    fake_ctx, renewal_agreement, renewing_subscription, preview_call
+):
+    """The row is the SKU the wizard sent, not the full Adobe offer id on the line."""
+    preview_call.answers = [
+        {
+            "lineItems": [
+                _answered_line(),
+                _answered_line(
+                    [{"code": "NEWCODE", "result": "FAILURE"}],
+                    line=2,
+                    offer_id=_NET_NEW_OFFER_ID,
+                ),
+            ],
+        },
+        {"lineItems": [_answered_line(), _answered_line(line=2, offer_id=_NET_NEW_OFFER_ID)]},
+    ]
+    body = _preview_body(
+        net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5, "flexDiscountCodes": ["NEWCODE"]}],
+        path="now",
+    )
+
+    with pytest.raises(ValidationError) as rejection:
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
+    assert rejection.value.errors == [
+        ErrorDetail(pointer=f"{_NET_NEW_SKU}/flexDiscountCodes/NEWCODE", detail="FAILURE"),
+    ]
 
 
 @pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])

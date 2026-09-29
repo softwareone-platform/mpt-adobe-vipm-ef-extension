@@ -82,6 +82,16 @@ frontend/                    TypeScript plug UI (esbuild)
     empty still previews (as an empty quote) when it carries one. A plan that
     keeps renewing but asks for fewer seats than already renewed is rejected
     on preview and submit alike, since a partial return is not supported.
+    A discount code the customer selected counts as applied only when Adobe
+    answers it with result `SUCCESS` on its line; a missing result is not a
+    confirmation. Answered lines are matched to the request by
+    `extLineItemNumber` (Adobe can change the offer level and leave the
+    subscription id empty), and an answer naming a line that was not sent, or
+    another subscription, fails the preview. Refused codes are dropped and the
+    plan quoted again until every refusal is found; each is reported against
+    its wizard row (the Adobe subscription id, or the SKU the wizard sent for a
+    new product) as `<row>/flexDiscountCodes/<code>`. A discount Adobe reports
+    on a line that did not send it (a held reusable) never blocks the plan.
     `inherited-discounts` reports the reusable discounts the customer already
     holds, per renewing line, so the wizard's discount codes step can pre-fill
     them and auto-apply them without an explicit pick. The set comes from an

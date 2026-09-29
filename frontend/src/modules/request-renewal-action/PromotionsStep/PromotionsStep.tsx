@@ -39,7 +39,7 @@ import type {
   Subscription,
 } from '../../shared/model';
 import { toDiscountErrorMessage } from '../../utils/adobeError';
-import { toRejectionMessage } from '../../utils/discountRejection';
+import { toRejectionMessage, toRejectionTarget } from '../../utils/discountRejection';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { getPartialSku } from '../../utils/sku';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
@@ -424,13 +424,13 @@ export function PromotionsStep({
   const rejectionMessages = useMemo(
     () =>
       (rejectedFields ?? []).map((rejection) => {
-        const row = rejection.pointer
+        const target = toRejectionTarget(rejection.pointer);
+        const row = target.row
           ? rows.find(
-              (candidate) =>
-                candidate.vendorId === rejection.pointer || candidate.id === rejection.pointer,
+              (candidate) => candidate.vendorId === target.row || candidate.id === target.row,
             )
           : undefined;
-        return toRejectionMessage(rejection, row?.itemName ?? '', row?.code ?? '');
+        return toRejectionMessage(rejection, row?.itemName ?? '', target.code || row?.code || '');
       }),
     [rejectedFields, rows],
   );
