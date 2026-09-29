@@ -33,6 +33,23 @@ export function toRejectionReason(reason: string): string {
     : i18n.t('Renewal:Promotions:Rejected:Fallback');
 }
 
+const CODE_SEGMENT = '/flexDiscountCodes/';
+
+/**
+ * Split a rejection's pointer into the row it names and the refused code.
+ *
+ * The backend points a refused code at ``<row>/flexDiscountCodes/<code>``, so
+ * the message can name the code Adobe refused even when the row's own
+ * selection is not what reached Adobe. A pointer without that segment names
+ * only the row.
+ */
+export function toRejectionTarget(pointer: string): { row: string; code: string } {
+  const at = pointer.indexOf(CODE_SEGMENT);
+  return at < 0
+    ? { row: pointer, code: '' }
+    : { row: pointer.slice(0, at), code: pointer.slice(at + CODE_SEGMENT.length) };
+}
+
 /** One rejection line: the code, the row it was applied to, and why it failed. */
 export function toRejectionMessage(rejection: RejectedField, itemName: string, code: string) {
   return i18n.t('Renewal:Promotions:Rejected:Line', {
