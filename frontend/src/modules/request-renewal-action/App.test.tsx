@@ -631,7 +631,18 @@ describe('request-renewal-action App', () => {
     expect(summaryProps).toBeUndefined();
   });
 
-  it('locks the side navigation once the order is placed', async () => {
+  it('never allows side navigation, so only back and next move the wizard', async () => {
+    mockActiveStepIndex = 1;
+    const { rerender } = render(<App />);
+    await waitFor(() => expect(wizardProps.isToDisableSideNavigation).toBe(true));
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    await screen.findByText('Review step');
+    expect(wizardProps.isToDisableSideNavigation).toBe(true);
+  });
+
+  it('keeps the side navigation locked once the order is placed', async () => {
     mockActiveStepIndex = 5;
     mockPost.mockImplementation((url: string) =>
       url === '/api/v2/agreements/AGR-1/renewal-order'
@@ -639,15 +650,13 @@ describe('request-renewal-action App', () => {
         : respondToPost(url),
     );
     render(<App />);
-
     await screen.findByText('Review step');
-    expect(wizardProps.isToDisableSideNavigation).toBe(false);
 
     await act(async () => {
       await reviewProps.onPlaceOrder();
     });
 
-    await waitFor(() => expect(wizardProps.isToDisableSideNavigation).toBe(true));
+    expect(wizardProps.isToDisableSideNavigation).toBe(true);
   });
 
   it('surfaces a rejected renewal order on the review step', async () => {
