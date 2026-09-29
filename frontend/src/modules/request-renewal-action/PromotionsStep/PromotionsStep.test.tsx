@@ -583,6 +583,32 @@ describe('PromotionsStep', () => {
       ]);
     });
 
+    it('names a refused code on a new product against its row', async () => {
+      mockPost.mockRejectedValue({
+        response: {
+          data: {
+            detail: 'Adobe rejected one or more discount codes',
+            errors: [{ pointer: 'OFFER-3/flexDiscountCodes/CODE-THREE', detail: 'NOT_FOUND' }],
+          },
+        },
+      });
+      const { findByTestId } = await renderStep({
+        path: 'now',
+        netNewItems: [NET_NEW_ITEM],
+        discountSelections: { 'ITM-3': 'CODE-THREE' },
+      });
+      await findByTestId('grid');
+
+      await act(async () => {
+        await registeredOnNext!(NAVIGATION);
+      });
+
+      const rejected = await findByTestId('promotions-step-rejected-codes');
+      expect(rejected.querySelector('li')?.textContent).toBe(
+        'CODE-THREE on Item Three: This code is not known to Adobe.',
+      );
+    });
+
     it('falls back to the generic message for a reason it does not know', async () => {
       mockPost.mockRejectedValue({
         response: {
