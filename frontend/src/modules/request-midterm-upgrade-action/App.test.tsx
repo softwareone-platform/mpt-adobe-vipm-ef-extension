@@ -94,12 +94,22 @@ jest.mock('../shared/hooks/useAdobeRecommendation', () => ({
   useAdobeRecommendation: () => mockRecommendation,
 }));
 
+let mockRenewalCheck: { status: string; error: string | null; data: string | null } = {
+  status: 'success',
+  error: null,
+  data: null,
+};
+jest.mock('../shared/hooks/useUpgradeRenewalInPlace', () => ({
+  useUpgradeRenewalInPlace: () => mockRenewalCheck,
+}));
+
 interface MockChildren {
   children?: ReactNode | ((args: { activeStepIndex: number }) => ReactNode);
 }
 interface MockWizardProps extends MockChildren {
   onClose?: () => void;
   isToDisableSideNavigation?: boolean;
+  stepsProps?: { title: string; nextButton?: { isDisabled?: boolean } }[];
 }
 let wizardProps: MockWizardProps;
 
@@ -275,6 +285,28 @@ describe('request-midterm-upgrade-action App', () => {
     mockDiscounts = { status: 'success', error: null, data: [], total: 0, refresh: jest.fn() };
     mockAdobeCustomer = { status: 'success', error: null, data: null, update: jest.fn(), refresh: jest.fn() };
     mockUseAllDiscounts.mockClear();
+    mockRenewalCheck = { status: 'success', error: null, data: null };
+  });
+
+  it('lets the first step continue when no renewal is in place', async () => {
+    render(<App />);
+
+    expect(await screen.findByText('Upgrade from step')).toBeTruthy();
+    expect(wizardProps.stepsProps?.[0].nextButton?.isDisabled).toBe(false);
+  });
+
+  it.each([
+    ['an early renewal is in place', { status: 'success', error: null, data: 'early' }],
+    ['a renewal is staged', { status: 'success', error: null, data: 'staged' }],
+    ['the renewal check is still loading', { status: 'loading', error: null, data: null }],
+    ['the renewal check failed', { status: 'error', error: 'Adobe service request failed', data: null }],
+  ])('stops on the first step when %s', async (_case, renewalCheck) => {
+    mockRenewalCheck = renewalCheck;
+
+    render(<App />);
+
+    expect(await screen.findByText('Upgrade from step')).toBeTruthy();
+    expect(wizardProps.stepsProps?.[0].nextButton?.isDisabled).toBe(true);
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {

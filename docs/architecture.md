@@ -50,7 +50,15 @@ frontend/                    TypeScript plug UI (esbuild)
     render endpoint on the caller's token, so the platform decides who may read
     the order, and decodes the JSON string body that endpoint answers with
   - `api/upgrade.py` — mid-term upgrade order route; restricted to client
-    accounts (non-client callers are rejected with `403`)
+    accounts (non-client callers are rejected with `403`). While a renewal is
+    in place for the agreement — an early renewal pending effect, or a renewal
+    staged for the anniversary — an upgrade would move seats that renewal
+    depends on, so `upgrade-order/renewal-in-place` reports it (`early`,
+    `staged` or `null`) for the wizard's first step, which then stops there,
+    and the submit route refuses the order. The signal
+    (`services/renewal_in_place.py`) mirrors the fulfilment extension's
+    native-order guards rule for rule, so the wizard never lets through an
+    order fulfilment would then fail.
   - `api/renewal.py` — renewal routes; restricted to client accounts. Every
     plan body carries the `renewalPath` the customer picked on the wizard's
     first step (`anniversary`, the default, or `now` for an early renewal),

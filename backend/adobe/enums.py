@@ -14,3 +14,11 @@ class AdobeOrderType(StrEnum):
     SWITCH = "SWITCH"
     PREVIEW_SWITCH = "PREVIEW_SWITCH"
     PREVIEW_RENEWAL = "PREVIEW_RENEWAL"
+    RENEWAL = "RENEWAL"
+
+
+class AdobeOrderStatus(StrEnum):
+    """Adobe order statuses read back from the orders API."""
+
+    COMPLETE = "1000"
+    OPEN = "1002"

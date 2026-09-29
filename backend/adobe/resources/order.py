@@ -134,3 +134,30 @@ class OrderClient:
                 "currencyCode": currency_code,
             },
         )
+
+    @wrap_http_error
+    def list_orders(
+        self, authorization_id: str, customer_id: str, order_type: AdobeOrderType
+    ) -> list[dict[str, Any]]:
+        """Retrieve every order of one type the customer holds, across all pages.
+
+        Adobe pages the order list (100 per page here) and names the next page
+        in ``links.next``; the walk follows it until there is none.
+        """
+        logger.info(
+            "list_orders: customer=%s authorization=%s type=%s",
+            customer_id,
+            authorization_id,
+            order_type.value,
+        )
+        authorization = self._transport.settings.get_authorization(authorization_id)
+        orders: list[dict[str, Any]] = []
+        next_path: str | None = f"/v3/customers/{customer_id}/orders?limit=100&offset=0"
+        while next_path:
+            page = self._transport.request(
+                "GET", authorization, next_path, params={"order-type": order_type.value}
+            )
+            orders.extend(page.get("items") or [])
+            next_link = (page.get("links") or {}).get("next") or {}
+            next_path = next_link.get("uri")
+        return orders
