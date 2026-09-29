@@ -80,3 +80,7 @@ npm-debug.log*
 # Adobe
 backend/adobe_authorizations.json
 backend/adobe_credentials.json
+
+# Claude
+.claude/*
+!.claude/settings.json
