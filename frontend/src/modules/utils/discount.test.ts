@@ -1,4 +1,4 @@
-import { formatDiscountValue, getDiscountedUnitPrice } from './discount';
+import { appliesToOrderType, formatDiscountValue, getDiscountedUnitPrice } from './discount';
 
 import type { Discount } from '../shared/model';
 
@@ -60,5 +60,27 @@ describe('formatDiscountValue', () => {
         values: [{ country: 'US', value: 5 }],
       }),
     ).toBe('5');
+  });
+});
+
+describe('appliesToOrderType', () => {
+  const discount: Discount = { id: 'DSC-1', code: 'CODE-ONE' };
+
+  it('applies a code with no order types to a renewal', () => {
+    expect(appliesToOrderType(discount, 'RENEWAL')).toBe(true);
+    expect(appliesToOrderType({ ...discount, applicableOrderTypes: [] }, 'RENEWAL')).toBe(true);
+  });
+
+  it('leaves a code with no order types out of a switch', () => {
+    expect(appliesToOrderType(discount, 'SWITCH')).toBe(false);
+    expect(appliesToOrderType({ ...discount, applicableOrderTypes: [] }, 'SWITCH')).toBe(false);
+  });
+
+  it('applies a code listing the order type', () => {
+    expect(appliesToOrderType({ ...discount, applicableOrderTypes: ['NEW', 'SWITCH'] }, 'SWITCH')).toBe(true);
+  });
+
+  it('leaves out a code restricted to other order types', () => {
+    expect(appliesToOrderType({ ...discount, applicableOrderTypes: ['RENEWAL'] }, 'SWITCH')).toBe(false);
   });
 });
