@@ -1,7 +1,7 @@
-import asyncio
 import logging
+from functools import partial
 from http import HTTPStatus
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 from mpt_api_client.exceptions import MPTHttpError
 from mpt_extension_sdk.api import (
@@ -16,11 +16,11 @@ from mpt_extension_sdk.api import (
 from mpt_extension_sdk.models import Agreement, Subscription, SubscriptionLine
 from mpt_extension_sdk.routing import APIRouter
 
-from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.context import adobe_client
 from mpt_adobe_vipm_ef.models.switch import (
     SwitchPayload,
     UpgradeOrderRequest,
+    UpgradePreviewRequest,
     build_switch_payload,
 )
 from mpt_adobe_vipm_ef.routers.api.customer import (
@@ -31,6 +31,10 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 )
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
+from mpt_adobe_vipm_ef.services.discount_preview import (
+    preview_with_discounts,
+    request_adobe_preview,
+)
 from mpt_adobe_vipm_ef.services.items import get_partial_sku, resolve_items_by_sku
 from mpt_adobe_vipm_ef.services.subscriptions import find_existing_target_line
 from mpt_adobe_vipm_ef.services.switch_order import (
@@ -45,6 +49,41 @@ logger = logging.getLogger(__name__)
 upgrade_router = APIRouter(prefix="/agreements")
 
 
+class _SwitchSelection(NamedTuple):
+    """The customer's switch selection, validated and resolved against the agreement."""
+
+    source_line: SubscriptionLine
+    adobe_subscription_id: str
+    target_item_id: str
+    switch_payload: SwitchPayload
+
+
+@upgrade_router.post(
+    path="/{agreement_id}/subscriptions/{subscription_id}/upgrade-order/preview",
+    name="agreements-upgrade-order-preview",
+    body_validator=UpgradePreviewRequest,
+)
+@validate_agreement_access
+@log_inputs
+async def preview_upgrade_order(
+    agreement_id: str, subscription_id: str, ctx: APIContext, body: UpgradePreviewRequest
+) -> APIResponse:
+    """Quote the mid-term upgrade through an Adobe ``PREVIEW_SWITCH`` order.
+
+    The wizard calls this on the Promotions step, before it advances: the
+    selection is validated exactly as the submission validates it, and the
+    flexible discount code the customer picked rides the target line of the
+    quoted switch, so Adobe adjudicates the code before any order exists.
+    Every refused code is answered as a ``422`` whose ``errors`` name the
+    target offer (``pointer``) and Adobe's reason (``detail``). On success the
+    Adobe quote is returned under ``preview`` so the wizard can show the
+    discounted price on Review order.
+    """
+    selection = await _resolve_switch_selection(ctx, agreement_id, subscription_id, body)
+    preview = await _preview_switch(ctx, agreement_id, selection.switch_payload, fetch_price=True)
+    return APIResponse.ok(payload={"preview": preview})
+
+
 @upgrade_router.post(
     path="/{agreement_id}/subscriptions/{subscription_id}/upgrade-order",
     name="agreements-upgrade-order",
@@ -52,15 +91,39 @@ upgrade_router = APIRouter(prefix="/agreements")
 )
 @validate_agreement_access
 @log_inputs
-async def create_upgrade_order(  # noqa: WPS210, WPS217
+async def create_upgrade_order(
     agreement_id: str, subscription_id: str, ctx: APIContext, body: UpgradeOrderRequest
 ) -> APIResponse:
     """Submit a mid-term upgrade as a switch-driven change order.
 
     Validates the customer's selection, gates it through an Adobe
-    ``PREVIEW_SWITCH`` quote, and only then creates the change order (directly
-    in Processing status) carrying the hidden ``switchPayload`` DataObject
-    parameter.
+    ``PREVIEW_SWITCH`` quote — carrying the flexible discount code applied on
+    the target line, so a code Adobe refuses fails here with the same
+    ``422`` the preview answers — and only then creates the change order
+    (directly in Processing status) carrying the hidden ``switchPayload``
+    DataObject parameter.
+    """
+    selection = await _resolve_switch_selection(ctx, agreement_id, subscription_id, body)
+
+    await _preview_switch(ctx, agreement_id, selection.switch_payload)
+
+    target_line = await find_existing_target_line(
+        ctx, agreement_id, selection.adobe_subscription_id, body.target_offer_id
+    )
+    lines = build_change_order_lines(
+        selection.source_line, body.quantity, target_line, selection.target_item_id
+    )
+    order = await _create_change_order(ctx, agreement_id, lines, selection.switch_payload, body)
+    return APIResponse.created(payload=order)
+
+
+async def _resolve_switch_selection(
+    ctx: APIContext, agreement_id: str, subscription_id: str, body: UpgradePreviewRequest
+) -> _SwitchSelection:
+    """Validate the customer's selection and build the switch snapshot it describes.
+
+    Shared by the preview and the submission, so a selection the preview
+    accepts is exactly the one the submission would place.
     """
     if not ctx.auth.account.is_client():
         raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
@@ -70,17 +133,10 @@ async def create_upgrade_order(  # noqa: WPS210, WPS217
     _validate_quantity(body.quantity, source_line.quantity)
 
     target_item_id = await _require_target_item_id(ctx, agreement, body.target_offer_id)
-    currency_code = cast(str, agreement.authorization.currency)
-    switch_payload = build_switch_payload(body, adobe_subscription_id, currency_code)
-
-    await _preview_switch(ctx, agreement_id, switch_payload)
-
-    target_line = await find_existing_target_line(
-        ctx, agreement_id, adobe_subscription_id, body.target_offer_id
+    switch_payload = build_switch_payload(
+        body, adobe_subscription_id, cast(str, agreement.authorization.currency)
     )
-    lines = build_change_order_lines(source_line, body.quantity, target_line, target_item_id)
-    order = await _create_change_order(ctx, agreement_id, lines, switch_payload, body)
-    return APIResponse.created(payload=order)
+    return _SwitchSelection(source_line, adobe_subscription_id, target_item_id, switch_payload)
 
 
 async def _load_switch_source(
@@ -163,35 +219,32 @@ async def _require_target_item_id(
 
 
 async def _preview_switch(
-    ctx: APIContext, agreement_id: str, switch_payload: SwitchPayload
-) -> None:
-    """Gate the submission on an Adobe PREVIEW_SWITCH quote of the exact snapshot."""
+    ctx: APIContext,
+    agreement_id: str,
+    switch_payload: SwitchPayload,
+    *,
+    fetch_price: bool = False,
+) -> dict[str, Any] | None:
+    """Quote the exact snapshot through an Adobe PREVIEW_SWITCH order.
+
+    Every pass re-sends the same cancelling items: only the target line's
+    discount code changes while the refused codes are walked.
+    """
     authorization_id = await get_authorization_id(ctx, agreement_id)
     customer_id = await require_customer_id(ctx, agreement_id)
     payload = switch_payload.to_dict()
-    try:
-        await asyncio.to_thread(
-            adobe_client(ctx).order.preview_switch_order,
-            authorization_id,
-            customer_id,
-            switch_payload.currency_code,
-            payload["lineItems"],
-            payload["cancellingItems"],
-            switch_payload.recommendation_tracker_id,
-        )
-    except AdobeAPIError as error:
-        logger.warning("Adobe rejected the switch preview: %s", error)
-        raise UpstreamServiceError(detail=str(error))
-    except AdobeHttpError as error:
-        logger.warning(
-            "Adobe HTTP error on switch preview: status=%s body=%r",
-            error.status_code if hasattr(error, "status_code") else "?",
-            error.response_content,
-        )
-        raise UpstreamServiceError(detail="Adobe service request failed")
-    except AdobeError as error:
-        logger.warning("Adobe configuration error on switch preview: %s", error)
-        raise ValidationError(detail=str(error))
+    quote = partial(
+        request_adobe_preview,
+        "switch",
+        adobe_client(ctx).order.preview_switch_order,
+        authorization_id,
+        customer_id,
+        switch_payload.currency_code,
+        cancelling_items=payload["cancellingItems"],
+        recommendation_tracker_id=switch_payload.recommendation_tracker_id,
+        fetch_price=fetch_price,
+    )
+    return await preview_with_discounts(quote, payload["lineItems"])
 
 
 async def _create_change_order(

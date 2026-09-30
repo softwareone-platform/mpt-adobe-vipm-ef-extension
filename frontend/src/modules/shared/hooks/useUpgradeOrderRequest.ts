@@ -5,10 +5,16 @@ import { i18n } from '../../../i18n/translations';
 
 import { useGuardedRequest } from './useGuardedRequest';
 
-export interface UpgradeOrderInput {
+/** The selection the upgrade preview quotes: the order body minus notes and additional ids. */
+export interface UpgradePreviewInput {
   targetOfferId: string;
   quantity: number;
   recommendationTrackerId?: string;
+  /** At most one code: it applies to the target line only. */
+  flexDiscountCodes?: string[];
+}
+
+export interface UpgradeOrderInput extends UpgradePreviewInput {
   notes?: string;
   externalIds?: { client?: string };
 }

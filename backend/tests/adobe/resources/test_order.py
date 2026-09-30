@@ -72,6 +72,32 @@ def test_preview_switch_order_sends_preview_switch_body(
 
 
 @responses.activate
+def test_preview_switch_order_asks_for_pricing_when_requested(
+    adobe_client, preview_switch_data, line_items, cancelling_items
+):
+    responses.post(_ORDERS_URL, json=preview_switch_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_switch_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", line_items, cancelling_items, fetch_price=True
+    )
+
+    assert responses.calls[0].request.url == f"{_ORDERS_URL}?fetch-price=true"
+
+
+@responses.activate
+def test_preview_switch_order_does_not_ask_for_pricing_by_default(
+    adobe_client, preview_switch_data, line_items, cancelling_items
+):
+    responses.post(_ORDERS_URL, json=preview_switch_data, status=http.HTTPStatus.OK)
+
+    adobe_client.order.preview_switch_order(  # act
+        "AUT-1234-5678", "CUST-000", "USD", line_items, cancelling_items
+    )
+
+    assert responses.calls[0].request.url == _ORDERS_URL
+
+
+@responses.activate
 def test_preview_switch_order_forwards_the_recommendation_tracker_header(
     adobe_client, preview_switch_data, line_items, cancelling_items
 ):

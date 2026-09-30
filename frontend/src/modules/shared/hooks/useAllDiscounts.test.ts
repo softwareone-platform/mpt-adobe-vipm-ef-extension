@@ -52,6 +52,61 @@ describe('useAllDiscounts', () => {
     );
   });
 
+  it('narrows the shortlist to one line with the eligibility context', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },
+    });
+
+    const { result } = renderHook(() =>
+      useAllDiscounts('AGR-1', 'SWITCH', {
+        offerId: '65322651CA02A12',
+        ownedOfferIds: ['65304479CA01A12', '', '65322587CA01A12'],
+        commitment: 'THREE_YC',
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    expect(mockGet).toHaveBeenCalledWith(
+      '/api/v2/discount-codes',
+      expect.objectContaining({
+        params: expect.objectContaining({
+          orderType: 'SWITCH',
+          offerId: '65322651CA02A12',
+          ownedOfferIds: '65304479CA01A12,65322587CA01A12',
+          commitment: 'THREE_YC',
+        }),
+      }),
+    );
+  });
+
+  it('omits the eligibility parameters it was not given', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },
+    });
+
+    const { result } = renderHook(() => useAllDiscounts('AGR-1', 'SWITCH', { ownedOfferIds: [] }));
+
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    const [, options] = mockGet.mock.calls[0] as [string, { params: Record<string, unknown> }];
+    expect(options.params).not.toHaveProperty('offerId');
+    expect(options.params).not.toHaveProperty('ownedOfferIds');
+    expect(options.params).not.toHaveProperty('commitment');
+  });
+
+  it('does not read again when the caller passes an equal context', async () => {
+    mockGet.mockResolvedValue({
+      data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },
+    });
+
+    const { result, rerender } = renderHook(() =>
+      useAllDiscounts('AGR-1', 'SWITCH', { offerId: 'OFFER-1', ownedOfferIds: ['SKU-1'] }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('success'));
+    rerender();
+
+    expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
   it('omits the order type when none is asked for', async () => {
     mockGet.mockResolvedValue({
       data: { data: [discount(1)], $meta: { pagination: { total: 1 } } },

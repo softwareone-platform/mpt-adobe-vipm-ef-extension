@@ -145,6 +145,46 @@ jest.mock('./UpgradeToStep', () => ({
   },
 }));
 
+interface PromotionsProps {
+  target: { targetBaseOfferId?: string } | null;
+  discounts: { data: Array<{ code: string }> };
+  discountCode: string | null;
+  recommendationTrackerId: string;
+  onDiscountChange: (code: string) => void;
+  onPreview: (preview: unknown) => void;
+}
+let promotionsProps: PromotionsProps;
+
+jest.mock('./PromotionsStep', () => ({
+  PromotionsStep: (props: PromotionsProps) => {
+    promotionsProps = props;
+    return <div>Promotions step</div>;
+  },
+}));
+
+let mockDiscounts: Record<string, unknown> = {
+  status: 'success',
+  error: null,
+  data: [],
+  total: 0,
+  refresh: jest.fn(),
+};
+const mockUseAllDiscounts = jest.fn<Record<string, unknown>, unknown[]>(() => mockDiscounts);
+jest.mock('../shared/hooks/useAllDiscounts', () => ({
+  useAllDiscounts: (...args: unknown[]) => mockUseAllDiscounts(...args),
+}));
+
+let mockAdobeCustomer: Record<string, unknown> = {
+  status: 'success',
+  error: null,
+  data: null,
+  update: jest.fn(),
+  refresh: jest.fn(),
+};
+jest.mock('../shared/hooks/useAdobeCustomer', () => ({
+  useAdobeCustomer: () => mockAdobeCustomer,
+}));
+
 interface SplitBillingProps {
   addBuyerToOrder: (buyer: { id?: string }) => Promise<void>;
   selectedBuyer: unknown;
@@ -232,6 +272,9 @@ describe('request-midterm-upgrade-action App', () => {
     mockActiveStepIndex = 0;
     mockOfferResult.data = defaultOfferData;
     mockRecommendation = { status: 'idle', error: null, data: null, refresh: jest.fn() };
+    mockDiscounts = { status: 'success', error: null, data: [], total: 0, refresh: jest.fn() };
+    mockAdobeCustomer = { status: 'success', error: null, data: null, update: jest.fn(), refresh: jest.fn() };
+    mockUseAllDiscounts.mockClear();
   });
 
   it('renders the wizard header and the upgrade-from step once loaded', async () => {
@@ -250,8 +293,8 @@ describe('request-midterm-upgrade-action App', () => {
     expect(upgradeToProps.subscriptions).toBeDefined();
   });
 
-  it('renders the split-billing step on the third step and wires its props', async () => {
-    mockActiveStepIndex = 2;
+  it('renders the split-billing step on the fourth step and wires its props', async () => {
+    mockActiveStepIndex = 3;
     render(<App />);
 
     expect(await screen.findByText('Split billing step')).toBeTruthy();
@@ -264,7 +307,7 @@ describe('request-midterm-upgrade-action App', () => {
   });
 
   it('bills the order to a buyer the subscription has no allocation for', async () => {
-    mockActiveStepIndex = 2;
+    mockActiveStepIndex = 3;
     render(<App />);
     await screen.findByText('Split billing step');
 
@@ -282,15 +325,15 @@ describe('request-midterm-upgrade-action App', () => {
     (http.post as jest.Mock).mockResolvedValueOnce({
       data: { data: { id: 'SUB-1', splitStatus: 'Disabled', product: { id: 'PRD-1' } } },
     });
-    mockActiveStepIndex = 2;
+    mockActiveStepIndex = 3;
     render(<App />);
 
     expect(await screen.findByText('Details step')).toBeTruthy();
     expect(screen.queryByText('Split billing step')).toBeNull();
   });
 
-  it('renders the details step on the fourth step and wires its props', async () => {
-    mockActiveStepIndex = 3;
+  it('renders the details step on the fifth step and wires its props', async () => {
+    mockActiveStepIndex = 4;
     render(<App />);
 
     expect(await screen.findByText('Details step')).toBeTruthy();
@@ -298,8 +341,8 @@ describe('request-midterm-upgrade-action App', () => {
     expect(typeof detailsProps.setOrder).toBe('function');
   });
 
-  it('renders the review-order step on the fifth step and wires its props', async () => {
-    mockActiveStepIndex = 4;
+  it('renders the review-order step on the sixth step and wires its props', async () => {
+    mockActiveStepIndex = 5;
     render(<App />);
 
     expect(await screen.findByText('Review order step')).toBeTruthy();
@@ -411,7 +454,7 @@ describe('request-midterm-upgrade-action App', () => {
       upgradeToProps.onSubscriptionsChange([selectedTarget]);
       upgradeToProps.onSelectedTargetChange(selectedTarget);
     });
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -427,6 +470,7 @@ describe('request-midterm-upgrade-action App', () => {
         targetOfferId: '65322651CA02A12',
         quantity: 6,
         recommendationTrackerId: '',
+        flexDiscountCodes: [],
         notes: '',
         externalIds: { client: '' },
       },
@@ -479,7 +523,7 @@ describe('request-midterm-upgrade-action App', () => {
       upgradeToProps.onSubscriptionsChange([target]);
       upgradeToProps.onSelectedTargetChange(target);
     });
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -531,7 +575,7 @@ describe('request-midterm-upgrade-action App', () => {
       upgradeToProps.onSubscriptionsChange([selectedTarget]);
       upgradeToProps.onSelectedTargetChange(selectedTarget);
     });
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -547,6 +591,7 @@ describe('request-midterm-upgrade-action App', () => {
         targetOfferId: '65322651CA02A12',
         quantity: 6,
         recommendationTrackerId: 'TRACKER-1',
+        flexDiscountCodes: [],
         notes: '',
         externalIds: { client: '' },
       },
@@ -579,7 +624,7 @@ describe('request-midterm-upgrade-action App', () => {
       upgradeToProps.onSubscriptionsChange([selectedTarget]);
       upgradeToProps.onSelectedTargetChange(selectedTarget);
     });
-    mockActiveStepIndex = 3;
+    mockActiveStepIndex = 4;
     rerender(<App />);
     expect(await screen.findByText('Details step')).toBeTruthy();
     act(() => {
@@ -589,7 +634,7 @@ describe('request-midterm-upgrade-action App', () => {
         externalIds: { client: '234234234' },
       });
     });
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -605,6 +650,7 @@ describe('request-midterm-upgrade-action App', () => {
         targetOfferId: '65322651CA02A12',
         quantity: 6,
         recommendationTrackerId: '',
+        flexDiscountCodes: [],
         notes: 'Upgrade for the design team',
         externalIds: { client: '234234234' },
       },
@@ -613,7 +659,7 @@ describe('request-midterm-upgrade-action App', () => {
   });
 
   it('blocks placing the order and surfaces an error when no target is selected', async () => {
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     const { rerender } = render(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -673,7 +719,7 @@ describe('request-midterm-upgrade-action App', () => {
       upgradeToProps.onSubscriptionsChange([selectedTarget]);
       upgradeToProps.onSelectedTargetChange(selectedTarget);
     });
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
 
@@ -687,20 +733,184 @@ describe('request-midterm-upgrade-action App', () => {
     expect(reviewOrderProps.errorMessage).toBe('Adobe rejected the switch preview.');
   });
 
+  const promotedTarget = {
+    id: null,
+    name: null,
+    status: '',
+    item: { id: 'ITM-TARGET', name: 'Creative Cloud All Apps', externalId: '65322651CA' },
+    targetBaseOfferId: '65322651CA02A12',
+    recommended: false,
+    currentQuantity: 0,
+    newQuantity: 6,
+    delta: 6,
+    unitSP: '100.00',
+    spxM: '50.00',
+    spxY: '600.00',
+    terms: '',
+    commitment: '',
+  };
+  const discount = (code: string, value: number, extra: Record<string, unknown> = {}) => ({
+    id: `DSC-${code}`,
+    code,
+    discountType: 'PERCENTAGE',
+    values: [{ value }],
+    applicableOrderTypes: ['SWITCH'],
+    ...extra,
+  });
+
+  async function selectPromotedTarget() {
+    mockActiveStepIndex = 1;
+    const view = render(<App />);
+    expect(await screen.findByText('Upgrade to step')).toBeTruthy();
+    act(() => {
+      upgradeToProps.onSubscriptionsChange([promotedTarget]);
+      upgradeToProps.onSelectedTargetChange(promotedTarget);
+    });
+    return view;
+  }
+
+  it('renders the promotions step on the third step and wires the selected target', async () => {
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+
+    expect(await screen.findByText('Promotions step')).toBeTruthy();
+    expect(promotionsProps.target?.targetBaseOfferId).toBe('65322651CA02A12');
+    expect(typeof promotionsProps.onDiscountChange).toBe('function');
+  });
+
+  it('reads the SWITCH shortlist for the target offer, owned SKUs and commitment', async () => {
+    mockAdobeCustomer = {
+      ...mockAdobeCustomer,
+      data: { benefits: [{ type: 'THREE_YEAR_COMMIT', commitment: { status: 'COMMITTED' } }] },
+    };
+    await selectPromotedTarget();
+
+    await waitFor(() => {
+      expect(mockUseAllDiscounts).toHaveBeenLastCalledWith('AGR-1', 'SWITCH', {
+        offerId: '65322651CA02A12',
+        ownedOfferIds: [],
+        commitment: 'THREE_YC',
+      });
+    });
+  });
+
+  it('waits for the customer commitment before reading the shortlist', async () => {
+    mockAdobeCustomer = { ...mockAdobeCustomer, status: 'loading' };
+    await selectPromotedTarget();
+
+    expect(mockUseAllDiscounts).toHaveBeenLastCalledWith('', 'SWITCH', {
+      offerId: '65322651CA02A12',
+      ownedOfferIds: [],
+      commitment: undefined,
+    });
+  });
+
+  it('offers only the codes that list SWITCH among their applicable order types', async () => {
+    mockDiscounts = {
+      ...mockDiscounts,
+      data: [
+        discount('ANY10', 10, { applicableOrderTypes: [] }),
+        discount('SWITCH20', 20, { applicableOrderTypes: ['NEW', 'SWITCH'] }),
+        discount('RENEW30', 30, { applicableOrderTypes: ['RENEWAL'] }),
+      ],
+    };
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+
+    await waitFor(() => expect(promotionsProps.discountCode).toBe('SWITCH20'));
+    expect(promotionsProps.discounts.data.map((entry) => entry.code)).toEqual(['SWITCH20']);
+  });
+
+  it('pre-selects the best-value code and places the order with it', async () => {
+    mockDiscounts = {
+      ...mockDiscounts,
+      data: [discount('SAVE10', 10), discount('SAVE20', 20), discount('USED30', 30, { redeemedAt: '2026-01-01' })],
+    };
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await waitFor(() => expect(promotionsProps.discountCode).toBe('SAVE20'));
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    const rows = reviewOrderProps.subscriptions as Array<Record<string, unknown>>;
+    expect(rows[1]).toMatchObject({ discountCode: 'SAVE20', unitSP: '80.00', spxY: '480.00' });
+
+    await act(async () => {
+      await reviewOrderProps.onPlaceOrder();
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
+      expect.objectContaining({ flexDiscountCodes: ['SAVE20'] }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it('sends no code once the customer clears the pre-selected one', async () => {
+    mockDiscounts = { ...mockDiscounts, data: [discount('SAVE10', 10)] };
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await waitFor(() => expect(promotionsProps.discountCode).toBe('SAVE10'));
+    act(() => promotionsProps.onDiscountChange(''));
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+    await act(async () => {
+      await reviewOrderProps.onPlaceOrder();
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      '/api/v2/agreements/AGR-1/subscriptions/SUB-1/upgrade-order',
+      expect.objectContaining({ flexDiscountCodes: [] }),
+      expect.objectContaining({ signal: expect.anything() }),
+    );
+  });
+
+  it('prices the review target from the Adobe quote when the promotions step previewed it', async () => {
+    mockDiscounts = { ...mockDiscounts, data: [discount('SAVE10', 10)] };
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await waitFor(() => expect(promotionsProps.discountCode).toBe('SAVE10'));
+    act(() =>
+      promotionsProps.onPreview({
+        lineItems: [
+          {
+            offerId: '65322651CA02A12',
+            pricing: { partnerPrice: 50, discountedPartnerPrice: 35 },
+          },
+        ],
+      }),
+    );
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    const rows = reviewOrderProps.subscriptions as Array<Record<string, unknown>>;
+    expect(rows[1]).toMatchObject({ discountCode: 'SAVE10', unitSP: '70.00', spxY: '420.00' });
+  });
+
   it('never allows side navigation, so only back and next move the wizard', async () => {
     mockActiveStepIndex = 1;
     const { rerender } = render(<App />);
     expect(await screen.findByText('Upgrade to step')).toBeTruthy();
     expect(wizardProps.isToDisableSideNavigation).toBe(true);
 
-    mockActiveStepIndex = 4;
+    mockActiveStepIndex = 5;
     rerender(<App />);
     expect(await screen.findByText('Review order step')).toBeTruthy();
     expect(wizardProps.isToDisableSideNavigation).toBe(true);
   });
 
-  it('renders the summary step on the sixth step and wires its order', async () => {
-    mockActiveStepIndex = 5;
+  it('renders the summary step on the seventh step and wires its order', async () => {
+    mockActiveStepIndex = 6;
     render(<App />);
 
     expect(await screen.findByText('Summary step')).toBeTruthy();
@@ -708,7 +918,7 @@ describe('request-midterm-upgrade-action App', () => {
   });
 
   it('renders no step content for an unknown step index', async () => {
-    mockActiveStepIndex = 6;
+    mockActiveStepIndex = 7;
     render(<App />);
 
     expect(await screen.findByText('Upgrade subscription')).toBeTruthy();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -10,7 +10,9 @@ import { useSettingsResult } from '../shared/hooks/useSettings';
 import type { AccountType } from '../shared/three-year-commitment';
 import { canRequestMidtermUpgradeAction } from '../utils/security';
 import { AccountRestrictedNotice } from '../shared/components/AccountRestrictedNotice/AccountRestrictedNotice';
+import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAdobeOffer } from '../shared/hooks/useAdobeOffer';
+import { useAllDiscounts } from '../shared/hooks/useAllDiscounts';
 import { useAdobeRecommendation } from '../shared/hooks/useAdobeRecommendation';
 import { useSubscriptionId } from '../shared/hooks/useSubscriptionId';
 import { useSubscriptionSync } from '../shared/hooks/useSubscriptionSync';
@@ -26,6 +28,7 @@ import { getPortalOrigin } from '../utils/link';
 import { getMonthlyPrice, getYearlyPrice } from '../utils/price';
 import { UpgradeFromStep } from './UpgradeFromStep';
 import { UpgradeToStep } from './UpgradeToStep';
+import { PromotionsStep } from './PromotionsStep';
 import { SplitBillingStep } from './SplitBillingStep';
 import { SplitBillingOptionValue } from './components/split-billing-option/SplitBillingOption';
 import { DetailsStep } from './DetailsStep';
@@ -38,7 +41,21 @@ import type {
 } from './model';
 
 import './App.scss';
-import { AdobeOfferSwitchPath, AgreementSplitAllocation, getRecommendedOfferIds } from '../shared/model';
+import {
+  AdobeOfferSwitchPath,
+  AgreementSplitAllocation,
+  getRecommendedOfferIds,
+  hasThreeYearCommitment,
+} from '../shared/model';
+import type { DiscountCommitment, SwitchPreview } from '../shared/model';
+import { appliesToOrderType, normalizeDiscountCode } from '../utils/discount';
+import {
+  findDiscount,
+  getBestDiscountCode,
+  getLocalUnitPrice,
+  getQuotedUnitPrice,
+  withDiscount,
+} from './discountPricing';
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../shared/constants';
 
 const initialOrder: Order = {
@@ -83,6 +100,9 @@ export default function App() {
   const [recommendationTrackerId, setRecommendationTrackerId] = useState<string>('');
   const [selectedTarget, setSelectedTarget] = useState<TargetSubscription | null>(null);
   const [placeOrderValidationError, setPlaceOrderValidationError] = useState<string>('');
+  // null until the best-value code is pre-selected; '' once the customer clears it.
+  const [discountCode, setDiscountCode] = useState<string | null>(null);
+  const [switchPreview, setSwitchPreview] = useState<SwitchPreview | null>(null);
   const {
     submitOrder,
     error: submitError,
@@ -99,6 +119,36 @@ export default function App() {
           row.targetBaseOfferId === selectedTarget.targetBaseOfferId,
       ) ?? null)
     : null;
+
+  const agreementId = subscription?.agreement?.id ?? '';
+  const targetOfferId = currentSelectedTarget?.targetBaseOfferId ?? '';
+  const adobeCustomer = useAdobeCustomer(agreementId);
+  const isCustomerResolved = adobeCustomer.status === 'success' || adobeCustomer.status === 'error';
+  // The shortlist only strips a code on a positive commitment contradiction,
+  // so an unreadable commitment is left out rather than guessed.
+  let commitment: DiscountCommitment | undefined;
+  if (adobeCustomer.status === 'success') {
+    commitment = hasThreeYearCommitment(adobeCustomer.data) ? 'THREE_YC' : 'ANNUAL';
+  }
+  // The SKUs the customer already holds qualify codes that require owning a product.
+  const ownedOfferIds = useMemo(
+    () => [
+      sourceSku,
+      ...targetSubscriptions.filter((row) => row.id).map((row) => row.item.externalId),
+    ].filter(Boolean),
+    [sourceSku, targetSubscriptions],
+  );
+  const allDiscounts = useAllDiscounts(
+    isCustomerResolved && targetOfferId ? agreementId : '',
+    'SWITCH',
+    { offerId: targetOfferId, ownedOfferIds, commitment },
+  );
+  // A switch order is only offered the codes whose applicable order types include SWITCH.
+  const switchDiscounts = useMemo(
+    () => allDiscounts.data.filter((discount) => appliesToOrderType(discount, 'SWITCH')),
+    [allDiscounts.data],
+  );
+  const discounts = { ...allDiscounts, data: switchDiscounts };
 
   const sourceUnitSP = subscription?.lines?.[0]?.price?.unitSP;
   const movedQuantity = currentSelectedTarget?.delta ?? 0;
@@ -132,9 +182,18 @@ export default function App() {
     subscriptionTerms: subscription?.terms,
     audit: subscription?.audit,
   };
-  const reviewSubscriptions = currentSelectedTarget
-    ? [sourceReviewRow, currentSelectedTarget]
-    : [sourceReviewRow];
+  const appliedCode = normalizeDiscountCode(discountCode ?? '');
+  // Review order shows the price Adobe quoted for the target when the
+  // Promotions step previewed it, the local estimate otherwise.
+  const reviewTarget = currentSelectedTarget
+    ? withDiscount(
+        currentSelectedTarget,
+        getQuotedUnitPrice(currentSelectedTarget, switchPreview) ??
+          getLocalUnitPrice(currentSelectedTarget, findDiscount(discounts.data, appliedCode)),
+        appliedCode,
+      )
+    : null;
+  const reviewSubscriptions = reviewTarget ? [sourceReviewRow, reviewTarget] : [sourceReviewRow];
 
   const onClose = useCallback(() => {
     close();
@@ -159,6 +218,7 @@ export default function App() {
       targetOfferId: currentSelectedTarget.targetBaseOfferId ?? '',
       quantity: currentSelectedTarget.delta,
       recommendationTrackerId,
+      flexDiscountCodes: appliedCode ? [appliedCode] : [],
       notes: order?.notes ?? '',
       externalIds: { client: order?.externalIds?.client ?? '' },
     });
@@ -173,6 +233,7 @@ export default function App() {
     offerPaths,
     sourceQuantity,
     recommendationTrackerId,
+    appliedCode,
     order?.notes,
     order?.externalIds?.client,
     submitOrder,
@@ -200,6 +261,25 @@ export default function App() {
   useEffect(() => {
     setRecommendationTrackerId(recommendations?.xRecommendationTrackerId ?? '');
   }, [recommendations]);
+
+  // Another target offer has its own shortlist: pre-select again for it.
+  useEffect(() => {
+    setDiscountCode(null);
+  }, [targetOfferId]);
+
+  // A quote only prices the selection it was taken for.
+  useEffect(() => {
+    setSwitchPreview(null);
+  }, [targetOfferId, movedQuantity]);
+
+  // Pre-select the best-value code once the shortlist loads, unless the
+  // customer already chose (or cleared) one for this target.
+  useEffect(() => {
+    if (discountCode !== null || !currentSelectedTarget || discounts.status !== 'success') {
+      return;
+    }
+    setDiscountCode(getBestDiscountCode(discounts.data, currentSelectedTarget));
+  }, [discountCode, currentSelectedTarget, discounts.status, discounts.data]);
 
   useEffect(() => {
     if (!offerSwitchPaths) return;
@@ -305,6 +385,20 @@ export default function App() {
           offerPaths={offerPaths}
           sourceQuantity={sourceQuantity}
           offerStatus={offerStatus}
+        />
+      ),
+    },
+    {
+      title: t('MidtermUpgrade:Steps:Promotions'),
+      render: () => (
+        <PromotionsStep
+          subscription={subscription}
+          target={currentSelectedTarget}
+          discounts={discounts}
+          discountCode={discountCode}
+          recommendationTrackerId={recommendationTrackerId}
+          onDiscountChange={setDiscountCode}
+          onPreview={setSwitchPreview}
         />
       ),
     },

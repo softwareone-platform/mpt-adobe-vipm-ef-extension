@@ -502,6 +502,13 @@ export function readRenewalPreview(payload: unknown): RenewalPreview | null {
   return { lineItems: lines.filter((line): line is RenewalPreviewLine => Boolean(line)) };
 }
 
+/**
+ * Adobe's ``PREVIEW_SWITCH`` quote for a mid-term upgrade: the target line,
+ * priced with the flexible discount code applied to it. It reads like the
+ * renewal quote, so the same reader parses it.
+ */
+export type SwitchPreview = RenewalPreview;
+
 /** The renewal order body: the plan plus everything only the submission carries. */
 export interface RenewalOrderInput extends RenewalPlanBody {
   recommendationTrackerId?: string;
@@ -651,6 +658,9 @@ export interface AgreementSplit {
 export type DiscountType = 'PERCENTAGE' | 'FIXED_DISCOUNT' | 'FIXED_PRICE';
 
 export type DiscountOrderType = 'NEW' | 'RENEWAL' | 'SWITCH';
+
+/** The customer's commitment term, matched against a code's annual / 3YC support flags. */
+export type DiscountCommitment = 'ANNUAL' | 'THREE_YC';
 
 export interface DiscountValueEntry {
   country?: string;
