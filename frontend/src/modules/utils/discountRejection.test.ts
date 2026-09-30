@@ -1,4 +1,4 @@
-import { toRejectionMessage, toRejectionReason } from './discountRejection';
+import { toRejectionMessage, toRejectionReason, toRejectionTarget } from './discountRejection';
 
 const ADOBE_REASONS = [
   'NOT_FOUND',
@@ -51,5 +51,18 @@ describe('toRejectionMessage', () => {
     expect(message).toContain('BADCODE1');
     expect(message).toContain('Photoshop for Enterprise');
     expect(message).toContain('is not known');
+  });
+});
+
+describe('toRejectionTarget', () => {
+  it('splits the row and the refused code', () => {
+    expect(toRejectionTarget('30005934CA/flexDiscountCodes/FESTIVITY_19')).toEqual({
+      row: '30005934CA',
+      code: 'FESTIVITY_19',
+    });
+  });
+
+  it('reads a pointer without a code as the row alone', () => {
+    expect(toRejectionTarget('adobe-sub-1')).toEqual({ row: 'adobe-sub-1', code: '' });
   });
 });
