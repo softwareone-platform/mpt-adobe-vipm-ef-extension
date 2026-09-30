@@ -440,6 +440,8 @@
     "Grid": {
       "Prompt": "Select the existing subscriptions to be renewed. Updated pricing, including applicable discount levels and promotions, will be shown on the Review order page.",
       "Current qty": "Current qty",
+      "Renewed": "{{renewed}} renewed",
+      "Renewed remaining": "{{renewed}} renewed · {{remaining}} left",
       "Renew": "Renew",
       "Unit SP": "Unit SP",
       "Unit SP basis": "named license/year",
