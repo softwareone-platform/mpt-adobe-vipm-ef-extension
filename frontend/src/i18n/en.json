@@ -308,7 +308,14 @@
       "commitment": "commitment",
       "recommitment": "recommitment"
     },
-    "RequestTypeHint": "If the customer already has a three year commitment, then choosing the \"commitment\" option above will update the existing commitment. In this scenario, only increases are allowed.",
+    "RequestTypeHint": "For a customer with an active three-year commitment, choose \"commitment\" to raise the existing minimum quantities. Choose \"recommitment\" to renew the commitment for a further three years; Adobe accepts it only in the 30 days before the commitment ends.",
+    "RecommitmentOpensOn": "Recommitment opens on {{opensOn}}, 30 days before the commitment ends on {{endDate}}.",
+    "RecommitmentNotCommitted": "Recommitment is available only to customers with an active three-year commitment.",
+    "PendingRequest": "A {{type}} request for {{quantities}} is awaiting acceptance in the Adobe Admin Console. Sending a new {{type}} request replaces it.",
+    "PendingLicenses": "{{quantity}} licenses",
+    "PendingConsumables": "{{quantity}} consumables",
+    "PendingAnd": " and ",
+    "RecommitmentInPlace": "This customer has a recommitment request in place, so Adobe does not accept a commitment request. Choose recommitment to replace a pending recommitment, or wait until the accepted one takes effect at the start of the new term.",
     "Licenses": "Licenses",
     "Consumables": "Consumables",
     "Discount level": "Discount level",
@@ -316,6 +323,8 @@
     "Discount tier": "Discount tier",
     "Discount tier placeholder": "Not required",
     "Not required": "Not required",
+    "Keep current": "Keep current ({{quantity}})",
+    "Current level": "{{label}} (current)",
     "Custom": "Custom",
     "LicenseLevels": {
       "Level 12": "Level 12 (10 licenses)",
@@ -340,7 +349,9 @@
     "Send invitation": "Send invitation",
     "Validation": {
       "AtLeastOne": "At least one quantity is required.",
-      "AlreadyCommitted": "The customer is already committed. Select recommitment instead."
+      "RecommitmentClosed": "Recommitment is not available for this customer.",
+      "BelowLicenseMinimum": "Licenses cannot be lower than the current committed minimum of {{quantity}}.",
+      "BelowConsumableMinimum": "Consumables cannot be lower than the current committed minimum of {{quantity}}."
     }
   },
   "LinkedMembership": {
