@@ -297,7 +297,8 @@
     "LoadInheritedDiscounts": "Failed to load the discounts you already hold.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated.",
-    "UpgradeDiscountValidation": "The selected discount code could not be validated."
+    "UpgradeDiscountValidation": "The selected discount code could not be validated.",
+    "LoadUpgradeRenewalInPlace": "Failed to check whether a renewal is in place for this agreement."
   },
   "Commitment": {
     "Title": "Request 3-year commitment",
@@ -649,6 +650,10 @@
         "AtLeast": "Quantity must be at least {{quantity}}",
         "CannotExceed": "Quantity cannot exceed {{quantity}}"
       }
+    },
+    "RenewalInPlace": {
+      "early": "An early renewal has already been placed for this agreement, so the subscription cannot be upgraded until it takes effect at the anniversary date. To change the renewal, re-open the renewal wizard.",
+      "staged": "A renewal has been set up for this agreement's anniversary date, so the subscription cannot be upgraded until it takes effect. To change the renewal, re-open the renewal wizard."
     }
   }
 }
