@@ -49,6 +49,7 @@ import {
   type RenewalPath,
   type RenewalQuantities,
   type RenewalSelections,
+  withHeldQuantity,
 } from './model';
 
 import './App.scss';
@@ -115,9 +116,9 @@ export default function App() {
   const pathSubscriptions = useMemo(
     () =>
       renewalPath === 'now'
-        ? subscriptions.data.filter((subscription) =>
-            isEarlyRenewable(subscription, renewalState.data),
-          )
+        ? subscriptions.data
+            .filter((subscription) => isEarlyRenewable(subscription, renewalState.data))
+            .map((subscription) => withHeldQuantity(subscription, renewalState.data))
         : anniversarySubscriptions,
     [renewalPath, subscriptions.data, renewalState.data, anniversarySubscriptions],
   );
@@ -365,6 +366,7 @@ export default function App() {
           quantities={renewalQuantities}
           netNewItems={netNewItems}
           path={renewalPath}
+          renewalStates={renewalState.data}
           onRenewChange={onRenewChange}
         />
       ),
