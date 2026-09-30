@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { http } from '@mpt-extension/sdk';
 import { i18n } from '../../../i18n/translations';
+import { toErrorMessage } from '../../utils/apiError';
 
 import { INITIAL_REQUEST_STATE } from '../constants';
 import type { RequestState } from '../constants';
@@ -46,9 +47,7 @@ export function useThreeYearCommitmentRequest(agreementId: string) {
         setState({ error: '', status: 'success' });
         return customerData;
       } catch (submitError) {
-        const error =
-          submitError instanceof Error ? submitError.message : i18n.t('Errors:CommitmentRequest');
-        setState({ error, status: 'error' });
+        setState({ error: toErrorMessage(submitError, 'Errors:CommitmentRequest'), status: 'error' });
         return false;
       }
     },

@@ -152,6 +152,29 @@ describe('useThreeYearCommitmentRequest', () => {
     expect(result.current.error).toBe('Commitment endpoint unavailable.');
   });
 
+  it('reports the backend detail instead of the HTTP status text', async () => {
+    const rejection = Object.assign(new Error('Request failed with status code 502'), {
+      response: {
+        data: {
+          detail:
+            '5122 - Invalid Request: Recommitment is allowed only within 30 days before the 3YC end date.',
+        },
+      },
+    });
+    mockPost.mockRejectedValue(rejection);
+
+    const { result } = renderHook(() => useThreeYearCommitmentRequest('AGR-1234-5678-9012'));
+
+    await act(async () => {
+      await result.current.submitRequest(RECOMMITMENT_INPUT);
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe(
+      '5122 - Invalid Request: Recommitment is allowed only within 30 days before the 3YC end date.',
+    );
+  });
+
   it('resets back to idle after a successful request', async () => {
     mockPost.mockResolvedValue({ data: { data: MOCK_CUSTOMER_DATA } });
 
