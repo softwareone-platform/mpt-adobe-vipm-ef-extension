@@ -33,6 +33,7 @@ import type { Agreement, RenewalPreview, Subscription } from '../../shared/model
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import { getPartialSku } from '../../utils/sku';
+import { CurrentQuantityCell } from '../components/current-quantity-cell/CurrentQuantityCell';
 import { SelectItemsDialog } from '../components/select-items-dialog/SelectItemsDialog';
 import {
   buildRenewalPlanRequest,
@@ -337,7 +338,13 @@ function buildColumns(handlers: RowHandlers): GridColumnDefinition<Row>[] {
       title: i18n.t('Renewal:Grid:Current qty'),
       fields: ['currentQuantity'],
       initialWidth: 100,
-      cell: (row) => <TextCell text={row.currentQuantity ?? EMPTY_VALUE} />,
+      cell: (row) => (
+        <CurrentQuantityCell
+          quantity={row.currentQuantity}
+          renewedQuantity={row.renewedQuantity}
+          remainingQuantity={row.remainingQuantity}
+        />
+      ),
     },
     {
       name: 'renewalQuantity',

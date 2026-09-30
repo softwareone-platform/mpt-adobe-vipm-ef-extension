@@ -7,7 +7,7 @@ import type { GenericAbortSignal } from 'axios';
 import { http } from '@mpt-extension/sdk';
 
 import App from './App';
-import type { RenewalPathState } from '../shared/model';
+import type { RenewalPathState, Subscription } from '../shared/model';
 
 const mockClose = jest.fn();
 let mockActiveStepIndex = 0;
@@ -155,7 +155,7 @@ jest.mock('./TimingStep', () => ({
 }));
 
 interface RenewalStepProps {
-  subscriptions: { id: string }[];
+  subscriptions: Subscription[];
   selections: Record<string, boolean>;
   quantities: Record<string, number | null>;
   netNewItems: { itemId: string }[];
@@ -172,7 +172,7 @@ jest.mock('./RenewalStep', () => ({
 }));
 
 interface ItemsStepProps {
-  subscriptions: { id: string }[];
+  subscriptions: Subscription[];
   selections: Record<string, boolean>;
   quantities: Record<string, number | null>;
   netNewItems: { itemId: string }[];
@@ -369,6 +369,58 @@ describe('request-renewal-action App', () => {
       'SUB-1',
       'SUB-2',
     ]);
+  });
+
+  it('shows the seats held in Adobe on every early-path step after a partial early renewal', async () => {
+    // The partial Renew now order left the platform line on the renewed total.
+    const renewedLine = [
+      {
+        ...SUBSCRIPTIONS[0],
+        externalIds: { vendor: 'a1b2c3d4e5NA' },
+        lines: [{ ...SUBSCRIPTIONS[0].lines[0], quantity: 15 }],
+      },
+    ];
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/api/v2/agreements/AGR-1/renewal-order/renewal-state') {
+        return Promise.resolve({
+          data: {
+            data: {
+              subscriptions: {
+                a1b2c3d4e5NA: {
+                  currentQuantity: 25,
+                  renewedQuantity: 15,
+                  state: 'partiallyRenewed',
+                  remainingQuantity: 10,
+                  earlyRenewable: true,
+                  increaseAllowed: false,
+                },
+              },
+            },
+          },
+        });
+      }
+      if (url === '/api/v2/agreements/AGR-1/subscriptions') {
+        return Promise.resolve({ data: { data: renewedLine } });
+      }
+      return respondTo(url);
+    });
+    const { rerender } = render(<App />);
+
+    await screen.findByText('Timing step');
+    act(() => timingProps.onPathChange('now'));
+    await waitFor(() => expect(timingProps.path).toBe('now'));
+
+    mockActiveStepIndex = 1;
+    rerender(<App />);
+    await screen.findByText('Renewal step');
+    await waitFor(() =>
+      expect(renewalProps.subscriptions[0].lines?.[0].quantity).toBe(25),
+    );
+
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await screen.findByText('Items step');
+    expect(itemsProps.subscriptions[0].lines?.[0].quantity).toBe(25);
   });
 
   it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {

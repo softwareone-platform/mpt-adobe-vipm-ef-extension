@@ -26,13 +26,16 @@ import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValid
 import type { Agreement, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice } from '../../utils/price';
+import { CurrentQuantityCell } from '../components/current-quantity-cell/CurrentQuantityCell';
 import {
   buildRenewalPlanRequest,
+  getRenewalState,
   isRenewedByDefault,
   type NetNewItem,
   type RenewalPath,
   type RenewalQuantities,
   type RenewalSelections,
+  type RenewalStates,
 } from '../model';
 
 import './RenewalStep.scss';
@@ -47,6 +50,7 @@ export interface RenewalStepProps {
   quantities: RenewalQuantities;
   netNewItems: NetNewItem[];
   path: RenewalPath;
+  renewalStates: RenewalStates;
   onRenewChange: (subscriptionId: string, renew: boolean) => void;
 }
 
@@ -60,6 +64,8 @@ interface Row {
   terms: string;
   commitment: string;
   quantity: number | null;
+  renewedQuantity: number | null;
+  remainingQuantity: number | null;
   unitSP?: number;
   spxM?: number;
   spxY?: number;
@@ -67,11 +73,16 @@ interface Row {
   initialRenew: boolean;
 }
 
-function toRows(subscriptions: Subscription[], selections: RenewalSelections): Row[] {
+function toRows(
+  subscriptions: Subscription[],
+  selections: RenewalSelections,
+  renewalStates: RenewalStates,
+): Row[] {
   return subscriptions.map((subscription) => {
     // Adobe subscriptions hold exactly one item, so the first line carries the
     // SKU, quantity and prices — the same line the renewal order acts on.
     const line = subscription.lines?.[0];
+    const renewalState = getRenewalState(subscription, renewalStates);
     const initialRenew = isRenewedByDefault(subscription);
     return {
       id: subscription.id,
@@ -83,6 +94,8 @@ function toRows(subscriptions: Subscription[], selections: RenewalSelections): R
       terms: TERM_PERIOD_LABELS[subscription.terms?.period ?? ''] ?? EMPTY_VALUE,
       commitment: TERM_COMMITMENT_LABELS[subscription.terms?.commitment ?? ''] ?? '',
       quantity: line?.quantity ?? null,
+      renewedQuantity: renewalState?.renewedQuantity ?? null,
+      remainingQuantity: renewalState?.remainingQuantity ?? null,
       unitSP: line?.price?.unitSP,
       spxM: line?.price?.SPxM,
       spxY: line?.price?.SPxY,
@@ -142,7 +155,13 @@ function buildColumns(
       title: i18n.t('Renewal:Grid:Current qty'),
       fields: ['quantity'],
       initialWidth: 112,
-      cell: (row) => <TextCell text={row.quantity ?? EMPTY_VALUE} />,
+      cell: (row) => (
+        <CurrentQuantityCell
+          quantity={row.quantity}
+          renewedQuantity={row.renewedQuantity}
+          remainingQuantity={row.remainingQuantity}
+        />
+      ),
     },
     {
       name: 'renew',
@@ -231,6 +250,7 @@ export function RenewalStep({
   quantities,
   netNewItems,
   path,
+  renewalStates,
   onRenewChange,
 }: RenewalStepProps) {
   const { t } = useTranslation();
@@ -241,7 +261,10 @@ export function RenewalStep({
   const { error: planError, status: planStatus, validatePlan, cancel, reset } = useRenewalPlanValidation(agreement.id, {
     quoteThroughAdobe: false,
   });
-  const rows = useMemo(() => toRows(subscriptions, selections), [subscriptions, selections]);
+  const rows = useMemo(
+    () => toRows(subscriptions, selections, renewalStates),
+    [subscriptions, selections, renewalStates],
+  );
   const columns = useMemo(() => buildColumns(onRenewChange), [onRenewChange]);
 
   useEffect(() => reset(), [selections, reset]);

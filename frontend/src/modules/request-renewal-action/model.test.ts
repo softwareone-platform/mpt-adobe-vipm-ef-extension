@@ -22,6 +22,7 @@ import {
   isRenewedByDefault,
   isRenewing,
   normalizeDiscountCode,
+  withHeldQuantity,
 } from './model';
 import type { Discount, InheritedDiscount, Subscription } from '../shared/model';
 
@@ -263,6 +264,18 @@ describe('renewal state helpers', () => {
 
   it('falls back to the whole line without a state', () => {
     expect(getRemainingQuantity(subscription, {})).toBe(10);
+  });
+
+  it('carries the quantity held in Adobe on the line after a partial early renewal', () => {
+    const held = withHeldQuantity(subscription, { [ADOBE_ID]: { ...partial, currentQuantity: 25 } });
+
+    expect(held.lines?.[0]).toEqual({ ...subscription.lines?.[0], quantity: 25 });
+    expect(subscription.lines?.[0].quantity).toBe(10);
+  });
+
+  it('leaves the subscription untouched without a state or once it is in sync', () => {
+    expect(withHeldQuantity(subscription, {})).toBe(subscription);
+    expect(withHeldQuantity(subscription, states)).toBe(subscription);
   });
 
   it('keeps a line the customer holds unless Adobe retired the SKU', () => {

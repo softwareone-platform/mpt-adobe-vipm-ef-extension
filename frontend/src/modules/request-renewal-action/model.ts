@@ -111,6 +111,25 @@ export function getRemainingQuantity(
 }
 
 /**
+ * The subscription with its line carrying the quantity the customer holds in Adobe.
+ *
+ * A partial early renewal is a Change order whose line carries the renewed
+ * total, so until the next agreement sync the platform line understates the
+ * seats still held. The early path reads the held quantity from the renewal
+ * state instead, so every step shows it and a follow-up renewal can carry the
+ * remaining seats. Without a state the line is left as it is.
+ */
+export function withHeldQuantity(
+  subscription: Subscription,
+  states: RenewalStates,
+): Subscription {
+  const state = getRenewalState(subscription, states);
+  const [line, ...others] = subscription.lines ?? [];
+  if (!state || !line || line.quantity === state.currentQuantity) return subscription;
+  return { ...subscription, lines: [{ ...line, quantity: state.currentQuantity }, ...others] };
+}
+
+/**
  * Whether the Items step offers an increase beyond the current quantity.
  *
  * An increase rides a later add-mode order, so it is offered only once every
