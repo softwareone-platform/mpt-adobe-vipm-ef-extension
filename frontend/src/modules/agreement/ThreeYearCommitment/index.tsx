@@ -139,8 +139,10 @@ export function ThreeYearCommitment() {
             onClick={() =>
               open('request-commitment-action', {
                 context,
+                // Adobe's answer to the request carries only the new request, not the
+                // current commitment, so the customer is read again after a send.
                 onClose: (data?: { customer?: typeof adobeCustomer.data }) => {
-                  if (data?.customer) adobeCustomer.update(data.customer);
+                  if (data?.customer) adobeCustomer.refresh();
                 },
               })
             }

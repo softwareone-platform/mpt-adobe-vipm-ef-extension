@@ -59,6 +59,11 @@ interface MockOption {
   value: string;
   disabled?: boolean;
 }
+interface MockSelectItem {
+  label: string;
+  value: string;
+  isDisabled?: boolean;
+}
 interface MockButtonProps {
   children: ReactNode;
   onClick?: () => void;
@@ -69,7 +74,7 @@ interface MockSelectProps {
   controlLabel: string;
   value: string;
   onChange: (value: string) => void;
-  options: MockOption[];
+  options: MockSelectItem[];
 }
 interface MockSwitcherProps {
   name: string;
@@ -107,7 +112,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/select', () => ({
     <select aria-label={controlLabel} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="" />
       {options.map((option, index) => (
-        <option key={index} value={option.value} disabled={option.disabled}>
+        <option key={index} value={option.value} disabled={option.isDisabled}>
           {option.label}
         </option>
       ))}
@@ -151,18 +156,54 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/text', () => ({
   RegularText: ({ children }: MockTextProps) => <span>{children}</span>,
 }));
 
-function committedCustomer(minimumLicenses?: number): AdobeCustomerData {
+function isoDateFromToday(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+interface CommittedCustomerOptions {
+  licenses?: number;
+  consumables?: number;
+  endsInDays?: number;
+  pendingRequest?: boolean;
+  acceptedRecommitment?: boolean;
+  pendingRecommitment?: boolean;
+}
+
+function committedCustomer({
+  licenses,
+  consumables,
+  endsInDays = 400,
+  pendingRequest = false,
+  acceptedRecommitment = false,
+  pendingRecommitment = false,
+}: CommittedCustomerOptions = {}): AdobeCustomerData {
+  const minimumQuantities = [
+    ...(licenses != null ? [{ offerType: 'LICENSE' as const, quantity: licenses }] : []),
+    ...(consumables != null ? [{ offerType: 'CONSUMABLES' as const, quantity: consumables }] : []),
+  ];
   return {
     benefits: [
       {
         type: 'THREE_YEAR_COMMIT',
         commitment: {
           status: 'COMMITTED',
-          minimumQuantities:
-            minimumLicenses != null
-              ? [{ offerType: 'LICENSE', quantity: minimumLicenses }]
-              : [],
+          endDate: isoDateFromToday(endsInDays),
+          minimumQuantities,
         },
+        commitmentRequest: pendingRequest
+          ? { status: 'REQUESTED', minimumQuantities: [{ offerType: 'LICENSE', quantity: 100 }] }
+          : null,
+        recommitmentRequest:
+          acceptedRecommitment || pendingRecommitment
+            ? {
+                status: acceptedRecommitment ? 'ACCEPTED' : 'REQUESTED',
+                minimumQuantities: [{ offerType: 'LICENSE', quantity: 10 }],
+              }
+            : null,
       },
     ],
   };
@@ -181,6 +222,12 @@ const selectConsumables = (utils: ReturnType<typeof setup>, value: string) =>
 
 const setRequestType = (utils: ReturnType<typeof setup>, value: string) =>
   fireEvent.change(utils.getByTestId('switcher-request-type'), { target: { value } });
+
+const setCustomLicenses = (utils: ReturnType<typeof setup>, value: string) =>
+  fireEvent.change(utils.getByTestId('input-customLicenses'), { target: { value } });
+
+const optionLabelled = (utils: ReturnType<typeof setup>, label: string) =>
+  utils.getByRole('option', { name: label }) as HTMLOptionElement;
 
 const clickSend = (utils: ReturnType<typeof setup>) =>
   fireEvent.click(utils.getByText('Send invitation'));
@@ -265,7 +312,8 @@ describe('request-commitment-action App', () => {
     await waitFor(() => expect(mockClose).toHaveBeenCalledWith({ customer: { customerId: 'P1' } }));
   });
 
-  it('submits a recommitment payload when recommitment is selected', async () => {
+  it('submits a recommitment payload inside the recommitment window', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10, endsInDays: 20 });
     const utils = setup();
 
     setRequestType(utils, 'recommitment');
@@ -310,22 +358,252 @@ describe('request-commitment-action App', () => {
     );
   });
 
-  it('rejects a commitment when the customer is already committed', () => {
-    mockCustomerData = committedCustomer();
+  it('defaults a committed customer to an uplevel through a commitment request', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10 });
     const utils = setup();
 
-    setRequestType(utils, 'commitment');
+    selectLicenses(utils, '50');
+    clickSend(utils);
+
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith({
+        benefits: [
+          {
+            type: 'THREE_YEAR_COMMIT',
+            commitmentRequest: {
+              minimumQuantities: [{ offerType: 'LICENSE', quantity: 50 }],
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  it('disables levels below the committed minimum and marks the current one', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+
+    expect(optionLabelled(utils, 'Keep current (50)')).toBeTruthy();
+    expect(optionLabelled(utils, 'Level 12 (10 licenses)').disabled).toBe(true);
+    expect(optionLabelled(utils, 'Level 13 (50 licenses) (current)').disabled).toBe(false);
+    expect(optionLabelled(utils, 'Level 14 (100 licenses)').disabled).toBe(false);
+  });
+
+  it('offers every level again when recommitment is selected', () => {
+    mockCustomerData = committedCustomer({ licenses: 50, endsInDays: 20 });
+    const utils = setup();
+
+    setRequestType(utils, 'recommitment');
+
+    expect(optionLabelled(utils, 'Level 12 (10 licenses)').disabled).toBe(false);
+    expect(utils.queryByRole('option', { name: 'Keep current (50)' })).toBeNull();
+  });
+
+  it('keeps the committed licenses when only consumables are added', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10 });
+    const utils = setup();
+
+    selectConsumables(utils, '1000');
+    clickSend(utils);
+
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith({
+        benefits: [
+          {
+            type: 'THREE_YEAR_COMMIT',
+            commitmentRequest: {
+              minimumQuantities: [
+                { offerType: 'LICENSE', quantity: 10 },
+                { offerType: 'CONSUMABLES', quantity: 1000 },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  it('accepts an uplevel request at the current committed minimum', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10 });
+    const utils = setup();
+
     selectLicenses(utils, '10');
     clickSend(utils);
 
+    await waitFor(() => expect(mockSubmit).toHaveBeenCalled());
+  });
+
+  it('rejects a custom license count below the committed minimum', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+    clickSend(utils);
+
     expect(
-      utils.getByText('The customer is already committed. Select recommitment instead.'),
+      utils.getByText('Licenses cannot be lower than the current committed minimum of 50.'),
     ).toBeTruthy();
     expect(mockSubmit).not.toHaveBeenCalled();
   });
 
+  it('clears the minimum error once the custom count is corrected, without a Send', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+    const belowMinimum = 'Licenses cannot be lower than the current committed minimum of 50.';
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+    clickSend(utils);
+
+    setCustomLicenses(utils, '30');
+    const stillBelow = utils.queryByText(belowMinimum);
+    setCustomLicenses(utils, '50');
+
+    expect(stillBelow).toBeTruthy();
+    expect(utils.queryByText(belowMinimum)).toBeNull();
+    expect(utils.queryByTestId('notification-error')).toBeNull();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears the minimum error once a level at or above it is chosen', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+    clickSend(utils);
+
+    selectLicenses(utils, '100');
+
+    expect(utils.queryByTestId('notification-error')).toBeNull();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows no minimum error before the first Send', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+
+    expect(utils.queryByTestId('notification-error')).toBeNull();
+  });
+
+  it('rejects consumables below the committed minimum', () => {
+    mockCustomerData = committedCustomer({ consumables: 2500 });
+    const utils = setup();
+
+    selectConsumables(utils, 'custom');
+    fireEvent.change(utils.getByTestId('input-customConsumables'), { target: { value: '1000' } });
+    clickSend(utils);
+
+    expect(
+      utils.getByText('Consumables cannot be lower than the current committed minimum of 2500.'),
+    ).toBeTruthy();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('closes recommitment outside the window and says when it opens', () => {
+    mockCustomerData = committedCustomer({ licenses: 10, endsInDays: 400 });
+    const utils = setup();
+
+    const opensOn = isoDateFromToday(370);
+    const endDate = isoDateFromToday(400);
+    expect(optionLabelled(utils, 'recommitment').disabled).toBe(true);
+    expect(
+      utils.getByText(
+        `Recommitment opens on ${opensOn}, 30 days before the commitment ends on ${endDate}.`,
+      ),
+    ).toBeTruthy();
+  });
+
+  it('closes recommitment for a customer without an active commitment', () => {
+    const utils = setup();
+
+    expect(optionLabelled(utils, 'recommitment').disabled).toBe(true);
+    expect(
+      utils.getByText(
+        'Recommitment is available only to customers with an active three-year commitment.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('refuses a recommitment the customer is not eligible for', () => {
+    const utils = setup();
+
+    setRequestType(utils, 'recommitment');
+    selectLicenses(utils, '10');
+    clickSend(utils);
+
+    expect(utils.getByText('Recommitment is not available for this customer.')).toBeTruthy();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('lets a pending request be replaced, and says so', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10, pendingRequest: true });
+    const utils = setup();
+
+    expect(utils.getByTestId('notification-info').textContent).toContain(
+      'A commitment request for 100 licenses is awaiting acceptance in the Adobe Admin Console. Sending a new commitment request replaces it.',
+    );
+    expect((utils.getByText('Send invitation') as HTMLButtonElement).disabled).toBe(false);
+
+    selectLicenses(utils, '50');
+    clickSend(utils);
+
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith({
+        benefits: [
+          {
+            type: 'THREE_YEAR_COMMIT',
+            commitmentRequest: {
+              minimumQuantities: [{ offerType: 'LICENSE', quantity: 50 }],
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  it.each([
+    ['accepted', { acceptedRecommitment: true }],
+    ['pending', { pendingRecommitment: true }],
+  ])('blocks a commitment request while a recommitment is %s', (_state, options) => {
+    mockCustomerData = committedCustomer({ licenses: 10, ...options });
+    const utils = setup();
+
+    expect(
+      utils.getAllByTestId('notification-info').some((notice) =>
+        (notice.textContent ?? '').includes('has a recommitment request in place'),
+      ),
+    ).toBe(true);
+    expect((utils.getByText('Send invitation') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('lets a pending recommitment be replaced through the recommitment path', async () => {
+    mockCustomerData = committedCustomer({ licenses: 10, endsInDays: 20, pendingRecommitment: true });
+    const utils = setup();
+
+    setRequestType(utils, 'recommitment');
+    selectLicenses(utils, '50');
+    clickSend(utils);
+
+    await waitFor(() =>
+      expect(mockSubmit).toHaveBeenCalledWith({
+        benefits: [
+          {
+            type: 'THREE_YEAR_COMMIT',
+            recommitmentRequest: {
+              minimumQuantities: [{ offerType: 'LICENSE', quantity: 50 }],
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+
   it('allows a recommitment below the current committed minimum', async () => {
-    mockCustomerData = committedCustomer(50);
+    mockCustomerData = committedCustomer({ licenses: 50, endsInDays: 20 });
     const utils = setup();
 
     setRequestType(utils, 'recommitment');
