@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { i18n } from '../../i18n/translations';
 import { useMPTContext, useMPTModal } from '@mpt-extension/sdk-react';
 import { Button } from '@softwareone-platform/sdk-react-ui-v0/button';
-import { Select } from '@softwareone-platform/sdk-react-ui-v0/select';
+import type { SelectItem } from '@softwareone-platform/sdk-react-ui-v0/select';
 import { Input } from '@softwareone-platform/sdk-react-ui-v0/input';
 import { Switcher } from '@softwareone-platform/sdk-react-ui-v0/switcher';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
@@ -30,6 +30,7 @@ import {
   recommitmentOpensOn,
 } from './commitmentRules';
 import type { CommitmentState, PendingRequest, RequestType } from './commitmentRules';
+import { QuantitySelect } from './QuantitySelect';
 
 import './App.scss';
 
@@ -105,7 +106,7 @@ const CONSUMABLE_TIERS: QuantityLevel[] = [
  * minimum are disabled, the current one is marked, and the empty choice keeps the
  * current minimum, because Adobe rejects a request that drops a committed type.
  */
-function buildQuantityOptions(levels: QuantityLevel[], floor: number | null) {
+function buildQuantityOptions(levels: QuantityLevel[], floor: number | null): SelectItem[] {
   return [
     floor != null
       ? { label: i18n.t('Commitment:Keep current', { quantity: floor }), value: '' }
@@ -116,7 +117,7 @@ function buildQuantityOptions(levels: QuantityLevel[], floor: number | null) {
           ? i18n.t('Commitment:Current level', { label: i18n.t(labelKey) })
           : i18n.t(labelKey),
       value: String(quantity),
-      disabled: floor != null && quantity < floor,
+      isDisabled: floor != null && quantity < floor,
     })),
     { label: i18n.t('Commitment:Custom'), value: 'custom' },
   ];
@@ -177,7 +178,8 @@ export default function App() {
 
   const { error, status, submitRequest } = useThreeYearCommitmentRequest(agreementId);
 
-  const [localError, setLocalError] = useState('');
+  // Set once a Send is refused: from then on the form's own check shows live.
+  const [showValidation, setShowValidation] = useState(false);
   const [requestType, setRequestType] = useState<RequestType>('commitment');
   const [discountLevel, setDiscountLevel] = useState('');
   const [customLicenses, setCustomLicenses] = useState('');
@@ -243,21 +245,22 @@ export default function App() {
   // Adobe accepts no commitment request while a recommitment request is in place.
   const isCommitmentBlocked = requestType === 'commitment' && commitmentState.hasRecommitmentRequest;
 
+  const effectiveLicenses = resolveValue(discountLevel, customLicenses, licenseFloor);
+  const effectiveConsumables = resolveValue(discountTier, customConsumables, consumableFloor);
+  const validationError =
+    validateRequestType(requestType, commitmentState) ??
+    validateAtLeastOneQuantity(effectiveLicenses, effectiveConsumables) ??
+    validateAboveFloor(effectiveLicenses, effectiveConsumables, licenseFloor, consumableFloor);
+  // Checked against the current values, so correcting one clears the banner without a Send.
+  const localError = showValidation ? validationError : null;
+
   async function handleSubmit() {
-    const effectiveLicenses = resolveValue(discountLevel, customLicenses, licenseFloor);
-    const effectiveConsumables = resolveValue(discountTier, customConsumables, consumableFloor);
-
-    const validationError =
-      validateRequestType(requestType, commitmentState) ??
-      validateAtLeastOneQuantity(effectiveLicenses, effectiveConsumables) ??
-      validateAboveFloor(effectiveLicenses, effectiveConsumables, licenseFloor, consumableFloor);
-
     if (validationError) {
-      setLocalError(validationError);
+      setShowValidation(true);
       return;
     }
 
-    setLocalError('');
+    setShowValidation(false);
     const minimumQuantities = buildMinimumQuantities(effectiveLicenses, effectiveConsumables);
     const input: ThreeYearCommitmentRequestInput = {
       benefits: [
@@ -343,8 +346,7 @@ export default function App() {
         {t('Commitment:Licenses')}
       </MediumText>
 
-      <Select
-        positions={{ position: 'bottom-start' }}
+      <QuantitySelect
         controlLabel={t('Commitment:Discount level')}
         placeholder={t('Commitment:Discount level placeholder')}
         value={discountLevel}
@@ -375,8 +377,7 @@ export default function App() {
         {t('Commitment:Consumables')}
       </MediumText>
 
-      <Select
-        positions={{ position: 'bottom-start' }}
+      <QuantitySelect
         controlLabel={t('Commitment:Discount tier')}
         placeholder={t('Commitment:Discount tier placeholder')}
         value={discountTier}
