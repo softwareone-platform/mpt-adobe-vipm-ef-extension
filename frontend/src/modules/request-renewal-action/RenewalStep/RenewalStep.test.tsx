@@ -6,7 +6,13 @@ import { http } from '@mpt-extension/sdk';
 
 import { RenewalStep } from './RenewalStep';
 import type { Agreement, Subscription } from '../../shared/model';
-import type { NetNewItem, RenewalPath, RenewalQuantities, RenewalSelections } from '../model';
+import type {
+  NetNewItem,
+  RenewalPath,
+  RenewalQuantities,
+  RenewalSelections,
+  RenewalStates,
+} from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
   http: {
@@ -167,6 +173,7 @@ const renderStep = ({
   quantities = {},
   netNewItems = [],
   path = 'anniversary',
+  renewalStates = {},
 }: {
   selections?: RenewalSelections;
   onRenewChange?: (subscriptionId: string, renew: boolean) => void;
@@ -174,6 +181,7 @@ const renderStep = ({
   quantities?: RenewalQuantities;
   netNewItems?: NetNewItem[];
   path?: RenewalPath;
+  renewalStates?: RenewalStates;
 } = {}) =>
   render(
     <RenewalStep
@@ -183,6 +191,7 @@ const renderStep = ({
       quantities={quantities}
       netNewItems={netNewItems}
       path={path}
+      renewalStates={renewalStates}
       onRenewChange={onRenewChange}
     />,
   );
@@ -208,6 +217,29 @@ describe('RenewalStep', () => {
     expect(getByText('1715')).toBeTruthy();
     expect(getAllByText('Yearly billing')).toHaveLength(2);
     expect(getAllByText('1 year commitment')).toHaveLength(2);
+  });
+
+  it('names the seats already early-renewed under the current quantity', () => {
+    const { getByTestId } = renderStep({
+      path: 'now',
+      subscriptionList: [
+        { ...subscriptions[0], externalIds: { vendor: 'a1b2c3d4e5NA' } },
+        subscriptions[1],
+      ],
+      renewalStates: {
+        a1b2c3d4e5NA: {
+          currentQuantity: 1715,
+          renewedQuantity: 1000,
+          state: 'partiallyRenewed',
+          remainingQuantity: 715,
+          earlyRenewable: true,
+          increaseAllowed: false,
+        },
+      },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('1000 renewed · 715 left');
+    expect(getByTestId('row-SUB-2').textContent).not.toContain('renewed');
   });
 
   it('seeds each Renew toggle from the standing autoRenewal preference', () => {

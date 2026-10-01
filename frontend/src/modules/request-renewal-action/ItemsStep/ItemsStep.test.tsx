@@ -402,6 +402,24 @@ describe('ItemsStep', () => {
     expect(queryByTestId('items-step-increase-error')).toBeNull();
   });
 
+  it('names the seats already early-renewed under the current quantity', () => {
+    const { getByTestId } = renderStep({
+      path: 'now',
+      renewalStates: {
+        [ADOBE_SUBSCRIPTION_ID]: {
+          currentQuantity: 37,
+          renewedQuantity: 15,
+          state: 'partiallyRenewed',
+          remainingQuantity: 22,
+          earlyRenewable: true,
+          increaseAllowed: false,
+        },
+      },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('15 renewed · 22 left');
+  });
+
   it('leaves a renewal quantity above the current one alone at the anniversary', () => {
     const { queryByTestId } = renderStep({ quantities: { 'SUB-1': 38 } });
 
