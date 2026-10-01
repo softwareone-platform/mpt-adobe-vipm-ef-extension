@@ -59,6 +59,11 @@ interface MockOption {
   value: string;
   disabled?: boolean;
 }
+interface MockSelectItem {
+  label: string;
+  value: string;
+  isDisabled?: boolean;
+}
 interface MockButtonProps {
   children: ReactNode;
   onClick?: () => void;
@@ -69,7 +74,7 @@ interface MockSelectProps {
   controlLabel: string;
   value: string;
   onChange: (value: string) => void;
-  options: MockOption[];
+  options: MockSelectItem[];
 }
 interface MockSwitcherProps {
   name: string;
@@ -107,7 +112,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/select', () => ({
     <select aria-label={controlLabel} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="" />
       {options.map((option, index) => (
-        <option key={index} value={option.value} disabled={option.disabled}>
+        <option key={index} value={option.value} disabled={option.isDisabled}>
           {option.label}
         </option>
       ))}
@@ -440,6 +445,47 @@ describe('request-commitment-action App', () => {
       utils.getByText('Licenses cannot be lower than the current committed minimum of 50.'),
     ).toBeTruthy();
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears the minimum error once the custom count is corrected, without a Send', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+    const belowMinimum = 'Licenses cannot be lower than the current committed minimum of 50.';
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+    clickSend(utils);
+
+    setCustomLicenses(utils, '30');
+    const stillBelow = utils.queryByText(belowMinimum);
+    setCustomLicenses(utils, '50');
+
+    expect(stillBelow).toBeTruthy();
+    expect(utils.queryByText(belowMinimum)).toBeNull();
+    expect(utils.queryByTestId('notification-error')).toBeNull();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('clears the minimum error once a level at or above it is chosen', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+    clickSend(utils);
+
+    selectLicenses(utils, '100');
+
+    expect(utils.queryByTestId('notification-error')).toBeNull();
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows no minimum error before the first Send', () => {
+    mockCustomerData = committedCustomer({ licenses: 50 });
+    const utils = setup();
+
+    selectLicenses(utils, 'custom');
+    setCustomLicenses(utils, '20');
+
+    expect(utils.queryByTestId('notification-error')).toBeNull();
   });
 
   it('rejects consumables below the committed minimum', () => {
