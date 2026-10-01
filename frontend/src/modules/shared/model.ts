@@ -409,6 +409,12 @@ export interface RenewalStateEntry {
 }
 
 /**
+ * The renewal in place that locks an agreement against a mid-term upgrade:
+ * an early renewal already placed, or a renewal staged for the anniversary.
+ */
+export type RenewalInPlace = 'early' | 'staged';
+
+/**
  * Whether a renewal can be planned today, and which path is already established.
  *
  * Adobe takes a renewal order and a scheduled net-new subscription only inside

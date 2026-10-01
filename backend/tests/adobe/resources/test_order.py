@@ -4,6 +4,7 @@ import json
 import pytest
 import responses
 
+from adobe.enums import AdobeOrderType
 from adobe.errors import AdobeAPIError, AdobeHttpError
 
 _ORDERS_URL = "https://api.adobe.io/v3/customers/CUST-000/orders"
@@ -291,3 +292,40 @@ def test_preview_automated_renewal_order_raises_adobe_api_error_when_no_auto_ren
         adobe_client.order.preview_automated_renewal_order("AUT-1234-5678", "CUST-000", "USD")
 
     assert exc_info.value.status_code == http.HTTPStatus.BAD_REQUEST
+
+
+@responses.activate
+def test_list_orders_walks_every_page_of_one_order_type(adobe_client):
+    responses.get(
+        _ORDERS_URL,
+        json={
+            "items": [{"orderId": "P1"}],
+            "links": {"next": {"uri": "/v3/customers/CUST-000/orders?limit=100&offset=100"}},
+        },
+        status=http.HTTPStatus.OK,
+    )
+    responses.get(
+        _ORDERS_URL,
+        json={"items": [{"orderId": "P2"}], "links": {}},
+        status=http.HTTPStatus.OK,
+    )
+
+    result = adobe_client.order.list_orders("AUT-1234-5678", "CUST-000", AdobeOrderType.RENEWAL)
+
+    assert result == [{"orderId": "P1"}, {"orderId": "P2"}]
+    first, second = (call.request for call in responses.calls)
+    assert "offset=0" in first.url
+    assert "order-type=RENEWAL" in first.url
+    assert "offset=100" in second.url
+
+
+@responses.activate
+def test_list_orders_raises_adobe_api_error_on_http_error_with_json(adobe_client):
+    responses.get(
+        _ORDERS_URL,
+        json={"code": "1116", "message": "Invalid Customer"},
+        status=http.HTTPStatus.NOT_FOUND,
+    )
+
+    with pytest.raises(AdobeAPIError):
+        adobe_client.order.list_orders("AUT-1234-5678", "CUST-000", AdobeOrderType.RENEWAL)

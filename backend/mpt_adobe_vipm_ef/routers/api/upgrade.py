@@ -32,6 +32,11 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.services.clients import build_caller_client
 from mpt_adobe_vipm_ef.services.items import get_partial_sku, resolve_items_by_sku
+from mpt_adobe_vipm_ef.services.renewal_in_place import (
+    RenewalInPlace,
+    load_renewal_in_place,
+    require_no_renewal_in_place,
+)
 from mpt_adobe_vipm_ef.services.subscriptions import find_existing_target_line
 from mpt_adobe_vipm_ef.services.switch_order import (
     build_change_order_lines,
@@ -43,6 +48,28 @@ from mpt_adobe_vipm_ef.services.switch_order import (
 logger = logging.getLogger(__name__)
 
 upgrade_router = APIRouter(prefix="/agreements")
+
+
+@upgrade_router.get(
+    path="/{agreement_id}/upgrade-order/renewal-in-place",
+    name="agreements-upgrade-order-renewal-in-place",
+)
+@validate_agreement_access
+@log_inputs
+async def get_upgrade_renewal_in_place(agreement_id: str, ctx: APIContext) -> APIResponse:
+    """Report whether a renewal in place locks the agreement against a mid-term upgrade.
+
+    The upgrade wizard reads this on its first step and stops there when a
+    renewal is in place (``early`` or ``staged``), explaining that renewal
+    changes are made in the renewal wizard. The submit route repeats the
+    check.
+    """
+    if not ctx.auth.account.is_client():
+        raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
+    renewal_in_place = await _load_renewal_in_place(ctx, agreement_id)
+    return APIResponse.ok(
+        payload={"renewalInPlace": renewal_in_place.value if renewal_in_place else None},
+    )
 
 
 @upgrade_router.post(
@@ -60,12 +87,15 @@ async def create_upgrade_order(  # noqa: WPS210, WPS217
     Validates the customer's selection, gates it through an Adobe
     ``PREVIEW_SWITCH`` quote, and only then creates the change order (directly
     in Processing status) carrying the hidden ``switchPayload`` DataObject
-    parameter.
+    parameter. A renewal in place (an early renewal placed, or one staged for
+    the anniversary) refuses the upgrade, since it would move seats that
+    renewal depends on; the wizard's first step shows the same answer.
     """
     if not ctx.auth.account.is_client():
         raise ForbiddenError(detail="The mid-term upgrade is available to client accounts only.")
     agreement = await load_agreement(ctx, agreement_id)
     require_active_agreement(agreement)
+    require_no_renewal_in_place(await _load_renewal_in_place(ctx, agreement_id))
     source_line, adobe_subscription_id = await _load_switch_source(ctx, agreement, subscription_id)
     _validate_quantity(body.quantity, source_line.quantity)
 
@@ -81,6 +111,12 @@ async def create_upgrade_order(  # noqa: WPS210, WPS217
     lines = build_change_order_lines(source_line, body.quantity, target_line, target_item_id)
     order = await _create_change_order(ctx, agreement_id, lines, switch_payload, body)
     return APIResponse.created(payload=order)
+
+
+async def _load_renewal_in_place(ctx: APIContext, agreement_id: str) -> RenewalInPlace | None:
+    authorization_id = await get_authorization_id(ctx, agreement_id)
+    customer_id = await require_customer_id(ctx, agreement_id)
+    return await load_renewal_in_place(ctx, authorization_id, customer_id)
 
 
 async def _load_switch_source(
