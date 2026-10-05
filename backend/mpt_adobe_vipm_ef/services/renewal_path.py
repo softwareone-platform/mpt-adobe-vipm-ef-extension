@@ -8,11 +8,14 @@ from mpt_extension_sdk.api import ValidationError
 
 from mpt_adobe_vipm_ef.constants import ACTIVE_SUBSCRIPTION_STATUS, SCHEDULED_SUBSCRIPTION_STATUS
 from mpt_adobe_vipm_ef.models.renewal import RenewalPath
+from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.services.renewal import is_within_scheduled_creation_window
 
 logger = logging.getLogger(__name__)
 
 Payload = dict[str, Any]
+
+_NO_SKUS: frozenset[str] = frozenset()
 
 
 def is_renewal_window_open(coterm_date: str) -> bool:
@@ -42,15 +45,42 @@ def has_active_subscriptions(adobe_subscriptions: Payload) -> bool:
     )
 
 
-def resolve_locked_path(coterm_date: str, adobe_subscriptions: Payload) -> RenewalPath | None:
+def resolve_anniversary_date(
+    coterm_date: str,
+    adobe_subscriptions: Payload,
+    non_renewable_skus: frozenset[str] = _NO_SKUS,
+) -> str:
+    """The date the customer's current term ends.
+
+    This is usually the ``cotermDate``. When an early renewal is fully returned,
+    Adobe leaves the ``cotermDate`` a year ahead, so the earliest subscription
+    ``renewalDate`` is used instead. Products that can't renew, such as credit
+    packs, have their own dates and are skipped.
+    """
+    coterm = _parse_date(coterm_date)
+    subscription_items = adobe_subscriptions.get("items") or []
+    if coterm is None or _has_early_renewed_seats(subscription_items, coterm):
+        return coterm_date
+    renewal_dates = _active_renewal_dates([
+        subscription_item
+        for subscription_item in subscription_items
+        if get_partial_sku(str(subscription_item.get("offerId") or "")) not in non_renewable_skus
+    ])
+    if not renewal_dates or coterm <= min(renewal_dates) or coterm in renewal_dates:
+        return coterm_date
+    return min(renewal_dates).isoformat()
+
+
+def resolve_locked_path(
+    coterm_date: str,
+    adobe_subscriptions: Payload,
+    non_renewable_skus: frozenset[str] = _NO_SKUS,
+) -> RenewalPath | None:
     """Which renewal path a renewal already in place has established, if any.
 
-    An early renewal rolls the anniversary forward once, immediately on the
-    first successful order, while each active subscription's ``renewalDate``
-    holds at the original anniversary until it passes. A ``cotermDate`` past
-    that date is therefore the proof that the early path is established. Only
-    active subscriptions count: an inactive one keeps the ``renewalDate`` of the
-    term it lapsed in, which says nothing about a renewal in place.
+    The path is locked to ``now`` while an active subscription still has seats
+    renewed early (``renewedQuantity`` above 0). Dates alone are not enough,
+    because they stay moved after an early renewal is returned.
 
     An at-anniversary renewal moves no date and bills nothing now: it lands as
     deferred auto-renewal preferences on the subscriptions renewing at the
@@ -70,15 +100,22 @@ def resolve_locked_path(coterm_date: str, adobe_subscriptions: Payload) -> Renew
     if coterm is None:
         return None
     subscription_items = adobe_subscriptions.get("items") or []
-    renewal_dates = _active_renewal_dates(subscription_items)
-    if renewal_dates and coterm > min(renewal_dates):
+    if _has_early_renewed_seats(subscription_items, coterm):
         return RenewalPath.NOW
-    staged = any(_is_staged(subscription_item, coterm) for subscription_item in subscription_items)
+    anniversary = _parse_date(
+        resolve_anniversary_date(coterm_date, adobe_subscriptions, non_renewable_skus)
+    )
+    staged = any(
+        _is_staged(subscription_item, anniversary) for subscription_item in subscription_items
+    )
     return RenewalPath.ANNIVERSARY if staged else None
 
 
 def require_unlocked_path(
-    renewal_path: RenewalPath, coterm_date: str, adobe_subscriptions: Payload
+    renewal_path: RenewalPath,
+    coterm_date: str,
+    adobe_subscriptions: Payload,
+    non_renewable_skus: frozenset[str] = _NO_SKUS,
 ) -> None:
     """Reject a plan on the path a renewal already in place has closed off.
 
@@ -88,7 +125,7 @@ def require_unlocked_path(
     the customer already set up for the anniversary owns the term this plan
     would renew.
     """
-    locked_path = resolve_locked_path(coterm_date, adobe_subscriptions)
+    locked_path = resolve_locked_path(coterm_date, adobe_subscriptions, non_renewable_skus)
     if locked_path is None or locked_path is renewal_path:
         return
     if locked_path is RenewalPath.NOW:
@@ -106,8 +143,24 @@ def require_unlocked_path(
     )
 
 
-def _is_staged(subscription_item: Payload, coterm: dt.date) -> bool:
-    if _parse_date(str(subscription_item.get("renewalDate") or "")) != coterm:
+def _has_early_renewed_seats(subscription_items: list[Payload], coterm: dt.date) -> bool:
+    return any(
+        _holds_early_renewed_seats(subscription_item, coterm)
+        for subscription_item in subscription_items
+    )
+
+
+def _holds_early_renewed_seats(subscription_item: Payload, coterm: dt.date) -> bool:
+    if str(subscription_item.get("status") or "") != ACTIVE_SUBSCRIPTION_STATUS:
+        return False
+    if int(subscription_item.get("renewedQuantity") or 0) <= 0:
+        return False
+    renewal_date = _parse_date(str(subscription_item.get("renewalDate") or ""))
+    return renewal_date is not None and renewal_date < coterm
+
+
+def _is_staged(subscription_item: Payload, anniversary: dt.date | None) -> bool:
+    if _parse_date(str(subscription_item.get("renewalDate") or "")) != anniversary:
         return False
     status = str(subscription_item.get("status") or "")
     auto_renewal = subscription_item.get("autoRenewal") or {}
