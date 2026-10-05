@@ -72,6 +72,8 @@ export interface PromotionsStepProps {
   discountSelections: DiscountSelections;
   /** The reusables the customer already holds, auto-applied per renewing line. */
   inheritedDiscounts: InheritedDiscount[];
+  inheritedDiscountsFailed: boolean;
+  onRetryInheritedDiscounts: () => void;
   /** The path picked on the first step; the early one gates Next on Adobe's preview. */
   path: RenewalPath;
   onDiscountChange: (rowId: string, code: string) => void;
@@ -353,6 +355,8 @@ export function PromotionsStep({
   netNewItems,
   discountSelections,
   inheritedDiscounts,
+  inheritedDiscountsFailed,
+  onRetryInheritedDiscounts,
   path,
   onDiscountChange,
   onPreview,
@@ -415,9 +419,10 @@ export function PromotionsStep({
   );
 
   const unknownCode = useMemo(() => {
+    if (discounts.status !== 'success') return '';
     const known = new Set(renewalDiscounts.map((discount) => normalizeDiscountCode(discount.code)));
     return Object.values(discountSelections).find((code) => code && !known.has(code)) ?? '';
-  }, [discountSelections, renewalDiscounts]);
+  }, [discounts.status, discountSelections, renewalDiscounts]);
 
   const validationMessage = toDiscountErrorMessage(discountValidationError, unknownCode);
 
@@ -501,6 +506,19 @@ export function PromotionsStep({
             <InlineNotification status="error">
               {discounts.error || t('Renewal:Promotions:Errors:Discounts could not be loaded')}
             </InlineNotification>
+          </div>
+        )}
+        {inheritedDiscountsFailed && (
+          <div
+            className="promotions-step__inherited-error"
+            data-testid="promotions-step-inherited-error"
+          >
+            <InlineNotification status="error">
+              {t('Errors:LoadInheritedDiscounts')}
+            </InlineNotification>
+            <Button onClick={onRetryInheritedDiscounts}>
+              {t('Common:Retry')}
+            </Button>
           </div>
         )}
         {ineligibleInherited.length > 0 && (

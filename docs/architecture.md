@@ -112,8 +112,10 @@ frontend/                    TypeScript plug UI (esbuild)
     the customer can override one (which takes precedence) and the priced order
     matches the preview; a reusable Adobe reports as no longer eligible is
     flagged rather than applied. The lookup is advisory — Adobe re-validates
-    every code on the real preview and at submit — so its failure degrades to no
-    inherited discounts rather than blocking the renewal.
+    every code on the real preview and at submit — so its failure never blocks
+    the renewal: Adobe's `2136` (no auto-renewal subscriptions) reads as no
+    inherited discounts, any other Adobe error is an upstream error, and the
+    Promotions step shows it with a Retry.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
     a renewal order and a scheduled net-new subscription only between 30 and 3
     days before the anniversary, and only for a customer holding an active

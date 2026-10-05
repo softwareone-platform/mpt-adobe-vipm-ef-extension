@@ -59,12 +59,15 @@ them as *inherited* discounts:
   line, the flexible discounts Adobe auto-applies and whether each still
   qualifies (`SUCCESS`/`FAILURE`). Adobe owns the precedence between several
   held reusables and the extended lock window, so this is the source of truth
-  for the inherited set. Adobe errors when the customer has no auto-renewal
-  subscriptions, which the extension reads as no inherited discounts.
+  for the inherited set. When the customer has no auto-renewal subscriptions,
+  Adobe returns error `2136`, which the extension reads as no inherited
+  discounts.
 
 The lookup is advisory: Adobe re-validates every applied code on the real
-`PREVIEW_RENEWAL` (with line items) and at submit, so a failure of either read
-degrades to no inherited discounts rather than blocking the renewal.
+`PREVIEW_RENEWAL` (with line items) and at submit, so a failure never blocks
+the renewal. Any other Adobe error is reported as an upstream error, and the
+wizard's Promotions step says the held discounts could not be loaded, with a
+Retry.
 
 ## Airtable discount-store synchronization
 
