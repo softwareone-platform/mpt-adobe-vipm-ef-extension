@@ -460,6 +460,7 @@ async def test_create_renewal_order_rejects_an_anniversary_plan_once_the_path_is
                 "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
                 "status": "1000",
                 "renewalDate": _COTERM_IN_WINDOW,
+                "renewedQuantity": 3,
             },
         ],
     }
@@ -1234,7 +1235,7 @@ async def test_get_renewal_path_state_reports_an_open_window(
 async def test_get_renewal_path_state_reports_a_closed_window(
     fake_ctx, renewal_agreement, adobe_call
 ):
-    adobe_call.returns = _path_state_payload(_COTERM_OUT_OF_WINDOW)
+    adobe_call.returns = _path_state_payload(_COTERM_OUT_OF_WINDOW, _COTERM_OUT_OF_WINDOW)
 
     result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
 
@@ -1256,12 +1257,47 @@ async def test_get_renewal_path_state_reports_no_active_subscriptions(
 async def test_get_renewal_path_state_locks_the_early_path_once_rolled(
     fake_ctx, renewal_agreement, adobe_call
 ):
-    """A coterm past the subscription's renewal date means an early renewal rolled it."""
+    """Seats renewed early for the term ending at the renewal date lock the early path."""
     adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 3
 
     result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
 
     assert result.payload["lockedPath"] == "now"
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_dates_a_returned_early_renewal_from_the_subscription(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 0
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert (
+        result.payload["anniversaryDate"],
+        result.payload["windowOpen"],
+        result.payload["lockedPath"],
+    ) == (_COTERM_IN_WINDOW, True, None)
+
+
+@freeze_time(_TODAY)
+async def test_get_renewal_path_state_skips_a_product_that_cannot_auto_renew(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0].update({"offerId": _OFFER_ID, "renewedQuantity": 0})
+    adobe_call.returns["items"].append({
+        "subscriptionId": "a-sub-one-time",
+        "offerId": "ONETIMESKUCA01A12",
+        "status": "1000",
+        "renewalDate": "2026-08-10",
+    })
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["anniversaryDate"] == _COTERM_IN_WINDOW
 
 
 async def test_get_renewal_path_state_rejects_a_non_active_agreement(

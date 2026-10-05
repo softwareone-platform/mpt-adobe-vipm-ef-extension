@@ -70,6 +70,7 @@ from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
     is_renewal_window_open,
     require_unlocked_path,
+    resolve_anniversary_date,
     resolve_locked_path,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
@@ -202,7 +203,7 @@ async def get_renewal_state(agreement_id: str, ctx: APIContext) -> APIResponse:
 )
 @validate_agreement_access
 @log_inputs
-async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIResponse:
+async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIResponse:  # noqa: WPS210
     """Report whether a renewal can be planned today and which path is established.
 
     The wizard's first step reads this before it offers a path: outside the
@@ -223,12 +224,14 @@ async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIRespo
     require_active_agreement(agreement)
     customer = await _load_adobe_customer(ctx, agreement_id)
     subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
+    non_renewable_skus = await _load_non_renewable_skus(ctx, agreement, subscriptions)
     coterm_date = str(customer.get("cotermDate") or "")
-    locked_path = resolve_locked_path(coterm_date, subscriptions)
+    anniversary_date = resolve_anniversary_date(coterm_date, subscriptions, non_renewable_skus)
+    locked_path = resolve_locked_path(coterm_date, subscriptions, non_renewable_skus)
     return APIResponse.ok(
         payload={
-            "anniversaryDate": coterm_date,
-            "windowOpen": is_renewal_window_open(coterm_date),
+            "anniversaryDate": anniversary_date,
+            "windowOpen": is_renewal_window_open(anniversary_date),
             "windowOpensDays": SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
             "windowClosesDays": SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
             "hasActiveSubscriptions": has_active_subscriptions(subscriptions),
@@ -439,7 +442,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     if net_new_lines:
         require_scheduled_creation_window(coterm_date)
     plan_subscriptions = await _resolve_submission_plan(
-        ctx, agreement_id, plan_subscriptions, body.renewal_path, coterm_date
+        ctx, agreement, plan_subscriptions, body.renewal_path, coterm_date
     )
     require_discount_code_change(body, plan_subscriptions, net_new_lines)
 
@@ -636,7 +639,7 @@ async def _load_adobe_customer(ctx: APIContext, agreement_id: str) -> dict[str, 
 
 async def _resolve_submission_plan(
     ctx: APIContext,
-    agreement_id: str,
+    agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     renewal_path: RenewalPath,
     coterm_date: str,
@@ -649,8 +652,9 @@ async def _resolve_submission_plan(
     behind the snapshot's deltas, with the plan rejected right here if it asks
     to take renewed seats back.
     """
-    adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement_id)
-    require_unlocked_path(renewal_path, coterm_date, adobe_subscriptions)
+    adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement.id)
+    non_renewable_skus = await _load_non_renewable_skus(ctx, agreement, adobe_subscriptions)
+    require_unlocked_path(renewal_path, coterm_date, adobe_subscriptions, non_renewable_skus)
     plan_subscriptions = _resolve_renewal_offer_ids(plan_subscriptions, adobe_subscriptions)
     plan_subscriptions = _resolve_current_discount_codes(plan_subscriptions, adobe_subscriptions)
     if renewal_path is RenewalPath.NOW:
@@ -798,6 +802,17 @@ def _held_partial_skus(subscriptions: dict[str, object]) -> list[str]:
         for subscription_item in subscription_items
         if subscription_item.get("offerId")
     })
+
+
+async def _load_non_renewable_skus(
+    ctx: APIContext, agreement: Agreement, subscriptions: dict[str, object]
+) -> frozenset[str]:
+    """The customer's products that can't auto-renew, such as credit packs."""
+    partial_skus = _held_partial_skus(subscriptions)
+    support = await load_auto_renew_support(
+        ctx, partial_skus, resolve_market_segment(ctx, agreement)
+    )
+    return frozenset(sku for sku in partial_skus if not support.get(sku))
 
 
 async def _load_adobe_subscriptions(ctx: APIContext, agreement_id: str) -> dict[str, object]:

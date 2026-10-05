@@ -7,6 +7,7 @@ from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
     is_renewal_window_open,
     require_unlocked_path,
+    resolve_anniversary_date,
     resolve_locked_path,
 )
 
@@ -80,9 +81,68 @@ def test_active_subscriptions_on_an_empty_customer():
 
 
 def test_locked_path_when_the_anniversary_has_rolled(adobe_subscriptions):
+    adobe_subscriptions["items"][0]["renewedQuantity"] = 3
+
     result = resolve_locked_path("2027-08-01", adobe_subscriptions)
 
     assert result is RenewalPath.NOW
+
+
+def test_no_locked_path_once_the_early_renewal_is_returned(adobe_subscriptions):
+    adobe_subscriptions["items"][0]["renewedQuantity"] = 0
+
+    result = resolve_locked_path("2027-08-01", adobe_subscriptions)
+
+    assert result is None
+
+
+def test_no_locked_path_from_dates_alone(adobe_subscriptions):
+    result = resolve_locked_path("2027-08-01", adobe_subscriptions)
+
+    assert result is None
+
+
+def test_no_locked_path_from_renewed_seats_on_an_inactive_subscription(adobe_subscriptions):
+    adobe_subscriptions["items"][0].update({"status": "1004", "renewedQuantity": 5})
+
+    result = resolve_locked_path("2027-08-01", adobe_subscriptions)
+
+    assert result is None
+
+
+def test_anniversary_falls_back_to_the_renewal_date_once_returned(adobe_subscriptions):
+    adobe_subscriptions["items"][0]["renewedQuantity"] = 0
+
+    result = resolve_anniversary_date("2027-08-01", adobe_subscriptions)
+
+    assert result == "2026-08-01"
+
+
+def test_returned_early_renewal_skips_a_one_time_offer_renewing_earlier(adobe_subscriptions):
+    adobe_subscriptions["items"][0]["renewedQuantity"] = 0
+    adobe_subscriptions["items"].append({
+        "subscriptionId": "a-sub-scp",
+        "offerId": "ONETIMESKUCA01A12",
+        "status": "1000",
+        "renewalDate": "2026-07-20",
+    })
+
+    result = resolve_anniversary_date("2027-08-01", adobe_subscriptions, frozenset(("ONETIMESKU",)))
+
+    assert result == "2026-08-01"
+
+
+def test_one_time_offer_renewing_earlier_changes_nothing(adobe_subscriptions):
+    adobe_subscriptions["items"].append(
+        {"subscriptionId": "a-sub-scp", "status": "1000", "renewalDate": "2026-07-20"},
+    )
+
+    result = (
+        resolve_anniversary_date("2026-08-01", adobe_subscriptions),
+        resolve_locked_path("2026-08-01", adobe_subscriptions),
+    )
+
+    assert result == ("2026-08-01", None)
 
 
 def test_no_locked_path_before_a_renewal(adobe_subscriptions):
@@ -194,12 +254,16 @@ def test_staged_preferences_ignored_on_an_inactive_subscription(staged_subscript
 
 
 def test_early_renewal_wins_over_staged_preferences(staged_subscriptions):
+    staged_subscriptions["items"][0]["renewedQuantity"] = 10
+
     result = resolve_locked_path("2027-08-01", staged_subscriptions)
 
     assert result is RenewalPath.NOW
 
 
 def test_anniversary_path_rejected_once_locked_to_now(adobe_subscriptions):
+    adobe_subscriptions["items"][0]["renewedQuantity"] = 3
+
     with pytest.raises(ValidationError) as exc_info:
         require_unlocked_path(RenewalPath.ANNIVERSARY, "2027-08-01", adobe_subscriptions)
 
