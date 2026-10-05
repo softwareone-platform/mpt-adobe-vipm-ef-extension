@@ -56,6 +56,10 @@ _ADOBE_API_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
     {"code": "3132", "message": "Ineligible product or orderType"},
 )
+_NO_AUTO_RENEWAL_ERROR = AdobeAPIError(
+    http.HTTPStatus.BAD_REQUEST,
+    {"code": "2136", "message": "Auto-renewal needs to be turned on for at least 1 quantity."},
+)
 
 
 def _line_payload(line_id, vendor_sku, quantity):
@@ -2235,12 +2239,31 @@ async def test_get_inherited_discounts_is_empty_when_the_customer_has_no_auto_re
 ):
     """Adobe rejects the automated preview with no auto-renewing subscriptions; that is no error."""
     order_call = FakeAdobeCall()
-    order_call.error = _ADOBE_API_ERROR
+    order_call.error = _NO_AUTO_RENEWAL_ERROR
     fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
 
     result = await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)
 
     assert result.payload == {"inheritedDiscounts": []}
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _ADOBE_API_ERROR,
+        AdobeHttpError(http.HTTPStatus.SERVICE_UNAVAILABLE, "Service Unavailable"),
+        AdobeError("Config error"),
+    ],
+)
+async def test_get_inherited_discounts_fails_when_the_adobe_lookup_fails(
+    fake_ctx, renewal_agreement, error
+):
+    order_call = FakeAdobeCall()
+    order_call.error = error
+    fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
+
+    with pytest.raises(UpstreamServiceError):
+        await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)
 
 
 @pytest.mark.parametrize("account_type", [AccountType.VENDOR, AccountType.OPERATIONS])

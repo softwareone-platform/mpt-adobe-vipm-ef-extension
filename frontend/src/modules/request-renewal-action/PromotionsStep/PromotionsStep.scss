@@ -21,4 +21,14 @@
     width: 100%;
   }
 
+  &__inherited-error {
+    display: flex;
+    flex-direction: column;
+    gap: $var-spacing-1;
+
+    > :last-child {
+      align-self: flex-start;
+    }
+  }
+
 }
