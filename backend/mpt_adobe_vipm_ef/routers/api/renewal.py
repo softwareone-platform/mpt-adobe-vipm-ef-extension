@@ -441,7 +441,7 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
     coterm_date = str(customer.get("cotermDate") or "")
-    if net_new_lines:
+    if net_new_lines and body.renewal_path is RenewalPath.ANNIVERSARY:
         require_scheduled_creation_window(coterm_date)
     plan_subscriptions = await _resolve_submission_plan(
         ctx, agreement, plan_subscriptions, body.renewal_path, coterm_date

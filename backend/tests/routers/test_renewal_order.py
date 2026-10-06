@@ -780,6 +780,23 @@ async def test_create_renewal_order_rejects_net_new_outside_the_window(
 
 
 @freeze_time(_TODAY)
+async def test_create_renewal_order_adds_net_new_early_outside_the_window(
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
+):
+    adobe_call.returns = {"cotermDate": _COTERM_OUT_OF_WINDOW}
+    body = _body(
+        subscriptions=[],
+        net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
+        path="now",
+    )
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[2] == [{"item": {"id": _NET_NEW_ITEM_ID}, "quantity": 5}]
+
+
+@freeze_time(_TODAY)
 async def test_create_renewal_order_creates_change_order_for_a_net_new_only_plan(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):

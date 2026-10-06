@@ -77,6 +77,8 @@ frontend/                    TypeScript plug UI (esbuild)
     eligibility); on the `now` path
     the quote also carries the net-new additions, which ride the RENEWAL order
     itself, so Adobe rejects the renew-and-add basket it forbids in one order.
+    Not being scheduled, they skip the 30-to-3-day window at submit, which
+    applies to net-new products on the anniversary path only.
     Because the `now` path can be ordered more than once, its quoted and
     snapshotted quantities are deltas against Adobe's live `renewedQuantity` —
     what the order still has to renew — an already-covered subscription
