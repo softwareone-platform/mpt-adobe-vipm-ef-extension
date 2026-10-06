@@ -400,6 +400,8 @@ export default function App() {
           netNewItems={netNewItems}
           discountSelections={discountSelections}
           inheritedDiscounts={inheritedData}
+          inheritedDiscountsFailed={inheritedDiscounts.status === 'error'}
+          onRetryInheritedDiscounts={inheritedDiscounts.refresh}
           path={renewalPath}
           onDiscountChange={onDiscountChange}
           onPreview={setRenewalPreview}
