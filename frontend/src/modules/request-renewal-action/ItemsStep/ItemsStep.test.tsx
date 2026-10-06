@@ -8,12 +8,13 @@ import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
 import type { Agreement, Subscription } from '../../shared/model';
-import type {
-  NetNewItem,
-  RenewalPath,
-  RenewalQuantities,
-  RenewalSelections,
-  RenewalStates,
+import {
+  findRenewAndAddConflict,
+  type NetNewItem,
+  type RenewalPath,
+  type RenewalQuantities,
+  type RenewalSelections,
+  type RenewalStates,
 } from '../model';
 
 jest.mock('@mpt-extension/sdk', () => ({
@@ -23,6 +24,13 @@ jest.mock('@mpt-extension/sdk', () => ({
 }), { virtual: true });
 
 const mockPost = jest.mocked(http.post);
+
+jest.mock('../model', () => {
+  const actual = jest.requireActual('../model');
+  return { ...actual, findRenewAndAddConflict: jest.fn(actual.findRenewAndAddConflict) };
+});
+
+const mockFindRenewAndAddConflict = jest.mocked(findRenewAndAddConflict);
 
 interface NavProps {
   currentStepIndex: number;
@@ -79,7 +87,7 @@ jest.mock('@softwareone-platform/sdk-react-ui-v0/grid', () => ({
   GridCellSimple: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useGridInMemory: (data: TestRow[], config: GridConfig) => {
     capturedConfig = config;
-    return { data, config, onEvent: onGridEvent };
+    return { data: data.slice(0, config.paging.pageSize), config, onEvent: onGridEvent };
   },
 }));
 
@@ -600,6 +608,34 @@ describe('ItemsStep', () => {
       expect(notice).toContain('this order cannot include both');
       expect(notice).toContain('undo the changes to line 1 (ITM-1) and remove line 3 (ITM-9)');
       expect(notice).toContain('undo the changes to line 2 (ITM-2)');
+    });
+
+    it('checks every line in the basket, not only the page on screen', async () => {
+      const [template] = subscriptions;
+      const [templateLine] = template.lines!;
+      const pageOfSubscriptions = Array.from({ length: 10 }, (_, index) => ({
+        ...template,
+        id: `SUB-${index + 1}`,
+        lines: [{ ...templateLine, item: { ...templateLine.item, id: `ITM-${index + 1}` } }],
+      }));
+      const { getByTestId } = renderStep({
+        path: 'now',
+        subscriptionList: pageOfSubscriptions,
+        netNewItems: [{ ...NET_NEW_ITEM, itemId: 'ITM-NEW' }],
+      });
+
+      let nextIndex: number | undefined;
+      await act(async () => {
+        nextIndex = await registeredOnNext!({ currentStepIndex: 2, targetStepIndex: 3 });
+      });
+
+      const [checkedLines] = mockFindRenewAndAddConflict.mock.lastCall!;
+      expect(checkedLines.map((line) => line.lineNumber)).toEqual(
+        Array.from({ length: 11 }, (_, index) => index + 1),
+      );
+      expect(getByTestId('items-step-conflict').textContent).toContain('remove line 11 (ITM-NEW)');
+      expect(nextIndex).toBe(2);
+      expect(mockPost).not.toHaveBeenCalled();
     });
 
     it('stays quiet when the basket only renews', () => {
