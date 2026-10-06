@@ -470,6 +470,22 @@ def exclude_redeemed(
     ]
 
 
+def exclude_unheld_past_end_date(
+    records: list[AirtableRecord], redemptions: dict[str, Redemption], now: dt.datetime
+) -> list[AirtableRecord]:
+    """Drop codes past their end date unless the customer redeemed them."""
+    return [
+        record
+        for record in records
+        if not _is_past_end_date(record, now) or record_code(record) in redemptions
+    ]
+
+
+def _is_past_end_date(record: AirtableRecord, now: dt.datetime) -> bool:
+    end_date = _read_date(record["fields"].get("end_date"))
+    return end_date is not None and end_date < now
+
+
 def to_api_payload(
     record: AirtableRecord,
     code_values: list[ValueEntry],
