@@ -205,6 +205,8 @@ const renderStep = async ({
   netNewItems = [] as NetNewItem[],
   discountSelections = {} as DiscountSelections,
   inheritedDiscounts = [] as InheritedDiscount[],
+  inheritedDiscountsFailed = false,
+  onRetryInheritedDiscounts = jest.fn(),
   path = 'anniversary' as RenewalPath,
   onDiscountChange = jest.fn(),
 } = {}) => {
@@ -217,6 +219,8 @@ const renderStep = async ({
       netNewItems={netNewItems}
       discountSelections={discountSelections}
       inheritedDiscounts={inheritedDiscounts}
+      inheritedDiscountsFailed={inheritedDiscountsFailed}
+      onRetryInheritedDiscounts={onRetryInheritedDiscounts}
       path={path}
       onDiscountChange={onDiscountChange}
       onPreview={jest.fn()}
@@ -380,6 +384,25 @@ describe('PromotionsStep', () => {
     expect(notice.textContent).toContain('is not known');
   });
 
+  it('does not call a code unknown while the code list is loading', async () => {
+    mockGet.mockReturnValue(new Promise(() => {}));
+    const { queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'CODE-ONE' },
+    });
+
+    expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
+  });
+
+  it('does not call a code unknown when the code list failed to load', async () => {
+    mockGet.mockRejectedValue(new Error('Discounts are down'));
+    const { findByTestId, queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'CODE-ONE' },
+    });
+
+    await findByTestId('promotions-step-error');
+    expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
+  });
+
   it('leaves an unknown code to Adobe on the early path', async () => {
     const { queryByTestId } = await renderStep({
       discountSelections: { 'SUB-1': 'TYPED-CODE' },
@@ -462,6 +485,27 @@ describe('PromotionsStep', () => {
     const notice = await findByTestId('promotions-step-ineligible-inherited');
     expect(notice.textContent).toContain('OLD-CODE');
     expect(notice.textContent).toContain('no longer qualify');
+  });
+
+  it('reports a failed held discounts read and retries it', async () => {
+    const onRetryInheritedDiscounts = jest.fn();
+    const { findByTestId, getByText } = await renderStep({
+      inheritedDiscountsFailed: true,
+      onRetryInheritedDiscounts,
+    });
+
+    const notice = await findByTestId('promotions-step-inherited-error');
+    expect(notice.textContent).toContain('Failed to load the discounts you already hold.');
+    fireEvent.click(getByText('Retry'));
+
+    expect(onRetryInheritedDiscounts).toHaveBeenCalled();
+  });
+
+  it('does not report the held discounts read when it succeeded', async () => {
+    const { findByTestId, queryByTestId } = await renderStep();
+
+    await findByTestId('grid');
+    expect(queryByTestId('promotions-step-inherited-error')).toBeNull();
   });
 
   describe('next-step gate', () => {

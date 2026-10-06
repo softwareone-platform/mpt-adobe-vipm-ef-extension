@@ -20,6 +20,7 @@ from mpt_extension_sdk.routing import APIRouter
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import (
+    NO_AUTO_RENEWAL_ERROR_CODE,
     SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
     SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
 )
@@ -231,7 +232,8 @@ async def get_inherited_discounts(agreement_id: str, ctx: APIContext) -> APIResp
     and enriched from the customer's held-reusable catalogue for display. A code
     Adobe returns as no longer eligible is flagged (``eligible`` false) so the
     step can warn rather than silently drop it. An empty list means the customer
-    holds no auto-applied reusables (or has no auto-renewing subscriptions).
+    holds no auto-applied reusables (or has no auto-renewing subscriptions). If
+    the Adobe lookup fails, the route returns an error.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -827,18 +829,21 @@ async def _load_inherited_discounts(
     An automated ``PREVIEW_RENEWAL`` (no line items) returns, per renewing line,
     the flexible discounts Adobe would auto-apply and whether each still
     qualifies; the customer's held-reusable catalogue enriches them for display.
-    The lookup is advisory — Adobe re-validates every code on the real preview
-    and at commit — so a failure never blocks the renewal: it degrades to no
-    inherited discounts. Adobe also errors here when the customer has no
-    auto-renewal-enabled subscriptions, which reads the same way.
+    If no subscription is set to auto-renew, Adobe returns an error, which
+    means no held discounts. Any other Adobe error is raised.
     """
     authorization_id = await get_authorization_id(ctx, agreement_id)
     customer_id = await require_customer_id(ctx, agreement_id)
     try:
         return await _fetch_inherited_discounts(ctx, authorization_id, customer_id, currency_code)
+    except AdobeAPIError as error:
+        if error.code == NO_AUTO_RENEWAL_ERROR_CODE:
+            return {}
+        logger.warning("Could not load inherited discounts for %s: %s", agreement_id, error)
+        raise UpstreamServiceError(detail=ADOBE_REQUEST_FAILED_DETAIL)
     except AdobeError as error:
         logger.warning("Could not load inherited discounts for %s: %s", agreement_id, error)
-        return {}
+        raise UpstreamServiceError(detail=ADOBE_REQUEST_FAILED_DETAIL)
 
 
 async def _fetch_inherited_discounts(
