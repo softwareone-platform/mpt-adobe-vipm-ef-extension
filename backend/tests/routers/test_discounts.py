@@ -240,6 +240,54 @@ async def test_list_keeps_a_redeemed_reusable_code(agreement, fake_store, code_r
 
 
 @freeze_time("2026-07-21T12:00:00Z")
+async def test_list_excludes_a_reusable_code_past_its_end_date_the_customer_does_not_hold(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(
+            reusable=True,
+            end_date="2026-07-01T00:00:00Z",
+            discount_lock_end_date="2026-12-31T23:59:59Z",
+        ),
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 0
+    assert result.payload == []
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_a_reusable_code_past_its_end_date_the_customer_holds(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [
+        code_record_factory(
+            reusable=True,
+            end_date="2026-07-01T00:00:00Z",
+            discount_lock_end_date="2026-12-31T23:59:59Z",
+        ),
+    ]
+    fake_store.list_redemptions.return_value = [
+        {
+            "id": "recR",
+            "fields": {
+                "code": "SUMMER25",
+                "redeemed_at": "2026-06-15T00:00:00Z",
+                "order_id": "ORD-1",
+            },
+        },
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+    assert result.payload[0]["code"] == "SUMMER25"
+
+
+@freeze_time("2026-07-21T12:00:00Z")
 async def test_list_without_order_type_keeps_a_redeemed_code(
     agreement, fake_store, code_record_factory
 ):
