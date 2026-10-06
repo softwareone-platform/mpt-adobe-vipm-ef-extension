@@ -226,8 +226,8 @@ function pricedWhileValid(row: Row, price: (unitSP: number | null, quantity: num
   return row.renewalQuantity == null ? '' : price(row.unitSP, row.renewalQuantity);
 }
 
-// The guidance names each line by the position the customer sees, so the rows
-// arrive in the grid's own order — sorting included — and are numbered as given.
+// The guidance numbers every line in the basket, across all grid pages, in the
+// order the rows are listed: subscriptions first, then added products.
 function toRenewalLines(rows: Row[]): RenewalLine[] {
   return rows.map((row, index) => ({
     lineNumber: index + 1,
@@ -537,7 +537,7 @@ export function ItemsStep({
     paging,
   });
 
-  const conflict = findRenewAndAddConflict(toRenewalLines(gridProps.data), path);
+  const conflict = findRenewAndAddConflict(toRenewalLines(rows), path);
   const blockedIncreases = findBlockedIncreases(rows, path);
 
   const onNext = useCallback(
