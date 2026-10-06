@@ -392,6 +392,7 @@ export default function App() {
           netNewItems={netNewItems}
           recommendedSkus={recommendedSkus}
           path={renewalPath}
+          pathState={pathState.data}
           renewalStates={renewalState.data}
           onQuantityChange={onRenewalQuantityChange}
           onNetNewItemsChange={setNetNewItems}
