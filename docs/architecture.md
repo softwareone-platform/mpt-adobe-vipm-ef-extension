@@ -118,12 +118,16 @@ frontend/                    TypeScript plug UI (esbuild)
     a renewal order and a scheduled net-new subscription only between 30 and 3
     days before the anniversary, and only for a customer holding an active
     subscription — and which path is already established: `lockedPath` is `now`
-    once an early renewal has rolled the customer's `cotermDate` past the
-    active subscriptions' `renewalDate` (an inactive subscription keeps the
-    `renewalDate` of the term it lapsed in, so it is ignored), and
+    while an active subscription still has seats renewed early
+    (`renewedQuantity` above 0) for a term ending before the `cotermDate`, and
     `anniversary` once a renewal is staged for the anniversary, since an
-    at-anniversary renewal moves no date and bills nothing now. A staged renewal
-    is read from the subscriptions renewing on the `cotermDate`: a scheduled
+    at-anniversary renewal moves no date and bills nothing now. The date gap
+    alone does not lock the path: Adobe keeps the moved `cotermDate` after an
+    early renewal is fully returned. In that case the anniversary reported (and
+    the window measured from) is the earliest active subscription
+    `renewalDate`, skipping products that can't auto-renew, such as credit
+    packs. A staged renewal is read from the subscriptions renewing on that
+    anniversary: a scheduled
     net-new subscription still armed to activate, or an active subscription
     still set to auto-renew with more seats than it holds. A disabled
     auto-renewal or a lower renewal quantity does not lock the path, because
