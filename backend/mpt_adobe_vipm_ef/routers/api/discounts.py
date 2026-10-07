@@ -64,6 +64,9 @@ async def list_discount_codes(ctx: APIContext) -> APIResponse:  # noqa: WPS210
         redemption_records = await store_call(store.list_redemptions, codes, scope.customer_id)
         redemptions = discount_mapping.redemptions_by_code(redemption_records)
         records = discount_mapping.exclude_redeemed(records, redemptions)
+        records = discount_mapping.exclude_unheld_past_end_date(
+            records, redemptions, dt.datetime.now(tz=dt.UTC)
+        )
         records = await _exclude_out_of_country(store, scope, records)
     pagination = ctx.request.pagination
     page = records[pagination.offset : pagination.offset + pagination.limit]
