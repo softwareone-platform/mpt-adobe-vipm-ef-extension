@@ -1,7 +1,6 @@
 import http
 
 import pytest
-from freezegun import freeze_time
 from mpt_api_client.exceptions import MPTAPIError, MPTHttpError
 from mpt_extension_sdk.api import ErrorDetail
 from mpt_extension_sdk.api.auth.context import AccountType
@@ -20,6 +19,7 @@ from mpt_adobe_vipm_ef.models.renewal import (
     RenewalOrderRequest,
     RenewalPlanRequest,
     RenewalPreviewRequest,
+    RenewalWindow,
     SkuAutoRenewSupportRequest,
 )
 from mpt_adobe_vipm_ef.routers.api.renewal import (
@@ -51,6 +51,7 @@ _COTERM_IN_WINDOW = "2026-08-20"
 _COTERM_OUT_OF_WINDOW = "2026-12-01"
 _COMMITMENT_END = "2029-08-20"
 _ABOVE_FLOOR_QUANTITY = 12
+_REPEAT_RENEWAL_TOTAL = 12
 
 _ADOBE_API_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
@@ -103,7 +104,7 @@ def _subscription_payload(vendor=_ADOBE_SUBSCRIPTION_ID, lines=None, *, auto_ren
     }
 
 
-def _body(  # noqa: WPS211
+def _body(
     *,
     renew=True,
     quantity=7,
@@ -180,7 +181,7 @@ def _customer_holding_the_subscription(codes=()):
     }
 
 
-def _three_yc_benefit(  # noqa: WPS211
+def _three_yc_benefit(
     *,
     status="COMMITTED",
     licenses=None,
@@ -296,6 +297,11 @@ def auto_renew_support_store(mocker, fake_ctx, allowed_product_id):
     return store
 
 
+@pytest.fixture(autouse=True)
+def frozen_today(frozen_clock):
+    frozen_clock.move_to(_TODAY)
+
+
 @pytest.fixture
 def lifecycle_store(mocker, fake_ctx, allowed_product_id):
     """Stub the Airtable lifecycle lookup (the SKU neither end of sale nor end of life)."""
@@ -317,7 +323,7 @@ def net_new_sku_mapping(mocker, fake_ctx, allowed_product_id):
 
 
 @pytest.fixture
-def submit_deps(  # noqa: WPS211
+def submit_deps(
     renewal_agreement,
     renewing_subscription,
     resolve_net_new_item,
@@ -509,7 +515,7 @@ async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_chan
     assert call_args[3].to_dict()["renewalPath"] == "now"
 
 
-async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_change_order(  # noqa: WPS211
+async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_change_order(
     fake_ctx,
     submit_deps,
     resolve_net_new_item,
@@ -641,12 +647,12 @@ async def test_create_renewal_order_snapshots_the_delta_on_a_repeat_early_renewa
     has to renew: the wizard's total minus Adobe's ``renewedQuantity``.
     """
     adobe_call.returns = _renewed_subscriptions_payload(4)
-    body = _body(quantity=12, path="now")  # noqa: WPS432
+    body = _body(quantity=_REPEAT_RENEWAL_TOTAL, path="now")
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
     call_args, _ = create_order_mock.await_args
-    assert call_args[2] == [{"id": _LINE_ID, "quantity": 12}]
+    assert call_args[2] == [{"id": _LINE_ID, "quantity": _REPEAT_RENEWAL_TOTAL}]
     assert call_args[3].to_dict()["subscriptions"][0]["renewalQuantity"] == 8
 
 
@@ -714,7 +720,6 @@ async def test_create_renewal_order_snapshots_the_removal_of_a_renewed_subscript
     assert subscription_snapshot["renewedQuantity"] == 4
 
 
-@freeze_time(_TODAY)
 async def test_create_renewal_order_snapshots_the_net_new_offers_in_the_payload(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
@@ -750,7 +755,6 @@ async def test_create_renewal_order_forwards_the_customer_details(
     assert call_args[4] is body
 
 
-@freeze_time(_TODAY)
 async def test_create_renewal_order_adds_net_new_lines_within_the_window(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
@@ -766,24 +770,45 @@ async def test_create_renewal_order_adds_net_new_lines_within_the_window(
     ]
 
 
-@freeze_time(_TODAY)
 async def test_create_renewal_order_rejects_net_new_outside_the_window(
     fake_ctx, submit_deps, create_order_mock, adobe_call
 ):
     adobe_call.returns = {"cotermDate": _COTERM_OUT_OF_WINDOW}
     body = _body(net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}])
 
-    with pytest.raises(ValidationError, match="anniversary date"):
+    with pytest.raises(ValidationError, match="from 30 days until 2 days before"):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
     create_order_mock.assert_not_awaited()
 
 
-@freeze_time(_TODAY)
-async def test_create_renewal_order_adds_net_new_early_outside_the_window(
+async def test_create_renewal_order_rejects_a_renewal_after_the_window_closes(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    adobe_call.returns = {"cotermDate": _TODAY}
+
+    with pytest.raises(ValidationError, match="too late to plan this renewal"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
+
+    create_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_rejects_an_early_renewal_after_the_window_closes(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    adobe_call.returns = {"cotermDate": _TODAY}
+
+    with pytest.raises(ValidationError, match="too late to plan this renewal"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(path="now"))
+
+    create_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_adds_net_new_on_a_follow_up_early_renewal(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
-    adobe_call.returns = {"cotermDate": _COTERM_OUT_OF_WINDOW}
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 3
     body = _body(
         subscriptions=[],
         net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
@@ -796,7 +821,24 @@ async def test_create_renewal_order_adds_net_new_early_outside_the_window(
     assert call_args[2] == [{"item": {"id": _NET_NEW_ITEM_ID}, "quantity": 5}]
 
 
-@freeze_time(_TODAY)
+async def test_create_renewal_order_rejects_a_follow_up_early_renewal_after_the_window_closes(
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call, frozen_clock
+):
+    frozen_clock.move_to("2026-08-19T07:00:00Z")
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 3
+    body = _body(
+        subscriptions=[],
+        net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
+        path="now",
+    )
+
+    with pytest.raises(ValidationError, match="too late to plan this renewal"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+
+
 async def test_create_renewal_order_creates_change_order_for_a_net_new_only_plan(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
@@ -839,7 +881,6 @@ async def test_create_renewal_order_maps_customer_load_errors_on_net_new(
     create_order_mock.assert_not_awaited()
 
 
-@freeze_time(_TODAY)
 async def test_create_renewal_order_rejects_a_net_new_offer_without_a_full_sku(
     fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
 ):
@@ -1038,7 +1079,7 @@ async def test_create_renewal_order_raises_forbidden_when_product_not_allowed(
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
 
 
-async def test_create_renewal_order_blocks_a_plan_below_the_three_yc_floor(  # noqa: WPS211
+async def test_create_renewal_order_blocks_a_plan_below_the_three_yc_floor(
     fake_ctx, submit_deps, three_yc_customer, sku_mapping_store, create_order_mock, adobe_call
 ):
     with pytest.raises(ValidationError, match="three-year commitment"):
@@ -1104,7 +1145,7 @@ async def test_check_renewal_order_three_yc_blocks_a_disable_below_the_floor(
         )
 
 
-async def test_check_renewal_order_three_yc_counts_net_new_quantities_toward_the_floor(  # noqa: WPS211
+async def test_check_renewal_order_three_yc_counts_net_new_quantities_toward_the_floor(
     fake_ctx,
     renewal_agreement,
     renewing_subscription,
@@ -1233,7 +1274,6 @@ def _path_state_payload(coterm_date, renewal_date=_COTERM_IN_WINDOW, status="100
     }
 
 
-@freeze_time(_TODAY)
 async def test_get_renewal_path_state_reports_an_open_window(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1244,26 +1284,44 @@ async def test_get_renewal_path_state_reports_an_open_window(
     assert result.status_code == http.HTTPStatus.OK
     assert result.payload == {
         "anniversaryDate": _COTERM_IN_WINDOW,
-        "windowOpen": True,
+        "window": RenewalWindow.OPEN,
         "windowOpensDays": 30,
-        "windowClosesDays": 3,
+        "windowClosesDays": 2,
         "hasActiveSubscriptions": True,
         "lockedPath": None,
     }
 
 
-@freeze_time(_TODAY)
-async def test_get_renewal_path_state_reports_a_closed_window(
+async def test_get_renewal_path_state_reports_a_window_not_yet_open(
     fake_ctx, renewal_agreement, adobe_call
 ):
     adobe_call.returns = _path_state_payload(_COTERM_OUT_OF_WINDOW, _COTERM_OUT_OF_WINDOW)
 
     result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
 
-    assert result.payload["windowOpen"] is False
+    assert result.payload["window"] == RenewalWindow.TOO_EARLY
 
 
-@freeze_time(_TODAY)
+async def test_get_renewal_path_state_reports_a_window_already_closed(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload(_TODAY, _TODAY)
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["window"] == RenewalWindow.TOO_LATE
+
+
+async def test_get_renewal_path_state_reports_an_unknown_window(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload("", "")
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["window"] == RenewalWindow.UNKNOWN
+
+
 async def test_get_renewal_path_state_reports_no_active_subscriptions(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1274,7 +1332,6 @@ async def test_get_renewal_path_state_reports_no_active_subscriptions(
     assert result.payload["hasActiveSubscriptions"] is False
 
 
-@freeze_time(_TODAY)
 async def test_get_renewal_path_state_locks_the_early_path_once_rolled(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1287,7 +1344,29 @@ async def test_get_renewal_path_state_locks_the_early_path_once_rolled(
     assert result.payload["lockedPath"] == "now"
 
 
-@freeze_time(_TODAY)
+async def test_get_renewal_path_state_opens_a_follow_up_early_renewal_by_the_renewal_date(
+    fake_ctx, renewal_agreement, adobe_call
+):
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 3
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["window"] == RenewalWindow.OPEN
+
+
+async def test_get_renewal_path_state_closes_a_follow_up_early_renewal_by_the_renewal_date(
+    fake_ctx, renewal_agreement, adobe_call, frozen_clock
+):
+    frozen_clock.move_to("2026-08-19T07:00:00Z")
+    adobe_call.returns = _path_state_payload("2027-08-20")
+    adobe_call.returns["items"][0]["renewedQuantity"] = 3
+
+    result = await get_renewal_path_state(_AGREEMENT_ID, fake_ctx)
+
+    assert result.payload["window"] == RenewalWindow.TOO_LATE
+
+
 async def test_get_renewal_path_state_dates_a_returned_early_renewal_from_the_subscription(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1298,12 +1377,11 @@ async def test_get_renewal_path_state_dates_a_returned_early_renewal_from_the_su
 
     assert (
         result.payload["anniversaryDate"],
-        result.payload["windowOpen"],
+        result.payload["window"],
         result.payload["lockedPath"],
-    ) == (_COTERM_IN_WINDOW, True, None)
+    ) == (_COTERM_IN_WINDOW, RenewalWindow.OPEN, None)
 
 
-@freeze_time(_TODAY)
 async def test_get_renewal_path_state_skips_a_product_that_cannot_auto_renew(
     fake_ctx, renewal_agreement, adobe_call
 ):
@@ -1443,7 +1521,7 @@ async def test_preview_renewal_plan_falls_back_to_the_selected_offer_id(
     assert call_args[3][0]["offerId"] == _OFFER_ID
 
 
-async def test_preview_renewal_plan_carries_the_early_renewal_additions(  # noqa: WPS211
+async def test_preview_renewal_plan_carries_the_early_renewal_additions(
     fake_ctx,
     renewal_agreement,
     renewing_subscription,
@@ -1494,7 +1572,7 @@ async def test_preview_renewal_plan_quotes_only_the_remaining_delta(
     ]
 
 
-async def test_preview_renewal_plan_drops_an_already_covered_subscription(  # noqa: WPS211
+async def test_preview_renewal_plan_drops_an_already_covered_subscription(
     fake_ctx,
     renewal_agreement,
     renewing_subscription,
@@ -1568,7 +1646,7 @@ async def test_preview_renewal_plan_leaves_the_anniversary_additions_out(
     assert [line["offerId"] for line in call_args[3]] == [_OFFER_ID]
 
 
-async def test_preview_renewal_plan_previews_an_early_add_only_basket(  # noqa: WPS211
+async def test_preview_renewal_plan_previews_an_early_add_only_basket(
     fake_ctx,
     renewal_agreement,
     renewing_subscription,

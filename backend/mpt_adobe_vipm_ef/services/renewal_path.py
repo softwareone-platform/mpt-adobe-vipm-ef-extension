@@ -7,9 +7,9 @@ from typing import Any
 from mpt_extension_sdk.api import ValidationError
 
 from mpt_adobe_vipm_ef.constants import ACTIVE_SUBSCRIPTION_STATUS, SCHEDULED_SUBSCRIPTION_STATUS
-from mpt_adobe_vipm_ef.models.renewal import RenewalPath
+from mpt_adobe_vipm_ef.models.renewal import RenewalPath, RenewalWindow
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
-from mpt_adobe_vipm_ef.services.renewal import is_within_scheduled_creation_window
+from mpt_adobe_vipm_ef.services.renewal import resolve_renewal_window
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +18,16 @@ Payload = dict[str, Any]
 _NO_SKUS: frozenset[str] = frozenset()
 
 
-def is_renewal_window_open(coterm_date: str) -> bool:
+def read_renewal_window(window_date: str) -> RenewalWindow:
     """Whether a renewal can be planned today, on either path.
 
-    Adobe accepts a renewal order and a scheduled net-new subscription in the
-    same window, between 30 and 3 days before the anniversary, so the wizard
-    reads one availability answer for the whole walkthrough. An unknown
-    anniversary reads as closed, so the customer is told to come back instead of
-    being sent into an Adobe rejection.
+    Both paths share one window, so the wizard reads one answer. A missing or
+    unreadable date reads as unknown.
     """
-    anniversary = _parse_date(coterm_date)
-    if anniversary is None:
-        return False
-    return is_within_scheduled_creation_window(anniversary)
+    renewal_date = _parse_date(window_date)
+    if renewal_date is None:
+        return RenewalWindow.UNKNOWN
+    return resolve_renewal_window(renewal_date)
 
 
 def has_active_subscriptions(adobe_subscriptions: Payload) -> bool:
@@ -69,6 +66,27 @@ def resolve_anniversary_date(
     if not renewal_dates or coterm <= min(renewal_dates) or coterm in renewal_dates:
         return coterm_date
     return min(renewal_dates).isoformat()
+
+
+def resolve_window_date(
+    coterm_date: str,
+    adobe_subscriptions: Payload,
+    non_renewable_skus: frozenset[str] = _NO_SKUS,
+) -> str:
+    """The date the renewal window counts down to.
+
+    After an early renewal, that's the renewed subscriptions' renewal date,
+    which doesn't move. Otherwise it's the anniversary.
+    """
+    coterm = _parse_date(coterm_date)
+    early_renewed_items = [
+        subscription_item
+        for subscription_item in adobe_subscriptions.get("items") or []
+        if coterm is not None and _holds_early_renewed_seats(subscription_item, coterm)
+    ]
+    if not early_renewed_items:
+        return resolve_anniversary_date(coterm_date, adobe_subscriptions, non_renewable_skus)
+    return min(_active_renewal_dates(early_renewed_items)).isoformat()
 
 
 def resolve_locked_path(

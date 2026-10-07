@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from '../shared/constants';
+import { MS_PER_DAY, PACIFIC_DATE } from '../shared/constants';
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -44,6 +44,18 @@ export function daysUntil(value?: string, from: Date = new Date()): number | und
     return undefined;
   }
   return Math.round((startOfDay(date) - startOfDay(from)) / MS_PER_DAY);
+}
+
+export function daysUntilInPacific(value?: string, now: Date = new Date()): number | undefined {
+  const date = toDate(value);
+  if (!date) {
+    return undefined;
+  }
+  const part = (type: string) =>
+    Number(PACIFIC_DATE.formatToParts(now).find((datePart) => datePart.type === type)?.value);
+  const today = Date.UTC(part('year'), part('month') - 1, part('day'));
+  const target = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.round((target - today) / MS_PER_DAY);
 }
 
 export function formatTime(value?: string): string | undefined {

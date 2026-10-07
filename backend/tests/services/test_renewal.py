@@ -1,48 +1,118 @@
+import datetime as dt
+
 import pytest
-from freezegun import freeze_time
 from mpt_extension_sdk.api import ValidationError
 
+from mpt_adobe_vipm_ef.models.renewal import RenewalWindow
 from mpt_adobe_vipm_ef.services.renewal import (
-    is_within_scheduled_creation_window,
     require_scheduled_creation_window,
+    resolve_renewal_window,
 )
 
 
-@pytest.mark.parametrize("today", ["2026-07-02", "2026-07-15", "2026-07-29"])
-def test_is_within_scheduled_creation_window_accepts_the_window(anniversary_date, today):
-    with freeze_time(today):
-        result = is_within_scheduled_creation_window(anniversary_date)
+@pytest.mark.parametrize(
+    "now",
+    [
+        pytest.param("2026-07-02T07:00:00Z", id="30-days-before-from-pacific-midnight"),
+        pytest.param("2026-07-15T12:00:00Z", id="mid-window"),
+        pytest.param("2026-07-30T19:00:00Z", id="2-days-before"),
+        pytest.param("2026-07-31T06:59:00Z", id="2-days-before-until-pacific-midnight"),
+    ],
+)
+def test_resolve_renewal_window_open(anniversary_date, frozen_clock, now):
+    frozen_clock.move_to(now)
 
-    assert result is True
+    result = resolve_renewal_window(anniversary_date)
+
+    assert result is RenewalWindow.OPEN
 
 
-@pytest.mark.parametrize("today", ["2026-07-01", "2026-07-30", "2026-08-01", "2026-08-02"])
-def test_is_within_scheduled_creation_window_rejects_outside_the_window(anniversary_date, today):
-    with freeze_time(today):
-        result = is_within_scheduled_creation_window(anniversary_date)
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        pytest.param("2026-07-01T12:00:00Z", RenewalWindow.TOO_EARLY, id="31-days-before"),
+        pytest.param(
+            "2026-07-02T06:59:00Z",
+            RenewalWindow.TOO_EARLY,
+            id="31-days-before-until-pacific-midnight",
+        ),
+        pytest.param(
+            "2026-07-31T07:00:00Z", RenewalWindow.TOO_LATE, id="1-day-before-from-pacific-midnight"
+        ),
+        pytest.param("2026-08-01T12:00:00Z", RenewalWindow.TOO_LATE, id="on-the-anniversary"),
+        pytest.param("2026-08-02T12:00:00Z", RenewalWindow.TOO_LATE, id="after-the-anniversary"),
+    ],
+)
+def test_resolve_renewal_window_closed(anniversary_date, frozen_clock, now, expected):
+    frozen_clock.move_to(now)
 
-    assert result is False
+    result = resolve_renewal_window(anniversary_date)
+
+    assert result is expected
 
 
-@freeze_time("2026-07-22")
-def test_require_scheduled_creation_window_passes_inside_the_window(anniversary_date):
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        pytest.param(
+            "2027-01-02T07:59:00Z",
+            RenewalWindow.TOO_EARLY,
+            id="31-days-before-until-pacific-midnight",
+        ),
+        pytest.param(
+            "2027-01-02T08:00:00Z", RenewalWindow.OPEN, id="30-days-before-from-pacific-midnight"
+        ),
+    ],
+)
+def test_resolve_renewal_window_counts_pacific_days_in_winter(frozen_clock, now, expected):
+    frozen_clock.move_to(now)
+
+    result = resolve_renewal_window(dt.date.fromisoformat("2027-02-01"))
+
+    assert result is expected
+
+
+@pytest.mark.parametrize(
+    "time_zone",
+    ["Australia/Perth", "UTC", "America/Los_Angeles", "Pacific/Honolulu"],
+)
+def test_resolve_renewal_window_ignores_the_local_time_zone(
+    anniversary_date, frozen_clock, local_time_zone_factory, time_zone
+):
+    local_time_zone_factory(time_zone)
+    frozen_clock.move_to("2026-07-31T06:59:00Z")
+
+    result = resolve_renewal_window(anniversary_date)
+
+    assert result is RenewalWindow.OPEN
+
+
+def test_require_scheduled_creation_window_passes_inside_the_window(anniversary_date, frozen_clock):
+    frozen_clock.move_to("2026-07-22T12:00:00Z")
+
     require_scheduled_creation_window(anniversary_date.isoformat())  # act
 
 
-@freeze_time("2026-07-01")
-def test_require_scheduled_creation_window_rejects_before_the_window_opens(anniversary_date):
+def test_require_scheduled_creation_window_rejects_before_the_window_opens(
+    anniversary_date, frozen_clock
+):
+    frozen_clock.move_to("2026-07-02T06:59:00Z")
+
     with pytest.raises(ValidationError) as exc_info:
         require_scheduled_creation_window(anniversary_date.isoformat())
 
-    assert "30 and 3 days before the anniversary date" in str(exc_info.value)
+    assert "from 30 days until 2 days before your renewal date" in str(exc_info.value)
 
 
-@freeze_time("2026-07-30")
-def test_require_scheduled_creation_window_rejects_after_the_window_closes(anniversary_date):
+def test_require_scheduled_creation_window_rejects_after_the_window_closes(
+    anniversary_date, frozen_clock
+):
+    frozen_clock.move_to("2026-07-31T07:00:00Z")
+
     with pytest.raises(ValidationError) as exc_info:
         require_scheduled_creation_window(anniversary_date.isoformat())
 
-    assert anniversary_date.isoformat() in str(exc_info.value)
+    assert "too late to plan this renewal" in str(exc_info.value)
 
 
 @pytest.mark.parametrize("coterm_date", ["", "not-a-date", None])

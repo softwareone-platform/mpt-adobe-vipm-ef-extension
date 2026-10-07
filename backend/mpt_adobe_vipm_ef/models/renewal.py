@@ -26,6 +26,18 @@ class RenewalPath(StrEnum):
     NOW = "now"
 
 
+class RenewalWindow(StrEnum):
+    """Whether a renewal can be planned today, and if not, why.
+
+    ``UNKNOWN`` means Adobe sent no usable renewal date to count from.
+    """
+
+    OPEN = "open"
+    TOO_EARLY = "tooEarly"
+    TOO_LATE = "tooLate"
+    UNKNOWN = "unknown"
+
+
 class RenewalState(StrEnum):
     """How much of a subscription's existing quantity is already early-renewed."""
 
