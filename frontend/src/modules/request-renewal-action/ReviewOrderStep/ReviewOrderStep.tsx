@@ -42,6 +42,7 @@ export interface ReviewOrderStepProps {
   subscriptions: Subscription[];
   selections: RenewalSelections;
   quantities: RenewalQuantities;
+  lineQuantities: Record<string, number>;
   netNewItems: NetNewItem[];
   preview: RenewalPreview | null;
   details: OrderDetails;
@@ -100,12 +101,13 @@ function toSubscriptionRows(
   subscriptions: Subscription[],
   selections: RenewalSelections,
   quantities: RenewalQuantities,
+  lineQuantities: Record<string, number>,
   preview: RenewalPreview | null,
 ): Row[] {
   return subscriptions.map((subscription, index) => {
     const line = subscription.lines?.[0];
     const renews = isRenewing(subscription, selections);
-    const currentQuantity = line?.quantity ?? 0;
+    const currentQuantity = lineQuantities[subscription.id] ?? line?.quantity ?? 0;
     const newQuantity = renews ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0;
     const change = newQuantity - currentQuantity;
     const delta = change === 0 ? null : change;
@@ -320,6 +322,7 @@ export function ReviewOrderStep({
   subscriptions,
   selections,
   quantities,
+  lineQuantities,
   netNewItems,
   preview,
   details,
@@ -331,10 +334,16 @@ export function ReviewOrderStep({
   const { registerOnNextCallback } = useStepActions();
 
   const rows = useMemo(() => {
-    const subscriptionRows = toSubscriptionRows(subscriptions, selections, quantities, preview);
+    const subscriptionRows = toSubscriptionRows(
+      subscriptions,
+      selections,
+      quantities,
+      lineQuantities,
+      preview,
+    );
     const lineRows = [...subscriptionRows, ...toNetNewRows(netNewItems, subscriptionRows.length)];
     return [...lineRows, toTotalRow(lineRows)];
-  }, [subscriptions, selections, quantities, netNewItems, preview]);
+  }, [subscriptions, selections, quantities, lineQuantities, netNewItems, preview]);
 
   const orderingParameters = (agreement.parameters?.ordering ?? []).filter(
     (parameter) => !parameter.constraints?.hidden,

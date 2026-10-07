@@ -219,6 +219,7 @@ jest.mock('./DetailsStep', () => ({
 
 interface ReviewOrderStepProps {
   subscriptions: { id: string }[];
+  lineQuantities: Record<string, number>;
   details: { externalId: string; notes: string };
   onPlaceOrder: () => Promise<boolean>;
   errorMessage?: string;
@@ -421,6 +422,11 @@ describe('request-renewal-action App', () => {
     rerender(<App />);
     await screen.findByText('Items step');
     expect(itemsProps.subscriptions[0].lines?.[0].quantity).toBe(25);
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    await screen.findByText('Review step');
+    expect(reviewProps.lineQuantities).toEqual({ [SUBSCRIPTIONS[0].id]: 15 });
   });
 
   it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {
