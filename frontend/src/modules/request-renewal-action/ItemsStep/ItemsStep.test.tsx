@@ -7,7 +7,7 @@ import type { GenericAbortSignal } from 'axios';
 import { http } from '@mpt-extension/sdk';
 
 import { ItemsStep } from './ItemsStep';
-import type { Agreement, Subscription } from '../../shared/model';
+import type { Agreement, RenewalPathState, Subscription } from '../../shared/model';
 import {
   findRenewAndAddConflict,
   type NetNewItem,
@@ -231,6 +231,15 @@ const NET_NEW_ITEM: NetNewItem = {
   recommended: true,
 };
 
+const OPEN_PATH_STATE: RenewalPathState = {
+  anniversaryDate: '2026-10-28',
+  windowOpen: true,
+  windowOpensDays: 30,
+  windowClosesDays: 3,
+  hasActiveSubscriptions: true,
+  lockedPath: null,
+};
+
 const renderStep = ({
   selections = {},
   quantities = {},
@@ -241,6 +250,7 @@ const renderStep = ({
   subscriptionList = subscriptions,
   agreementOverride = agreement,
   path = 'anniversary',
+  pathState = OPEN_PATH_STATE,
   renewalStates = {},
 }: {
   selections?: RenewalSelections;
@@ -252,6 +262,7 @@ const renderStep = ({
   subscriptionList?: Subscription[];
   agreementOverride?: Agreement;
   path?: RenewalPath;
+  pathState?: RenewalPathState | null;
   renewalStates?: RenewalStates;
 } = {}) =>
   render(
@@ -263,6 +274,7 @@ const renderStep = ({
       netNewItems={netNewItems}
       recommendedSkus={recommendedSkus}
       path={path}
+      pathState={pathState}
       renewalStates={renewalStates}
       onQuantityChange={onQuantityChange}
       onNetNewItemsChange={onNetNewItemsChange}
@@ -545,10 +557,28 @@ describe('ItemsStep', () => {
     expect(capturedConfig.sort).toEqual([]);
   });
 
-  it('hides adding items on a first early renewal', () => {
-    const { queryByTestId } = renderStep({ path: 'now' });
+  it('offers adding items on a first early renewal', () => {
+    const { getByTestId } = renderStep({ path: 'now' });
 
-    expect(queryByTestId('add-items')).toBeNull();
+    expect(getByTestId('add-items')).toBeTruthy();
+  });
+
+  it('offers adding items once a line is partly early-renewed', () => {
+    const { getByTestId } = renderStep({
+      path: 'now',
+      renewalStates: {
+        [ADOBE_SUBSCRIPTION_ID]: {
+          currentQuantity: 37,
+          renewedQuantity: 15,
+          state: 'partiallyRenewed',
+          remainingQuantity: 22,
+          earlyRenewable: true,
+          increaseAllowed: false,
+        },
+      },
+    });
+
+    expect(getByTestId('add-items')).toBeTruthy();
   });
 
   it('offers adding items once a line is fully early-renewed', () => {
@@ -567,6 +597,14 @@ describe('ItemsStep', () => {
     });
 
     expect(getByTestId('add-items')).toBeTruthy();
+  });
+
+  it('hides adding items at the anniversary once the window has closed', () => {
+    const { queryByTestId } = renderStep({
+      pathState: { ...OPEN_PATH_STATE, windowOpen: false, lockedPath: 'anniversary' },
+    });
+
+    expect(queryByTestId('add-items')).toBeNull();
   });
 
   it('keeps held and already added SKUs out of the picker', () => {
@@ -878,6 +916,7 @@ describe('ItemsStep', () => {
           netNewItems={[]}
           recommendedSkus={new Set<string>()}
           path="anniversary"
+          pathState={OPEN_PATH_STATE}
           renewalStates={{}}
           onQuantityChange={onQuantityChange}
           onNetNewItemsChange={jest.fn()}
