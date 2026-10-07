@@ -122,6 +122,16 @@ export default function App() {
         : anniversarySubscriptions,
     [renewalPath, subscriptions.data, renewalState.data, anniversarySubscriptions],
   );
+  const lineQuantities = useMemo(
+    () =>
+      Object.fromEntries(
+        subscriptions.data.map((subscription) => [
+          subscription.id,
+          subscription.lines?.[0]?.quantity ?? 0,
+        ]),
+      ),
+    [subscriptions.data],
+  );
   const recommendedSkus = useMemo(
     () => new Set(Array.from(getRecommendedOfferIds(recommendations.data), getPartialSku)),
     [recommendations.data],
@@ -430,6 +440,7 @@ export default function App() {
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
           quantities={renewalQuantities}
+          lineQuantities={lineQuantities}
           netNewItems={netNewItems}
           preview={renewalPreview}
           details={orderDetails}

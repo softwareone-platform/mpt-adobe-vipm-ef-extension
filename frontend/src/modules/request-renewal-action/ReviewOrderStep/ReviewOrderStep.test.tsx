@@ -138,6 +138,7 @@ const NET_NEW_ITEM: NetNewItem = {
 const renderStep = ({
   selections = {} as RenewalSelections,
   quantities = {} as RenewalQuantities,
+  lineQuantities = { 'SUB-1': 10, 'SUB-2': 4 } as Record<string, number>,
   netNewItems = [] as NetNewItem[],
   preview = null as RenewalPreview | null,
   details = { externalId: '', notes: '' } as OrderDetails,
@@ -150,6 +151,7 @@ const renderStep = ({
       subscriptions={SUBSCRIPTIONS}
       selections={selections}
       quantities={quantities}
+      lineQuantities={lineQuantities}
       netNewItems={netNewItems}
       preview={preview}
       details={details}
@@ -228,6 +230,16 @@ describe('ReviewOrderStep', () => {
     expect(row.textContent).toContain('—');
     expect(row.textContent).toContain('100.00');
     expect(row.textContent).toContain('1,200.00');
+  });
+
+  it('prices a follow-up early renewal against the platform line, not the seats held in Adobe', () => {
+    const { getByTestId } = renderStep({
+      quantities: { 'SUB-1': 10 },
+      lineQuantities: { 'SUB-1': 9, 'SUB-2': 4 },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('+1');
+    expect(getByTestId('row-order-price').textContent).toContain('-120.00');
   });
 
   it('leads the order price with the net change and the resulting total beneath', () => {
