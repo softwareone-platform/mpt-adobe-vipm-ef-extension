@@ -17,9 +17,9 @@ const URL = `/api/v2/agreements/${AGREEMENT_ID}/renewal-order/path-state`;
 
 const PATH_STATE = {
   anniversaryDate: '2026-08-20',
-  windowOpen: true,
+  window: 'open',
   windowOpensDays: 30,
-  windowClosesDays: 3,
+  windowClosesDays: 2,
   hasActiveSubscriptions: true,
   lockedPath: null,
 };

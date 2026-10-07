@@ -77,8 +77,6 @@ frontend/                    TypeScript plug UI (esbuild)
     eligibility); on the `now` path
     the quote also carries the net-new additions, which ride the RENEWAL order
     itself, so Adobe rejects the renew-and-add basket it forbids in one order.
-    Not being scheduled, they skip the 30-to-3-day window at submit, which
-    applies to net-new products on the anniversary path only.
     Because the `now` path can be ordered more than once, its quoted and
     snapshotted quantities are deltas against Adobe's live `renewedQuantity` —
     what the order still has to renew — an already-covered subscription
@@ -119,10 +117,14 @@ frontend/                    TypeScript plug UI (esbuild)
     inherited discounts, any other Adobe error is an upstream error, and the
     Promotions step shows it with a Retry.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
-    a renewal order and a scheduled net-new subscription only between 30 and 3
-    days before the anniversary, and only for a customer holding an active
-    subscription — and which path is already established: `lockedPath` is `now`
-    while an active subscription still has seats renewed early
+    a renewal order and a scheduled net-new subscription only from 30 to 2
+    days before the renewal date, counted by the date in Pacific time
+    (`America/Los_Angeles`) as Adobe does, and only for a customer holding an
+    active subscription. `window` is `open`, `tooEarly`, `tooLate` or `unknown`
+    (no usable date). After an early renewal the window counts down to the
+    renewed subscriptions' `renewalDate`, which doesn't move, rather than the
+    moved `cotermDate`. It also reports which path is already established:
+    `lockedPath` is `now` while an active subscription still has seats renewed early
     (`renewedQuantity` above 0) for a term ending before the `cotermDate`, and
     `anniversary` once a renewal is staged for the anniversary, since an
     at-anniversary renewal moves no date and bills nothing now. The date gap
@@ -137,8 +139,9 @@ frontend/                    TypeScript plug UI (esbuild)
     auto-renewal or a lower renewal quantity does not lock the path, because
     both exist without any renewal set up. The wizard's first step presents the
     established path as confirmed state and offers no other. The submit route
-    repeats that lock check and rejects a plan on the closed-off path, because
-    the wizard's gate is a display, not the boundary. `path-state` also
+    repeats that lock check and the window, and rejects a plan on the
+    closed-off path or outside the window, because the wizard's gate is a
+    display, not the boundary. `path-state` also
     rejects a non-Active agreement, so the wizard never opens while an order
     is still processing: a plan assembled then would read `renewedQuantity`
     before the in-flight order lands on it and double-count what is left to

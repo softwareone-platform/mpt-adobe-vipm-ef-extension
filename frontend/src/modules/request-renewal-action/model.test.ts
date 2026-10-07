@@ -298,13 +298,13 @@ describe('renewal state helpers', () => {
 describe('canAddNetNewItems', () => {
   const pathState: RenewalPathState = {
     anniversaryDate: '2026-10-28',
-    windowOpen: true,
+    window: 'open',
     windowOpensDays: 30,
-    windowClosesDays: 3,
+    windowClosesDays: 2,
     hasActiveSubscriptions: true,
     lockedPath: null,
   };
-  const closed = { ...pathState, windowOpen: false };
+  const closed: RenewalPathState = { ...pathState, window: 'tooLate' };
 
   it('always offers new products on renew now', () => {
     expect(canAddNetNewItems('now', pathState)).toBe(true);

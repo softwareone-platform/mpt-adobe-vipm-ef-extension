@@ -387,6 +387,9 @@ export interface RenewalPlanNetNewItemSelection {
  */
 export type RenewalPath = 'anniversary' | 'now';
 
+/** Whether a renewal can be planned today, and if not, why. */
+export type RenewalWindow = 'open' | 'tooEarly' | 'tooLate' | 'unknown';
+
 /** How much of a subscription's existing quantity is already early-renewed. */
 export type RenewalStateValue = 'notRenewed' | 'partiallyRenewed' | 'fullyRenewed';
 
@@ -425,7 +428,7 @@ export type RenewalInPlace = 'early' | 'staged';
  */
 export interface RenewalPathState {
   anniversaryDate: string;
-  windowOpen: boolean;
+  window: RenewalWindow;
   windowOpensDays: number;
   windowClosesDays: number;
   hasActiveSubscriptions: boolean;
@@ -435,15 +438,12 @@ export interface RenewalPathState {
 /**
  * Whether the wizard can go past its first step.
  *
- * An established early path is answer enough: the anniversary has already
- * rolled, so the customer returns to a confirmed path rather than to the window
- * notice. Otherwise there has to be something to renew and a window Adobe still
- * accepts an order in.
+ * The window has to be open, on an established path too. Then an established
+ * path is answer enough; otherwise there has to be something to renew.
  */
 export function canPlanRenewal(pathState: RenewalPathState | null): boolean {
-  if (!pathState) return false;
-  if (pathState.lockedPath) return true;
-  return pathState.windowOpen && pathState.hasActiveSubscriptions;
+  if (pathState?.window !== 'open') return false;
+  return pathState.lockedPath != null || pathState.hasActiveSubscriptions;
 }
 
 /** The renewal plan body shared by the 3YC check, preview and submission endpoints. */

@@ -15,6 +15,15 @@ export const MAX_MODAL_WIDTH = 1760;
 
 export const MS_PER_DAY = 86400000;
 
+export const ADOBE_TIME_ZONE = 'America/Los_Angeles';
+
+export const PACIFIC_DATE = new Intl.DateTimeFormat('en-US', {
+  timeZone: ADOBE_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+});
+
 export const RENEWAL_LEARN_MORE_URL = 'https://docs.softwareone.com';
 
 export const COTERM_DATE_PARAM = 'cotermDate';

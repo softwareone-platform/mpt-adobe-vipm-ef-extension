@@ -1,5 +1,25 @@
+import time
+
 import pytest
+from freezegun import freeze_time
 from mpt_extension_sdk.models import Agreement
+
+
+@pytest.fixture
+def frozen_clock():
+    with freeze_time() as clock:
+        yield clock
+
+
+@pytest.fixture
+def local_time_zone_factory(monkeypatch):
+    def factory(time_zone):
+        monkeypatch.setenv("TZ", time_zone)
+        time.tzset()
+
+    yield factory
+    monkeypatch.undo()
+    time.tzset()
 
 
 @pytest.fixture

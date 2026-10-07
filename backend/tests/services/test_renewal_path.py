@@ -1,11 +1,10 @@
 import pytest
-from freezegun import freeze_time
 from mpt_extension_sdk.api import ValidationError
 
-from mpt_adobe_vipm_ef.models.renewal import RenewalPath
+from mpt_adobe_vipm_ef.models.renewal import RenewalPath, RenewalWindow
 from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
-    is_renewal_window_open,
+    read_renewal_window,
     require_unlocked_path,
     resolve_anniversary_date,
     resolve_locked_path,
@@ -37,27 +36,48 @@ def staged_subscriptions():
     }
 
 
-@pytest.mark.parametrize("today", ["2026-07-02", "2026-07-29"])
-def test_window_open_inside_the_window(anniversary_date, today):
-    with freeze_time(today):
-        result = is_renewal_window_open(anniversary_date.isoformat())
+@pytest.mark.parametrize(
+    "now",
+    [
+        pytest.param("2026-07-02T07:00:00Z", id="30-days-before-from-pacific-midnight"),
+        pytest.param("2026-07-31T06:59:00Z", id="2-days-before-until-pacific-midnight"),
+    ],
+)
+def test_window_open_inside_the_window(anniversary_date, frozen_clock, now):
+    frozen_clock.move_to(now)
 
-    assert result is True
+    result = read_renewal_window(anniversary_date.isoformat())
+
+    assert result is RenewalWindow.OPEN
 
 
-@pytest.mark.parametrize("today", ["2026-07-01", "2026-07-30", "2026-08-02"])
-def test_window_closed_outside_the_window(anniversary_date, today):
-    with freeze_time(today):
-        result = is_renewal_window_open(anniversary_date.isoformat())
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        pytest.param(
+            "2026-07-02T06:59:00Z",
+            RenewalWindow.TOO_EARLY,
+            id="31-days-before-until-pacific-midnight",
+        ),
+        pytest.param(
+            "2026-07-31T07:00:00Z", RenewalWindow.TOO_LATE, id="1-day-before-from-pacific-midnight"
+        ),
+        pytest.param("2026-08-02T12:00:00Z", RenewalWindow.TOO_LATE, id="after-the-anniversary"),
+    ],
+)
+def test_window_closed_outside_the_window(anniversary_date, frozen_clock, now, expected):
+    frozen_clock.move_to(now)
 
-    assert result is False
+    result = read_renewal_window(anniversary_date.isoformat())
+
+    assert result is expected
 
 
 @pytest.mark.parametrize("coterm_date", ["", "not-a-date"])
-def test_window_closed_without_an_anniversary(coterm_date):
-    result = is_renewal_window_open(coterm_date)
+def test_window_unknown_without_an_anniversary(coterm_date):
+    result = read_renewal_window(coterm_date)
 
-    assert result is False
+    assert result is RenewalWindow.UNKNOWN
 
 
 def test_active_subscriptions_found(adobe_subscriptions):

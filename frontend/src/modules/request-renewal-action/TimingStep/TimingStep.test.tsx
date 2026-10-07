@@ -1,3 +1,6 @@
+/**
+ * @jest-environment ./test/timezone-environment.cjs
+ */
 import { ChangeEvent, ReactNode } from 'react';
 
 import { fireEvent, render } from '@testing-library/react';
@@ -39,6 +42,8 @@ jest.mock('../../shared/components/WizardHighlights/WizardHighlights', () => ({
   WizardHighlights: () => <div data-testid="wizard-highlights" />,
 }));
 
+declare const setTimeZone: (timeZone: string | undefined) => void;
+
 const agreement: Agreement = { id: 'AGR-1111-1111', name: 'Agreement Name' };
 
 function dateInDays(days: number): string {
@@ -51,9 +56,9 @@ function dateInDays(days: number): string {
 
 const pathState: RenewalPathState = {
   anniversaryDate: dateInDays(7),
-  windowOpen: true,
+  window: 'open',
   windowOpensDays: 30,
-  windowClosesDays: 3,
+  windowClosesDays: 2,
   hasActiveSubscriptions: true,
   lockedPath: null,
 };
@@ -91,6 +96,29 @@ describe('TimingStep', () => {
     });
 
     expect(getByText(/\(1 day away\)/)).toBeTruthy();
+  });
+
+  describe('with the browser in another time zone', () => {
+    const browserTimeZone = process.env.TZ;
+
+    afterEach(() => {
+      jest.useRealTimers();
+      setTimeZone(browserTimeZone);
+    });
+
+    it.each([
+      ['Australia/Perth', '2026-09-30T17:00:00Z', 15],
+      ['Pacific/Honolulu', '2026-10-01T09:30:00Z', 14],
+    ])('counts the days away from the Pacific date in %s', (timeZone, now, days) => {
+      setTimeZone(timeZone);
+      jest.useFakeTimers().setSystemTime(new Date(now));
+
+      const { getByText } = renderStep({
+        pathState: { ...pathState, anniversaryDate: '2026-10-15' },
+      });
+
+      expect(getByText(new RegExp(`\\(${days} days away\\)`))).toBeTruthy();
+    });
   });
 
   it('states the anniversary Adobe reports, not the stored agreement parameter', () => {
@@ -150,6 +178,19 @@ describe('TimingStep', () => {
     expect(queryByText(/This choice applies to the whole renewal/)).toBeNull();
   });
 
+  it('notes that further orders after an early renewal renew now', () => {
+    const { getByText } = renderStep({
+      pathState: { ...pathState, lockedPath: 'now' },
+    });
+
+    expect(
+      getByText(
+        "You've already renewed early, so any further renewal orders renew now. " +
+          'You can place them until 2 days before your renewal date.',
+      ),
+    ).toBeTruthy();
+  });
+
   it('presents a staged at-anniversary renewal as the only path', () => {
     const { getByText, getByTestId, queryByTestId } = renderStep({
       pathState: { ...pathState, lockedPath: 'anniversary' },
@@ -163,12 +204,16 @@ describe('TimingStep', () => {
     expect(queryByTestId('box-now')).toBeNull();
   });
 
-  it('offers no path outside the renewal window', () => {
+  it.each([
+    ['tooEarly', /You can plan your renewal from 30 days until 2 days before your renewal date/],
+    ['tooLate', /It's too late to plan this renewal/],
+    ['unknown', /Your renewal date is unknown/],
+  ] as const)('offers no path when the window is %s', (window, message) => {
     const { getByText, queryByTestId } = renderStep({
-      pathState: { ...pathState, windowOpen: false },
+      pathState: { ...pathState, window },
     });
 
-    expect(getByText(/only plan your renewal within 30 to 3 days/)).toBeTruthy();
+    expect(getByText(message)).toBeTruthy();
     expect(queryByTestId('box-anniversary')).toBeNull();
     expect(queryByTestId('box-now')).toBeNull();
   });
@@ -182,12 +227,12 @@ describe('TimingStep', () => {
     expect(queryByTestId('box-now')).toBeNull();
   });
 
-  it('keeps the established path over the window notice', () => {
-    const { getByText, queryByText } = renderStep({
-      pathState: { ...pathState, windowOpen: false, lockedPath: 'now' },
+  it('offers no path after an early renewal once the window has closed', () => {
+    const { getByText, queryByTestId } = renderStep({
+      pathState: { ...pathState, window: 'tooLate', lockedPath: 'now' },
     });
 
-    expect(getByText('Renew now (confirmed)')).toBeTruthy();
-    expect(queryByText(/only plan your renewal within/)).toBeNull();
+    expect(getByText(/It's too late to plan this renewal/)).toBeTruthy();
+    expect(queryByTestId('box-now')).toBeNull();
   });
 });
