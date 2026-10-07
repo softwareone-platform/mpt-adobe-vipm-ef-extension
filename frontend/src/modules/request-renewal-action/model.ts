@@ -2,6 +2,7 @@ import type {
   Discount,
   InheritedDiscount,
   RenewalPath,
+  RenewalPathState,
   RenewalPlanBody,
   RenewalStateEntry,
   Subscription,
@@ -154,16 +155,14 @@ export function isIncreaseAllowed(
   return path === 'now' && getRenewalState(subscription, states)?.increaseAllowed === true;
 }
 
-/** Whether the Items step offers net-new products: early renewal adds them in a later order. */
-export function canAddNetNewItems(
-  subscriptions: Subscription[],
-  states: RenewalStates,
-  path: RenewalPath,
-): boolean {
-  return (
-    path !== 'now' ||
-    subscriptions.some((subscription) => isIncreaseAllowed(subscription, states, path))
-  );
+/**
+ * Whether the Items step offers new products.
+ *
+ * Renew now always offers them; the anniversary offers them only while Adobe's
+ * 30-to-3-day window is open.
+ */
+export function canAddNetNewItems(path: RenewalPath, pathState: RenewalPathState | null): boolean {
+  return path === 'now' || pathState?.windowOpen === true;
 }
 
 /** One Items-step line as the renew-and-add check reads it. */

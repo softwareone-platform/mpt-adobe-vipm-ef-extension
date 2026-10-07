@@ -24,7 +24,7 @@ import {
   normalizeDiscountCode,
   withHeldQuantity,
 } from './model';
-import type { Discount, InheritedDiscount, Subscription } from '../shared/model';
+import type { Discount, InheritedDiscount, RenewalPathState, Subscription } from '../shared/model';
 
 describe('isRenewedByDefault', () => {
   it('renews a subscription whose autoRenewal preference is on', () => {
@@ -293,13 +293,29 @@ describe('renewal state helpers', () => {
     expect(isIncreaseAllowed(subscription, states, 'now')).toBe(false);
     expect(isIncreaseAllowed(subscription, {}, 'now')).toBe(false);
   });
+});
 
-  it('offers net-new items only once the early path can increase a line', () => {
-    const renewed = { [ADOBE_ID]: { ...partial, increaseAllowed: true } };
-    expect(canAddNetNewItems([subscription], renewed, 'now')).toBe(true);
-    expect(canAddNetNewItems([subscription], states, 'now')).toBe(false);
-    expect(canAddNetNewItems([subscription], {}, 'now')).toBe(false);
-    expect(canAddNetNewItems([subscription], {}, 'anniversary')).toBe(true);
+describe('canAddNetNewItems', () => {
+  const pathState: RenewalPathState = {
+    anniversaryDate: '2026-10-28',
+    windowOpen: true,
+    windowOpensDays: 30,
+    windowClosesDays: 3,
+    hasActiveSubscriptions: true,
+    lockedPath: null,
+  };
+  const closed = { ...pathState, windowOpen: false };
+
+  it('always offers new products on renew now', () => {
+    expect(canAddNetNewItems('now', pathState)).toBe(true);
+    expect(canAddNetNewItems('now', closed)).toBe(true);
+    expect(canAddNetNewItems('now', null)).toBe(true);
+  });
+
+  it('offers new products at the anniversary only while the window is open', () => {
+    expect(canAddNetNewItems('anniversary', pathState)).toBe(true);
+    expect(canAddNetNewItems('anniversary', closed)).toBe(false);
+    expect(canAddNetNewItems('anniversary', null)).toBe(false);
   });
 });
 

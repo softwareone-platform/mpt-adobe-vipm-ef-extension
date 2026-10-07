@@ -29,7 +29,12 @@ import {
   TERM_PERIOD_LABELS,
 } from '../../shared/constants';
 import { useRenewalPlanValidation } from '../../shared/hooks/useRenewalPlanValidation';
-import type { Agreement, RenewalPreview, Subscription } from '../../shared/model';
+import type {
+  Agreement,
+  RenewalPathState,
+  RenewalPreview,
+  Subscription,
+} from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
 import { formatPrice, getMonthlyPrice, getYearlyPrice } from '../../utils/price';
 import { getPartialSku } from '../../utils/sku';
@@ -70,6 +75,7 @@ export interface ItemsStepProps {
   recommendedSkus: Set<string>;
   /** The path picked on the first step; the early one gates Next on Adobe's preview. */
   path: RenewalPath;
+  pathState: RenewalPathState | null;
   /** How much of each subscription is already early-renewed, keyed by Adobe id. */
   renewalStates: RenewalStates;
   onQuantityChange: (subscriptionId: string, quantity: number | null) => void;
@@ -446,6 +452,7 @@ export function ItemsStep({
   netNewItems,
   recommendedSkus,
   path,
+  pathState,
   renewalStates,
   onQuantityChange,
   onNetNewItemsChange,
@@ -576,7 +583,7 @@ export function ItemsStep({
 
   useEffect(() => registerOnNextCallback(onNext), [onNext, registerOnNextCallback]);
 
-  const addItemsButton = canAddNetNewItems(subscriptions, renewalStates, path) ? (
+  const addItemsButton = canAddNetNewItems(path, pathState) ? (
     <Button isDisabled={!listingId} onClick={() => setDialogOpen(true)} testId="add-items">
       {t('Renewal:Items:Add items')}
     </Button>
