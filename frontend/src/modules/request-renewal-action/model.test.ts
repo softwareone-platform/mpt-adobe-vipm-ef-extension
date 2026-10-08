@@ -320,7 +320,7 @@ describe('canAddNetNewItems', () => {
 });
 
 describe('findRenewAndAddConflict', () => {
-  const renewalLine = { lineNumber: 1, itemId: 'ITM-1', isNetNew: false };
+  const renewalLine = { lineNumber: 1, itemId: 'ITM-1', isNetNew: false, renewedQuantity: null };
   const increase = { ...renewalLine, currentQuantity: 37, renewalQuantity: 53 };
   const decrease = { ...renewalLine, lineNumber: 2, itemId: 'ITM-2', currentQuantity: 10, renewalQuantity: 6 };
   const netNew = {
@@ -329,6 +329,7 @@ describe('findRenewAndAddConflict', () => {
     isNetNew: true,
     currentQuantity: null,
     renewalQuantity: 22,
+    renewedQuantity: null,
   };
 
   it('reports both sides when an increase meets a renewal change', () => {
@@ -355,6 +356,27 @@ describe('findRenewAndAddConflict', () => {
 
     expect(findRenewAndAddConflict([unchanged, netNew], 'now')).toEqual({
       renewals: [unchanged],
+      additions: [netNew],
+    });
+  });
+
+  it('accepts a new product beside a line already renewed in full', () => {
+    const renewed = { ...renewalLine, currentQuantity: 5, renewalQuantity: 5, renewedQuantity: 5 };
+
+    expect(findRenewAndAddConflict([renewed, netNew], 'now')).toBeNull();
+  });
+
+  it('accepts a new product beside a line kept at its partly renewed quantity', () => {
+    const renewed = { ...renewalLine, currentQuantity: 5, renewalQuantity: 3, renewedQuantity: 3 };
+
+    expect(findRenewAndAddConflict([renewed, netNew], 'now')).toBeNull();
+  });
+
+  it('counts a line renewing beyond its renewed quantity as a renewal', () => {
+    const renewing = { ...renewalLine, currentQuantity: 5, renewalQuantity: 4, renewedQuantity: 3 };
+
+    expect(findRenewAndAddConflict([renewing, netNew], 'now')).toEqual({
+      renewals: [renewing],
       additions: [netNew],
     });
   });

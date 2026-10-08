@@ -61,6 +61,10 @@ _NO_AUTO_RENEWAL_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
     {"code": "2136", "message": "Auto-renewal needs to be turned on for at least 1 quantity."},
 )
+_ALL_RENEWED_ERROR = AdobeAPIError(
+    http.HTTPStatus.BAD_REQUEST,
+    {"code": "2164", "message": "All subscriptions are already renewed."},
+)
 
 
 def _line_payload(line_id, vendor_sku, quantity):
@@ -679,6 +683,25 @@ async def test_create_renewal_order_keeps_an_already_covered_subscription_in_the
 
     call_args, _ = create_order_mock.await_args
     assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
+    subscription_snapshot = call_args[3].to_dict()["subscriptions"][0]
+    assert subscription_snapshot["renew"] is True
+    assert subscription_snapshot["renewalQuantity"] == 0
+
+
+async def test_create_renewal_order_adds_net_new_beside_an_already_covered_subscription(
+    fake_ctx, submit_deps, net_new_sku_mapping, create_order_mock, adobe_call
+):
+    adobe_call.returns = _renewed_subscriptions_payload(_CURRENT_QUANTITY)
+    body = _body(
+        quantity=_CURRENT_QUANTITY,
+        path="now",
+        net_new=[{"offerId": _NET_NEW_OFFER_ID, "quantity": 5}],
+    )
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert {"item": {"id": _NET_NEW_ITEM_ID}, "quantity": 5} in call_args[2]
     subscription_snapshot = call_args[3].to_dict()["subscriptions"][0]
     assert subscription_snapshot["renew"] is True
     assert subscription_snapshot["renewalQuantity"] == 0
@@ -2329,12 +2352,13 @@ async def test_get_inherited_discounts_flags_an_ineligible_reusable(fake_ctx, re
     assert result.payload["inheritedDiscounts"][0]["eligible"] is False
 
 
-async def test_get_inherited_discounts_is_empty_when_the_customer_has_no_auto_renewals(
-    fake_ctx, renewal_agreement
+@pytest.mark.parametrize("error", [_NO_AUTO_RENEWAL_ERROR, _ALL_RENEWED_ERROR])
+async def test_get_inherited_discounts_is_empty_when_adobe_has_nothing_to_renew(
+    fake_ctx, renewal_agreement, error
 ):
-    """Adobe rejects the automated preview with no auto-renewing subscriptions; that is no error."""
+    """Adobe rejects the automated preview when nothing is left to renew; that is no error."""
     order_call = FakeAdobeCall()
-    order_call.error = _NO_AUTO_RENEWAL_ERROR
+    order_call.error = error
     fake_ctx.adobe_client.order = FakeAdobeNamespace(order_call)
 
     result = await get_inherited_discounts(_AGREEMENT_ID, fake_ctx)

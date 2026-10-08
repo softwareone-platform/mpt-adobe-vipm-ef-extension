@@ -194,6 +194,8 @@ interface PromotionsStepProps {
   discountSelections: Record<string, string>;
   path: string;
   onDiscountChange: (rowId: string, code: string) => void;
+  inheritedDiscountsFailed: boolean;
+  onRetryInheritedDiscounts: () => void;
 }
 let promotionsProps: PromotionsStepProps;
 
@@ -568,6 +570,29 @@ describe('request-renewal-action App', () => {
     await waitFor(() =>
       expect(promotionsProps.discountSelections).toEqual({ 'SUB-1': 'CODE-ONE' }),
     );
+  });
+
+  it('retries a failed held discounts read and pre-fills the code it then finds', async () => {
+    const inheritedUrl = '/api/v2/agreements/AGR-1/renewal-order/inherited-discounts';
+    const heldCode = { offerId: '65322587CA01A12', code: 'HELD-CODE', eligible: true };
+    let inheritedFails = true;
+    mockGet.mockImplementation((url: string) => {
+      if (url !== inheritedUrl) return respondTo(url);
+      return inheritedFails
+        ? Promise.reject(new Error('Adobe is down'))
+        : Promise.resolve({ data: { data: { inheritedDiscounts: [heldCode] } } });
+    });
+    mockActiveStepIndex = 3;
+    render(<App />);
+
+    await waitFor(() => expect(promotionsProps.inheritedDiscountsFailed).toBe(true));
+    inheritedFails = false;
+    act(() => promotionsProps.onRetryInheritedDiscounts());
+
+    await waitFor(() =>
+      expect(promotionsProps.discountSelections).toEqual({ 'SUB-1': 'HELD-CODE' }),
+    );
+    expect(mockGet.mock.calls.filter(([url]) => url === inheritedUrl)).toHaveLength(2);
   });
 
   it('stores the order details in the wizard state', async () => {

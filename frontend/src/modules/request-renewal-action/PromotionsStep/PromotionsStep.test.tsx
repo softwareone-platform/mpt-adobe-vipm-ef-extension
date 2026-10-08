@@ -393,6 +393,16 @@ describe('PromotionsStep', () => {
     expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
   });
 
+  it('does not call a code unknown once the loaded code list contains it', async () => {
+    const { findByTestId, queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'CODE-ONE' },
+      inheritedDiscounts: [inheritedDiscount({ offerId: 'OFFER-1', code: 'CODE-ONE' })],
+    });
+
+    await findByTestId('discount-code-SUB-1');
+    expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
+  });
+
   it('does not call a code unknown when the code list failed to load', async () => {
     mockGet.mockRejectedValue(new Error('Discounts are down'));
     const { findByTestId, queryByTestId } = await renderStep({

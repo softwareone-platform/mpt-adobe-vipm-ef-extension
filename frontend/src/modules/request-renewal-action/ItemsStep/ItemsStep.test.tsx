@@ -676,6 +676,33 @@ describe('ItemsStep', () => {
       expect(mockPost).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['in full', 37, 'fullyRenewed' as const],
+      ['in part', 15, 'partiallyRenewed' as const],
+    ])(
+      'stays quiet when a new product joins a line already renewed %s',
+      (_, renewedQuantity, state) => {
+        const { queryByTestId } = renderStep({
+          path: 'now',
+          subscriptionList: [subscriptions[0]],
+          quantities: { 'SUB-1': renewedQuantity },
+          netNewItems: [NET_NEW_ITEM],
+          renewalStates: {
+            [ADOBE_SUBSCRIPTION_ID]: {
+              currentQuantity: 37,
+              renewedQuantity,
+              state,
+              remainingQuantity: 37 - renewedQuantity,
+              earlyRenewable: true,
+              increaseAllowed: state === 'fullyRenewed',
+            },
+          },
+        });
+
+        expect(queryByTestId('items-step-conflict')).toBeNull();
+      },
+    );
+
     it('stays quiet when the basket only renews', () => {
       const { queryByTestId } = renderStep({ path: 'now', quantities: { 'SUB-1': 30 } });
 

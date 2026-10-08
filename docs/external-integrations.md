@@ -61,7 +61,8 @@ them as *inherited* discounts:
   held reusables and the extended lock window, so this is the source of truth
   for the inherited set. When the customer has no auto-renewal subscriptions,
   Adobe returns error `2136`, which the extension reads as no inherited
-  discounts.
+  discounts. When every subscription is already renewed early, Adobe returns
+  error `2164`, which the extension reads the same way.
 
 The lookup is advisory: Adobe re-validates every applied code on the real
 `PREVIEW_RENEWAL` (with line items) and at submit, so a failure never blocks

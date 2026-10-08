@@ -173,6 +173,7 @@ export interface RenewalLine {
   isNetNew: boolean;
   currentQuantity: number | null;
   renewalQuantity: number | null;
+  renewedQuantity: number | null;
 }
 
 /** The two sides of a basket Adobe cannot place as one order. */
@@ -199,17 +200,19 @@ export function isAddition(line: RenewalLine): boolean {
 /**
  * Whether the line renews existing seats.
  *
- * Any existing line carried at or below the quantity the customer holds counts,
- * unchanged ones included: it still rides the renew-mode order, which Adobe
- * cannot combine with an addition. A line above the current quantity is the
- * addition itself, so it is left to ``isAddition``.
+ * An existing line at or below the quantity the customer holds counts,
+ * unchanged ones included, as long as it renews seats beyond those already
+ * renewed: those ride the renew-mode order, which Adobe cannot combine with an
+ * addition. Seats already renewed are left out of that order. A line above the
+ * current quantity is the addition itself, so it is left to ``isAddition``.
  */
 export function isRenewalChange(line: RenewalLine): boolean {
   return (
     !line.isNetNew &&
     line.currentQuantity != null &&
     line.renewalQuantity != null &&
-    line.renewalQuantity <= line.currentQuantity
+    line.renewalQuantity <= line.currentQuantity &&
+    line.renewalQuantity > (line.renewedQuantity ?? 0)
   );
 }
 
