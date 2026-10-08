@@ -113,8 +113,9 @@ frontend/                    TypeScript plug UI (esbuild)
     matches the preview; a reusable Adobe reports as no longer eligible is
     flagged rather than applied. The lookup is advisory — Adobe re-validates
     every code on the real preview and at submit — so its failure never blocks
-    the renewal: Adobe's `2136` (no auto-renewal subscriptions) reads as no
-    inherited discounts, any other Adobe error is an upstream error, and the
+    the renewal: Adobe's `2136` (no auto-renewal subscriptions) and `2164`
+    (every subscription already renewed) read as no inherited discounts, any
+    other Adobe error is an upstream error, and the
     Promotions step shows it with a Retry.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
     a renewal order and a scheduled net-new subscription only from 30 to 2
