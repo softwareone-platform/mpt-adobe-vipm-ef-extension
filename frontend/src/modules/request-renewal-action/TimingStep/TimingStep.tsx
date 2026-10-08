@@ -7,8 +7,8 @@ import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/t
 
 import { WizardHighlights } from '../../shared/components/WizardHighlights/WizardHighlights';
 import { RENEWAL_LEARN_MORE_URL } from '../../shared/constants';
-import { Agreement, canPlanRenewal, RenewalPathState } from '../../shared/model';
-import { daysUntil, formatDate } from '../../utils/date';
+import { Agreement, canPlanRenewal, RenewalPathState, RenewalWindow } from '../../shared/model';
+import { daysUntilInPacific, formatDate } from '../../utils/date';
 import { RenewalPath } from '../model';
 
 import './TimingStep.scss';
@@ -26,6 +26,12 @@ const PATH_KEYS: Record<RenewalPath, string> = {
   now: 'Now',
 };
 
+const CLOSED_KEYS: Record<Exclude<RenewalWindow, 'open'>, string> = {
+  tooEarly: 'Too early',
+  tooLate: 'Too late',
+  unknown: 'Unknown',
+};
+
 export function TimingStep({
   agreement,
   renewalDate,
@@ -36,7 +42,7 @@ export function TimingStep({
   const { t } = useTranslation();
   const anniversaryDate = pathState?.anniversaryDate || renewalDate;
   const formattedRenewalDate = formatDate(anniversaryDate);
-  const days = daysUntil(anniversaryDate);
+  const days = daysUntilInPacific(anniversaryDate);
   const lockedPath = pathState?.lockedPath ?? null;
   const selectedPath = lockedPath ?? path;
   const canPlan = canPlanRenewal(pathState);
@@ -55,6 +61,16 @@ export function TimingStep({
       {t('Renewal:Timing:Learn more')}
     </a>
   );
+
+  const closedMessage = () => {
+    if (pathState?.window === 'open') {
+      return t('Renewal:Timing:No subscriptions');
+    }
+    return t(`Renewal:Timing:${CLOSED_KEYS[pathState?.window ?? 'unknown']}`, {
+      opens: pathState?.windowOpensDays,
+      closes: pathState?.windowClosesDays,
+    });
+  };
 
   const optionKey = (option: RenewalPath) =>
     `Renewal:Timing:${PATH_KEYS[option]}${lockedPath ? ':Locked' : ''}`;
@@ -96,22 +112,21 @@ export function TimingStep({
           t('Renewal:Timing:PromptWithoutDate')
         )}
       </RegularText>
-      {!lockedPath &&
-        (canPlan ? (
-          <InlineNotification status="warning">
-            {t('Renewal:Timing:Lock notice')} {learnMore}
-          </InlineNotification>
-        ) : (
-          <InlineNotification status="error">
-            {pathState?.hasActiveSubscriptions === false
-              ? t('Renewal:Timing:No subscriptions')
-              : t('Renewal:Timing:Window closed', {
-                  opens: pathState?.windowOpensDays,
-                  closes: pathState?.windowClosesDays,
-                })}{' '}
-            {learnMore}
-          </InlineNotification>
-        ))}
+      {!canPlan && (
+        <InlineNotification status="error">
+          {closedMessage()} {learnMore}
+        </InlineNotification>
+      )}
+      {canPlan && !lockedPath && (
+        <InlineNotification status="warning">
+          {t('Renewal:Timing:Lock notice')} {learnMore}
+        </InlineNotification>
+      )}
+      {canPlan && lockedPath === 'now' && (
+        <InlineNotification status="info">
+          {t('Renewal:Timing:Now:Locked:Notice', { closes: pathState?.windowClosesDays })}
+        </InlineNotification>
+      )}
       <div className="timing-step__options">
         {options.map((option) => (
           <div className="timing-step__option" key={option}>

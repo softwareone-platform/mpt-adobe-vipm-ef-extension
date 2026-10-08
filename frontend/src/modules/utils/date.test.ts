@@ -1,4 +1,15 @@
-import { daysUntil, EM_DASH, formatDate, formatDateOnly, formatReviewDate, formatTime } from './date';
+/**
+ * @jest-environment ./test/timezone-environment.cjs
+ */
+import {
+  daysUntil,
+  daysUntilInPacific,
+  EM_DASH,
+  formatDate,
+  formatDateOnly,
+  formatReviewDate,
+  formatTime,
+} from './date';
 
 describe('formatDate', () => {
   it('formats an ISO timestamp as a localized date', () => {
@@ -37,6 +48,32 @@ describe('daysUntil', () => {
   it('returns undefined for missing or invalid values', () => {
     expect(daysUntil(undefined)).toBeUndefined();
     expect(daysUntil('not-a-date')).toBeUndefined();
+  });
+});
+
+declare const setTimeZone: (timeZone: string | undefined) => void;
+
+describe('daysUntilInPacific', () => {
+  const browserTimeZone = process.env.TZ;
+
+  afterEach(() => {
+    setTimeZone(browserTimeZone);
+  });
+
+  it.each([
+    ['Australia/Perth', '2026-09-30T17:00:00Z', 15],
+    ['Pacific/Honolulu', '2026-10-01T09:30:00Z', 14],
+    ['America/Los_Angeles', '2026-10-01T06:59:00Z', 15],
+    ['America/Los_Angeles', '2026-10-01T07:00:00Z', 14],
+  ])('counts from the Pacific date with the browser in %s at %s', (timeZone, now, expected) => {
+    setTimeZone(timeZone);
+
+    expect(daysUntilInPacific('2026-10-15', new Date(now))).toBe(expected);
+  });
+
+  it('returns undefined for missing or invalid values', () => {
+    expect(daysUntilInPacific(undefined)).toBeUndefined();
+    expect(daysUntilInPacific('not-a-date')).toBeUndefined();
   });
 });
 

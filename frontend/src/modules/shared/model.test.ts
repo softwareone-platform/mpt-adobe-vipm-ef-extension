@@ -1,7 +1,9 @@
 import {
   CommerceParameter,
   ProductSegments,
+  RenewalPathState,
   RenewalPlanBody,
+  canPlanRenewal,
   findLinkedMembership,
   getRecommendedOfferIds,
   hasThreeYearCommitment,
@@ -249,4 +251,38 @@ describe('readRenewalPreview', () => {
     expect(readRenewalPreview({ preview: null, eligibility: {} })).toBeNull();
     expect(readRenewalPreview(null)).toBeNull();
   });
+});
+
+describe('canPlanRenewal', () => {
+  const pathState: RenewalPathState = {
+    anniversaryDate: '2026-10-28',
+    window: 'open',
+    windowOpensDays: 30,
+    windowClosesDays: 2,
+    hasActiveSubscriptions: true,
+    lockedPath: null,
+  };
+
+  it('plans inside the window', () => {
+    expect(canPlanRenewal(pathState)).toBe(true);
+  });
+
+  it.each(['tooEarly', 'tooLate', 'unknown'] as const)('does not plan when the window is %s', (window) => {
+    expect(canPlanRenewal({ ...pathState, window })).toBe(false);
+  });
+
+  it('does not plan without an active subscription', () => {
+    expect(canPlanRenewal({ ...pathState, hasActiveSubscriptions: false })).toBe(false);
+  });
+
+  it('plans on an established path inside the window', () => {
+    expect(canPlanRenewal({ ...pathState, lockedPath: 'now' })).toBe(true);
+  });
+
+  it.each(['now', 'anniversary'] as const)(
+    'does not plan on an established %s path once the window has closed',
+    (lockedPath) => {
+      expect(canPlanRenewal({ ...pathState, window: 'tooLate', lockedPath })).toBe(false);
+    },
+  );
 });

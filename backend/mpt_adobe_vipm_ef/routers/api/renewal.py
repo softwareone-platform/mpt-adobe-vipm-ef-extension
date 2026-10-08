@@ -68,10 +68,11 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
 )
 from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
-    is_renewal_window_open,
+    read_renewal_window,
     require_unlocked_path,
     resolve_anniversary_date,
     resolve_locked_path,
+    resolve_window_date,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     Line,
@@ -204,10 +205,11 @@ async def get_renewal_path_state(agreement_id: str, ctx: APIContext) -> APIRespo
     coterm_date = str(customer.get("cotermDate") or "")
     anniversary_date = resolve_anniversary_date(coterm_date, subscriptions, non_renewable_skus)
     locked_path = resolve_locked_path(coterm_date, subscriptions, non_renewable_skus)
+    window_date = resolve_window_date(coterm_date, subscriptions, non_renewable_skus)
     return APIResponse.ok(
         payload={
             "anniversaryDate": anniversary_date,
-            "windowOpen": is_renewal_window_open(anniversary_date),
+            "window": read_renewal_window(window_date),
             "windowOpensDays": SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
             "windowClosesDays": SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
             "hasActiveSubscriptions": has_active_subscriptions(subscriptions),
@@ -416,8 +418,6 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     customer = await _load_adobe_customer(ctx, agreement_id)
     await _check_three_yc_floor(ctx, agreement, customer, plan_subscriptions, net_new_lines)
     coterm_date = str(customer.get("cotermDate") or "")
-    if net_new_lines and body.renewal_path is RenewalPath.ANNIVERSARY:
-        require_scheduled_creation_window(coterm_date)
     plan_subscriptions = await _resolve_submission_plan(
         ctx, agreement, plan_subscriptions, body.renewal_path, coterm_date
     )
@@ -587,7 +587,7 @@ async def _load_adobe_customer(ctx: APIContext, agreement_id: str) -> dict[str, 
     """Load the Adobe customer behind the agreement.
 
     The renewal endpoints read the customer's 3YC benefit (for the commitment
-    floor pre-check) and its coterm date (for the net-new scheduling window),
+    floor pre-check) and its coterm date (for the renewal window),
     failing with wizard-friendly messages instead of a Failed order.
     """
     authorization_id = await get_authorization_id(ctx, agreement_id)
@@ -623,7 +623,7 @@ async def _resolve_submission_plan(
 ) -> list[PlanSubscription]:
     """Check the path lock and stamp the plan for submission, off one Adobe load.
 
-    The same subscriptions load serves the path lock, the full offer ids, the
+    The same subscriptions load serves the path lock, the renewal window, the full offer ids, the
     discount codes each subscription already holds (which tell a code-only
     plan apart from a no-op) and — on the early path — the renewed quantities
     behind the snapshot's deltas, with the plan rejected right here if it asks
@@ -632,6 +632,9 @@ async def _resolve_submission_plan(
     adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement.id)
     non_renewable_skus = await _load_non_renewable_skus(ctx, agreement, adobe_subscriptions)
     require_unlocked_path(renewal_path, coterm_date, adobe_subscriptions, non_renewable_skus)
+    require_scheduled_creation_window(
+        resolve_window_date(coterm_date, adobe_subscriptions, non_renewable_skus)
+    )
     plan_subscriptions = _resolve_renewal_offer_ids(plan_subscriptions, adobe_subscriptions)
     plan_subscriptions = _resolve_current_discount_codes(plan_subscriptions, adobe_subscriptions)
     if renewal_path is RenewalPath.NOW:
