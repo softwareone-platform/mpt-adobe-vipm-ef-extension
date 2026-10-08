@@ -75,9 +75,9 @@ const AUTO_RENEW_SUPPORTED = { '65322587CA': true, '65322588CA': true };
 const PATH_STATE_URL = '/api/v2/agreements/AGR-1/renewal-order/path-state';
 const PATH_STATE: RenewalPathState = {
   anniversaryDate: '2026-08-20',
-  windowOpen: true,
+  window: 'open',
   windowOpensDays: 30,
-  windowClosesDays: 3,
+  windowClosesDays: 2,
   hasActiveSubscriptions: true,
   lockedPath: null,
 };
@@ -850,7 +850,7 @@ describe('request-renewal-action App', () => {
 
   it('blocks the first step outside the renewal window', async () => {
     mockGet.mockImplementation((url: string) =>
-      respondTo(url, { ...PATH_STATE, windowOpen: false }),
+      respondTo(url, { ...PATH_STATE, window: 'tooEarly' }),
     );
     render(<App />);
 

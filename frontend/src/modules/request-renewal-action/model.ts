@@ -152,7 +152,7 @@ export function isIncreaseAllowed(
  * 30-to-3-day window is open.
  */
 export function canAddNetNewItems(path: RenewalPath, pathState: RenewalPathState | null): boolean {
-  return path === 'now' || pathState?.windowOpen === true;
+  return path === 'now' || pathState?.window === 'open';
 }
 
 /** One Items-step line as the renew-and-add check reads it. */

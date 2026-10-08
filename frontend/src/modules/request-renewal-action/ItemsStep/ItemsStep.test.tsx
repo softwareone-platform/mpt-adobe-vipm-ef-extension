@@ -233,9 +233,9 @@ const NET_NEW_ITEM: NetNewItem = {
 
 const OPEN_PATH_STATE: RenewalPathState = {
   anniversaryDate: '2026-10-28',
-  windowOpen: true,
+  window: 'open',
   windowOpensDays: 30,
-  windowClosesDays: 3,
+  windowClosesDays: 2,
   hasActiveSubscriptions: true,
   lockedPath: null,
 };
@@ -601,7 +601,7 @@ describe('ItemsStep', () => {
 
   it('hides adding items at the anniversary once the window has closed', () => {
     const { queryByTestId } = renderStep({
-      pathState: { ...OPEN_PATH_STATE, windowOpen: false, lockedPath: 'anniversary' },
+      pathState: { ...OPEN_PATH_STATE, window: 'tooLate', lockedPath: 'anniversary' },
     });
 
     expect(queryByTestId('add-items')).toBeNull();
