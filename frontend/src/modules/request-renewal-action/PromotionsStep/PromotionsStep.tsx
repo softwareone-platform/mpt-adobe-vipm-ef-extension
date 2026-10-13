@@ -418,11 +418,14 @@ export function PromotionsStep({
     [renewalDiscounts, getOptions, onDiscountChange],
   );
 
+  // An inherited code is Adobe's record of what the customer holds, so only a
+  // code the customer typed or picked is checked against the renewal list.
   const unknownCode = useMemo(() => {
     if (discounts.status !== 'success') return '';
     const known = new Set(renewalDiscounts.map((discount) => normalizeDiscountCode(discount.code)));
-    return Object.values(discountSelections).find((code) => code && !known.has(code)) ?? '';
-  }, [discounts.status, discountSelections, renewalDiscounts]);
+    const unknownRow = rows.find((row) => row.code && !row.isInherited && !known.has(row.code));
+    return unknownRow?.code ?? '';
+  }, [discounts.status, rows, renewalDiscounts]);
 
   const validationMessage = toDiscountErrorMessage(discountValidationError, unknownCode);
 

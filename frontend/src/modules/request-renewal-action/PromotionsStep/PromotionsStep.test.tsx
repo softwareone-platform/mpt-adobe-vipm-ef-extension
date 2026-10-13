@@ -422,6 +422,38 @@ describe('PromotionsStep', () => {
     expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
   });
 
+  it('does not call an inherited code unknown when the renewal list leaves it out', async () => {
+    const { findByTestId, queryByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'HELD-CODE' },
+      inheritedDiscounts: [inheritedDiscount({ offerId: 'OFFER-1', code: 'HELD-CODE' })],
+    });
+
+    await findByTestId('inherited-SUB-1');
+    expect(queryByTestId('promotions-step-unknown-code')).toBeNull();
+  });
+
+  it('calls a typed code unknown once it replaces the inherited one on its line', async () => {
+    const { findByTestId } = await renderStep({
+      discountSelections: { 'SUB-1': 'TYPED-CODE' },
+      inheritedDiscounts: [inheritedDiscount({ offerId: 'OFFER-1', code: 'HELD-CODE' })],
+    });
+
+    const notice = await findByTestId('promotions-step-unknown-code');
+    expect(notice.textContent).toContain('TYPED-CODE');
+  });
+
+  it('calls only the typed code unknown when another line keeps its inherited code', async () => {
+    const { findByTestId } = await renderStep({
+      netNewItems: [NET_NEW_ITEM],
+      discountSelections: { 'SUB-1': 'HELD-CODE', 'ITM-3': 'TYPED-CODE' },
+      inheritedDiscounts: [inheritedDiscount({ offerId: 'OFFER-1', code: 'HELD-CODE' })],
+    });
+
+    const notice = await findByTestId('promotions-step-unknown-code');
+    expect(notice.textContent).toContain('TYPED-CODE');
+    expect(notice.textContent).not.toContain('HELD-CODE');
+  });
+
   it('keeps the list price on an applied code, since Review order carries the pricing', async () => {
     const { findByTestId } = await renderStep({ discountSelections: { 'SUB-1': 'CODE-ONE' } });
 
