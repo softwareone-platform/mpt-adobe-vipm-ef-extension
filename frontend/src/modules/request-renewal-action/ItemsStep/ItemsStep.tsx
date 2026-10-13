@@ -241,6 +241,7 @@ function toRenewalLines(rows: Row[]): RenewalLine[] {
     isNetNew: row.kind === 'net-new',
     currentQuantity: row.currentQuantity,
     renewalQuantity: row.renewalQuantity,
+    renewedQuantity: row.renewedQuantity,
   }));
 }
 

@@ -20,6 +20,7 @@ from mpt_extension_sdk.routing import APIRouter
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import (
+    ALL_SUBSCRIPTIONS_RENEWED_ERROR_CODE,
     NO_AUTO_RENEWAL_ERROR_CODE,
     SCHEDULED_CREATION_WINDOW_CLOSES_DAYS,
     SCHEDULED_CREATION_WINDOW_OPENS_DAYS,
@@ -832,15 +833,16 @@ async def _load_inherited_discounts(
     An automated ``PREVIEW_RENEWAL`` (no line items) returns, per renewing line,
     the flexible discounts Adobe would auto-apply and whether each still
     qualifies; the customer's held-reusable catalogue enriches them for display.
-    If no subscription is set to auto-renew, Adobe returns an error, which
-    means no held discounts. Any other Adobe error is raised.
+    If no subscription is set to auto-renew, or every subscription is already
+    renewed, Adobe returns an error, which means no held discounts. Any other
+    Adobe error is raised.
     """
     authorization_id = await get_authorization_id(ctx, agreement_id)
     customer_id = await require_customer_id(ctx, agreement_id)
     try:
         return await _fetch_inherited_discounts(ctx, authorization_id, customer_id, currency_code)
     except AdobeAPIError as error:
-        if error.code == NO_AUTO_RENEWAL_ERROR_CODE:
+        if error.code in {NO_AUTO_RENEWAL_ERROR_CODE, ALL_SUBSCRIPTIONS_RENEWED_ERROR_CODE}:
             return {}
         logger.warning("Could not load inherited discounts for %s: %s", agreement_id, error)
         raise UpstreamServiceError(detail=ADOBE_REQUEST_FAILED_DETAIL)
