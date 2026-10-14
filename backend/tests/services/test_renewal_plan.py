@@ -29,6 +29,7 @@ _NET_NEW_SKU = "65304481CA"
 _NET_NEW_OFFER_ID = "65304481CA01A12"
 _ADOBE_SUBSCRIPTION_ID = "adobe-sub-1"
 _CURRENT_QUANTITY = 10
+_COTERM_DATE = "2026-10-20"
 _MARKET_SEGMENT = "COM"
 
 
@@ -248,10 +249,11 @@ def test_build_renewal_payload_snapshots_the_whole_plan():
         ),
     ]
 
-    result = build_renewal_payload(_plan(request), net_new_lines, request, "USD")
+    result = build_renewal_payload(_plan(request), net_new_lines, request, "USD", _COTERM_DATE)
 
     assert result.to_dict() == {
         "renewalPath": "anniversary",
+        "plannedCotermDate": _COTERM_DATE,
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [
@@ -289,7 +291,7 @@ def test_build_renewal_payload_keeps_codes_off_lapsing_subscriptions():
         subscriptions=[_selection(renew=False, quantity=0, codes=["BLACK_FRIDAY"])],
     )
 
-    result = build_renewal_payload(_plan(request), [], request, "USD")
+    result = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     assert result.subscriptions[0].flex_discount_codes == []
 
@@ -304,7 +306,7 @@ def test_build_renewal_payload_snapshots_a_removed_code():
         ],
     )
 
-    result = build_renewal_payload(_plan(request), [], request, "USD")
+    result = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     assert [entry.clear_flex_discount_codes for entry in result.subscriptions] == [
         True,
@@ -316,7 +318,7 @@ def test_build_renewal_payload_snapshots_a_removed_code():
 def test_build_renewal_payload_defaults_the_optional_fields():
     request = _request(subscriptions=[_selection()], recommendationTrackerId="")
 
-    result = build_renewal_payload(_plan(request), [], request, "USD")
+    result = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     payload = result.to_dict()
     assert not payload["recommendationTrackerId"]
@@ -327,7 +329,7 @@ def test_build_renewal_payload_snapshots_the_early_renewal_path():
     """The path is the discriminator fulfilment routes the snapshot on."""
     request = _request(subscriptions=[_selection()], renewalPath="now")
 
-    result = build_renewal_payload(_plan(request), [], request, "USD")
+    result = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     assert result.to_dict()["renewalPath"] == "now"
 
@@ -340,7 +342,9 @@ def test_build_renewal_payload_snapshots_the_delta_still_to_renew():
     """
     request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
 
-    result = build_renewal_payload(_plan(request, renewed_quantity=4), [], request, "USD")
+    result = build_renewal_payload(
+        _plan(request, renewed_quantity=4), [], request, "USD", _COTERM_DATE
+    )
 
     assert result.subscriptions[0].renewal_quantity == 6
 
@@ -353,7 +357,7 @@ def test_build_renewal_payload_keeps_a_fully_covered_subscription_with_a_zero_de
     request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
 
     result = build_renewal_payload(
-        _plan(request, renewed_quantity=_CURRENT_QUANTITY), [], request, "USD"
+        _plan(request, renewed_quantity=_CURRENT_QUANTITY), [], request, "USD", _COTERM_DATE
     )
 
     assert result.subscriptions[0].renewal_quantity == 0
@@ -369,7 +373,9 @@ def test_build_renewal_payload_snapshots_the_removal_of_a_renewed_subscription()
     """
     request = _request(subscriptions=[_selection(renew=False, quantity=0)], renewalPath="now")
 
-    result = build_renewal_payload(_plan(request, renewed_quantity=4), [], request, "USD")
+    result = build_renewal_payload(
+        _plan(request, renewed_quantity=4), [], request, "USD", _COTERM_DATE
+    )
 
     assert result.subscriptions[0].renew is False
     assert result.subscriptions[0].renewal_quantity == 0

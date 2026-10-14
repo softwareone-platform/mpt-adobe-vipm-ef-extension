@@ -156,7 +156,10 @@ frontend/                    TypeScript plug UI (esbuild)
     submit route repeats every gate and creates the
     change order carrying the plan snapshot (the renewal path, renew decisions,
     quantities, discount codes, a per-line flag marking a held code the
-    customer removed with Undo, and the recommendation tracker id) on the hidden
+    customer removed with Undo, the recommendation tracker id, and the Adobe
+    `cotermDate` the plan was built for as `plannedCotermDate`, which
+    fulfilment compares with Adobe's current one so a plan still processing
+    after the anniversary fails instead of applying to the next year) on the hidden
     `renewalPayload` order parameter, the discriminator fulfilment reads to pick
     the execution flow. A plan that moves no quantity and adds no net-new
     product cannot be a change order, so it is submitted as a configuration

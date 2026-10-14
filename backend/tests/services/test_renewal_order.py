@@ -22,6 +22,7 @@ _NET_NEW_OFFER_ID = "65304481CA01A12"
 _NET_NEW_ITEM_ID = "ITM-NET-NEW"
 _ADOBE_SUBSCRIPTION_ID = "adobe-sub-1"
 _CURRENT_QUANTITY = 10
+_COTERM_DATE = "2026-10-20"
 
 
 def _request(subscriptions=None, net_new_items=None, **extra):
@@ -205,7 +206,7 @@ async def test_create_renewal_change_order_creates_in_processing_status(mocker, 
         subscriptions=[_selection(codes=["BLACK_FRIDAY"])],
         recommendationTrackerId="TRACKER-1",
     )
-    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
     lines = [{"id": _LINE_ID, "quantity": 7}]
 
     result = await create_renewal_change_order(
@@ -232,7 +233,7 @@ async def test_create_renewal_change_order_carries_the_customer_details(mocker, 
         notes="Renewal for the design team",
         externalIds={"client": "234234234"},
     )
-    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     await create_renewal_change_order(client, _AGREEMENT_ID, [], renewal_payload, request)  # act
 
@@ -247,7 +248,7 @@ async def test_create_renewal_configuration_order_creates_in_processing_status_w
 ):
     client = mocker.Mock(commerce=mocker.Mock(orders=orders_service))
     request = _request(subscriptions=[_selection(renew=False)], renewalPath=renewal_path)
-    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
     subscriptions = [{"id": _SUBSCRIPTION_ID, "AutoRenew": False, "lines": []}]
 
     result = await create_renewal_configuration_order(
@@ -277,7 +278,7 @@ async def test_create_renewal_configuration_order_carries_the_customer_details(
         externalIds={"client": "234234234"},
     )
 
-    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD")
+    renewal_payload = build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
 
     await create_renewal_configuration_order(  # act
         client, _AGREEMENT_ID, [], request, renewal_payload
