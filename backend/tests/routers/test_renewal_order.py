@@ -410,6 +410,7 @@ async def test_create_renewal_order_snapshots_the_plan_on_an_early_renewal_confi
     call_args, _ = create_configuration_order_mock.await_args
     assert call_args[4].to_dict() == {
         "renewalPath": "now",
+        "plannedCotermDate": _COTERM_IN_WINDOW,
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [
@@ -442,6 +443,7 @@ async def test_create_renewal_order_carries_the_payload_on_an_anniversary_config
     call_args, _ = create_configuration_order_mock.await_args
     assert call_args[4].to_dict() == {
         "renewalPath": "anniversary",
+        "plannedCotermDate": _COTERM_IN_WINDOW,
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [
@@ -610,6 +612,7 @@ async def test_create_renewal_order_passes_the_renewal_payload(
     call_args, _ = create_order_mock.await_args
     assert call_args[3].to_dict() == {
         "renewalPath": "anniversary",
+        "plannedCotermDate": _COTERM_IN_WINDOW,
         "recommendationTrackerId": "TRACKER-1",
         "currencyCode": "USD",
         "subscriptions": [

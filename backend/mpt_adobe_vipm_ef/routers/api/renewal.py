@@ -457,12 +457,14 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
             ctx, net_new_lines, lambda: resolve_market_segment(ctx, agreement)
         )
         renewal_payload = build_renewal_payload(
-            plan_subscriptions, net_new_lines, body, currency_code
+            plan_subscriptions, net_new_lines, body, currency_code, coterm_date
         )
         order = await _create_change_order(ctx, agreement_id, lines, renewal_payload, body)
     else:
         configuration_subscriptions = build_configuration_order_subscriptions(plan_subscriptions)
-        renewal_payload = _configuration_renewal_payload(agreement, plan_subscriptions, body)
+        renewal_payload = _configuration_renewal_payload(
+            agreement, plan_subscriptions, body, coterm_date
+        )
         if configuration_subscriptions:
             order = await _create_configuration_order(
                 ctx, agreement_id, configuration_subscriptions, body, renewal_payload
@@ -1298,6 +1300,7 @@ def _configuration_renewal_payload(
     agreement: Agreement,
     plan_subscriptions: list[PlanSubscription],
     body: RenewalOrderRequest,
+    coterm_date: str,
 ) -> RenewalPayload:
     """Build the plan snapshot a quantity-less renewal plan still has to carry.
 
@@ -1311,7 +1314,7 @@ def _configuration_renewal_payload(
     subscriptions load), so the snapshot is ready to build.
     """
     currency_code = agreement.authorization.currency if agreement.authorization else ""
-    return build_renewal_payload(plan_subscriptions, [], body, currency_code or "")
+    return build_renewal_payload(plan_subscriptions, [], body, currency_code or "", coterm_date)
 
 
 async def _create_configuration_order(
