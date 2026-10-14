@@ -206,9 +206,14 @@ class RenewalPayload(APIBaseModel):
     discriminator fulfilment routes on: ``anniversary`` applies the plan as
     auto-renewal preferences at the coterm date, ``now`` places the early
     RENEWAL order (plus any RETURN orders) immediately.
+    ``plannedCotermDate`` is the Adobe ``cotermDate`` the plan was built for:
+    auto-renewal preferences apply at whatever coterm date is next when
+    fulfilment runs, so fulfilment compares it with Adobe's current one and
+    fails the order instead of carrying the plan into a later renewal.
     """
 
     renewal_path: str = Field(alias="renewalPath")
+    planned_coterm_date: str = Field(default="", alias="plannedCotermDate")
     recommendation_tracker_id: str = Field(default="", alias="recommendationTrackerId")
     currency_code: str = Field(alias="currencyCode")
     subscriptions: list[RenewalPayloadSubscription]
