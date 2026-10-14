@@ -71,7 +71,9 @@ frontend/                    TypeScript plug UI (esbuild)
     explicit RENEWAL order and never uses those preferences. `3yc-check`
     re-checks that routing and pre-checks the plan against the customer's 3YC
     commitment floors (splitting licenses and consumables through the same SKU
-    mapping), `preview` re-checks the routing and quotes the plan through an
+    mapping). Like fulfillment, it counts every Adobe subscription the customer
+    holds, not only the plan's: one outside the plan counts what Adobe will
+    auto-renew, and an inactive one counts nothing. `preview` re-checks the routing and quotes the plan through an
     Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
     codes and returning the renewal pricing plus each line's now-path
     eligibility); on the `now` path

@@ -52,6 +52,7 @@ _COTERM_OUT_OF_WINDOW = "2026-12-01"
 _COMMITMENT_END = "2029-08-20"
 _ABOVE_FLOOR_QUANTITY = 12
 _REPEAT_RENEWAL_TOTAL = 12
+_PLAN_PLUS_OUTSIDE_PLAN_LICENSES = 17
 
 _ADOBE_API_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
@@ -267,8 +268,17 @@ def adobe_customer(adobe_call):
 
 @pytest.fixture
 def three_yc_customer(adobe_call):
-    """Preset the Adobe customer load with a committed 3YC floor of 10 licenses."""
-    adobe_call.returns = _customer_payload(benefits=[_three_yc_benefit(licenses=10)])
+    """Preset the Adobe loads with a 3YC floor of 10 licenses and the renewing subscription.
+
+    The 3YC check counts the customer's Adobe subscriptions, so the renewing
+    subscription has to be among them for the plan's seats to count.
+    """
+    adobe_call.returns = {
+        **_customer_payload(benefits=[_three_yc_benefit(licenses=10)]),
+        "items": [
+            {"subscriptionId": _ADOBE_SUBSCRIPTION_ID, "offerId": _OFFER_ID, "status": "1000"},
+        ],
+    }
     return adobe_call
 
 
@@ -658,6 +668,22 @@ async def test_create_renewal_order_snapshots_the_delta_on_a_repeat_early_renewa
     call_args, _ = create_order_mock.await_args
     assert call_args[2] == [{"id": _LINE_ID, "quantity": _REPEAT_RENEWAL_TOTAL}]
     assert call_args[3].to_dict()["subscriptions"][0]["renewalQuantity"] == 8
+
+
+async def test_create_renewal_order_counts_renewed_seats_toward_the_three_yc_floor(
+    fake_ctx, submit_deps, sku_mapping_store, create_order_mock, adobe_call
+):
+    adobe_call.returns = {
+        **_renewed_subscriptions_payload(_CURRENT_QUANTITY),
+        "benefits": [_three_yc_benefit(licenses=10)],
+    }
+    body = _body(quantity=_REPEAT_RENEWAL_TOTAL, path="now")
+    expected_result = 2
+
+    await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
+
+    call_args, _ = create_order_mock.await_args
+    assert call_args[3].to_dict()["subscriptions"][0]["renewalQuantity"] == expected_result
 
 
 async def test_create_renewal_order_keeps_an_already_covered_subscription_in_the_snapshot(
@@ -1108,9 +1134,9 @@ async def test_create_renewal_order_blocks_a_plan_below_the_three_yc_floor(
     with pytest.raises(ValidationError, match="three-year commitment"):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body(quantity=7))
 
-    # Only the Adobe customer load ran: the floor breach blocks the plan
-    # before the PREVIEW_RENEWAL quote and the order creation.
-    assert len(adobe_call.calls) == 1
+    # Only the Adobe customer and subscriptions loads ran: the floor breach
+    # blocks the plan before the PREVIEW_RENEWAL quote and the order creation.
+    assert len(adobe_call.calls) == 2
     create_order_mock.assert_not_awaited()
 
 
@@ -1194,6 +1220,73 @@ async def test_check_renewal_order_three_yc_skips_a_commitment_ending_before_the
     )
 
     assert result.payload == {"checked": False, "commitmentStatus": "COMMITTED"}
+
+
+@pytest.mark.parametrize(
+    (
+        "plan_quantity",
+        "renewed_quantity",
+        "outside_subscriptions",
+        "minimum_licenses_quantity",
+        "expected_count",
+    ),
+    [
+        pytest.param(10, 0, [], 10, 10, id="renew-now-first-10"),
+        pytest.param(
+            _REPEAT_RENEWAL_TOTAL,
+            10,
+            [],
+            10,
+            _REPEAT_RENEWAL_TOTAL,
+            id="renew-now-10-renewed-plus-2",
+        ),
+        pytest.param(
+            _REPEAT_RENEWAL_TOTAL,
+            10,
+            [
+                {
+                    "subscriptionId": "adobe-sub-2",
+                    "offerId": _OFFER_ID,
+                    "status": "1000",
+                    "autoRenewal": {"enabled": True, "renewalQuantity": 5},
+                },
+            ],
+            _PLAN_PLUS_OUTSIDE_PLAN_LICENSES,
+            _PLAN_PLUS_OUTSIDE_PLAN_LICENSES,
+            id="renew-now-plus-5-outside",
+        ),
+    ],
+)
+async def test_check_renewal_order_three_yc_counts_the_renew_now_plan(
+    fake_ctx,
+    renewal_agreement,
+    renewing_subscription,
+    sku_mapping_store,
+    adobe_call,
+    plan_quantity,
+    renewed_quantity,
+    outside_subscriptions,
+    minimum_licenses_quantity,
+    expected_count,
+):
+    adobe_call.returns = {
+        **_customer_payload(benefits=[_three_yc_benefit(licenses=minimum_licenses_quantity)]),
+        "items": [
+            {
+                "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+                "offerId": _OFFER_ID,
+                "status": "1000",
+                "renewedQuantity": renewed_quantity,
+            },
+            *outside_subscriptions,
+        ],
+    }
+    body = _plan_body(quantity=plan_quantity, path="now")
+    expected_result = {"selected": expected_count, "minimum": minimum_licenses_quantity}
+
+    result = await check_renewal_order_three_yc(_AGREEMENT_ID, fake_ctx, body)
+
+    assert result.payload["licenses"] == expected_result
 
 
 async def test_check_renewal_order_three_yc_rejects_an_empty_plan(fake_ctx, renewal_agreement):

@@ -98,6 +98,7 @@ from mpt_adobe_vipm_ef.services.renewal_state import (
 from mpt_adobe_vipm_ef.services.renewal_three_yc import (
     check_renewal_plan_three_yc_floor,
     has_three_yc_in_force,
+    project_renewal_quantities,
 )
 from mpt_adobe_vipm_ef.services.switch_order import (
     mpt_order_error_detail,
@@ -491,12 +492,19 @@ async def _check_three_yc_floor(
     plan_subscriptions: list[PlanSubscription],
     net_new_lines: list[NetNewLine],
 ) -> dict[str, object]:
+    """Count the renewing seats and check them against the 3YC minimum.
+
+    The Adobe subscriptions are only loaded for a customer with a 3YC in force,
+    because no other customer is checked.
+    """
+    adobe_subscriptions: dict[str, object] = {}
+    if has_three_yc_in_force(customer):
+        adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement.id)
     return await check_renewal_plan_three_yc_floor(
         ctx,
         customer,
         lambda: resolve_market_segment(ctx, agreement),
-        plan_subscriptions,
-        net_new_lines,
+        project_renewal_quantities(adobe_subscriptions, plan_subscriptions, net_new_lines),
     )
 
 

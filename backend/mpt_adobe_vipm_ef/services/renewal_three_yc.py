@@ -20,6 +20,10 @@ from mpt_extension_sdk.api import (
 )
 from requests import RequestException
 
+from mpt_adobe_vipm_ef.constants import (
+    INACTIVE_SUBSCRIPTION_STATUS,
+    SCHEDULED_SUBSCRIPTION_STATUS,
+)
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
 from mpt_adobe_vipm_ef.services.renewal_plan import NetNewLine, PlanSubscription
 from mpt_adobe_vipm_ef.services.sku_mapping import (
@@ -64,12 +68,11 @@ async def check_renewal_plan_three_yc_floor(  # noqa: WPS210
     ctx: APIContext,
     customer: dict[str, Any],
     resolve_market_segment: Callable[[], str],
-    plan_subscriptions: list[PlanSubscription],
-    net_new_lines: list[NetNewLine],
+    renewal_quantities: dict[str, int],
 ) -> dict[str, Any]:
     """Check the renewal plan against the customer's 3YC minimum quantities.
 
-    Sums the quantities the plan renews (plus the net-new additions), splits
+    Takes the seats per product from ``project_renewal_quantities``, splits
     them into licenses and consumables through the Airtable SKU mapping and
     compares each total against its committed floor. Returns the check summary
     for the wizard; raises :class:`ValidationError` when a floor would break.
@@ -81,9 +84,8 @@ async def check_renewal_plan_three_yc_floor(  # noqa: WPS210
     commitment_status = commitment.get("status") or None
     if not _is_enforceable(commitment, str(customer.get("cotermDate") or "")):
         return {"checked": False, "commitmentStatus": commitment_status}
-    plan_quantities = _plan_quantities(plan_subscriptions, net_new_lines)
-    sku_types = await _load_sku_types(ctx, sorted(plan_quantities), resolve_market_segment())
-    licenses, consumables = _count_by_offer_type(plan_quantities, sku_types)
+    sku_types = await _load_sku_types(ctx, sorted(renewal_quantities), resolve_market_segment())
+    licenses, consumables = _count_by_offer_type(renewal_quantities, sku_types)
     minimum_licenses, minimum_consumables = _require_floors(commitment, licenses, consumables)
     return {
         "checked": True,
@@ -106,24 +108,77 @@ def _is_enforceable(commitment: dict[str, Any], coterm_date: str) -> bool:
     return not (end_date and coterm_date and end_date < coterm_date)
 
 
-def _plan_quantities(
-    plan_subscriptions: list[PlanSubscription], net_new_lines: list[NetNewLine]
+def project_renewal_quantities(
+    adobe_subscriptions: dict[str, Any],
+    plan_subscriptions: list[PlanSubscription],
+    net_new_lines: list[NetNewLine],
 ) -> dict[str, int]:
-    """Total the post-anniversary quantity per partial SKU.
+    """Count the seats each product will renew, the same way fulfillment counts them.
 
-    A renewing subscription contributes its renewal quantity, a lapsing one
-    contributes nothing, and net-new products contribute their quantity.
+    Every Adobe subscription counts, not only the ones in the plan. Inactive
+    ones count nothing.
     """
-    quantities: dict[str, int] = {}
-    for plan in plan_subscriptions:
-        if not plan.selection.renew:
-            continue
-        sku = get_partial_sku(plan.selection.offer_id)
-        quantities[sku] = quantities.get(sku, 0) + plan.selection.renewal_quantity
+    plans_by_subscription_id = {plan.adobe_subscription_id: plan for plan in plan_subscriptions}
+    projected = [
+        _project_subscription(
+            subscription_item,
+            plans_by_subscription_id.get(str(subscription_item.get("subscriptionId") or "")),
+        )
+        for subscription_item in adobe_subscriptions.get("items") or []
+        if subscription_item.get("status") != INACTIVE_SUBSCRIPTION_STATUS
+    ]
     for net_new in net_new_lines:
-        net_new_sku = get_partial_sku(net_new.selection.offer_id)
-        quantities[net_new_sku] = quantities.get(net_new_sku, 0) + net_new.selection.quantity
+        _project_net_new_line(projected, net_new)
+    return _sum_by_sku(projected)
+
+
+def _sum_by_sku(projected: list[dict[str, Any]]) -> dict[str, int]:
+    quantities: dict[str, int] = {}
+    for projected_subscription in projected:
+        sku = projected_subscription["sku"]
+        quantities[sku] = quantities.get(sku, 0) + projected_subscription["quantity"]
     return quantities
+
+
+def _project_subscription(
+    subscription_item: dict[str, Any], plan: PlanSubscription | None
+) -> dict[str, Any]:
+    """Outside the plan, count what Adobe will auto-renew."""
+    if plan is None:
+        auto_renewal = subscription_item.get("autoRenewal") or {}
+        enabled = bool(auto_renewal.get("enabled"))
+        quantity = int(auto_renewal.get("renewalQuantity") or 0) if enabled else 0
+    elif plan.selection.renew:
+        quantity = plan.selection.renewal_quantity
+    else:
+        quantity = 0
+    return {
+        "status": str(subscription_item.get("status") or ""),
+        "sku": get_partial_sku(str(subscription_item.get("offerId") or "")),
+        "quantity": quantity,
+    }
+
+
+def _project_net_new_line(projected: list[dict[str, Any]], net_new: NetNewLine) -> None:
+    """Count a net-new product once, even if Adobe already has it scheduled."""
+    sku = get_partial_sku(net_new.selection.offer_id)
+    scheduled = next(
+        (
+            projected_subscription
+            for projected_subscription in projected
+            if projected_subscription["status"] == SCHEDULED_SUBSCRIPTION_STATUS
+            and projected_subscription["sku"] == sku
+        ),
+        None,
+    )
+    if scheduled is None:
+        projected.append({
+            "status": SCHEDULED_SUBSCRIPTION_STATUS,
+            "sku": sku,
+            "quantity": net_new.selection.quantity,
+        })
+    else:
+        scheduled["quantity"] = net_new.selection.quantity
 
 
 async def _load_sku_types(
