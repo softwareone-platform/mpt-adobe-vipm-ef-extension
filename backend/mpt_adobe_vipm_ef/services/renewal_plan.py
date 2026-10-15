@@ -362,6 +362,7 @@ def build_renewal_payload(
     net_new_lines: list[NetNewLine],
     request: RenewalOrderRequest,
     currency_code: str,
+    coterm_date: str,
 ) -> RenewalPayload:
     """Build the ``renewalPayload`` DataObject snapshot from the customer's plan.
 
@@ -387,10 +388,14 @@ def build_renewal_payload(
     each code to the line it was picked for and nothing else. The net-new
     products carry their full offer ids (resolved from the Airtable SKU
     mapping, see ``resolve_net_new_offer_ids``) so fulfilment can create the
-    scheduled subscriptions without re-resolving them.
+    scheduled subscriptions without re-resolving them. The Adobe
+    ``coterm_date`` read when the order was placed is recorded as the
+    anniversary the plan was built for, so fulfilment can refuse to apply it
+    once Adobe has moved on to a later coterm date.
     """
     return RenewalPayload.from_payload({
         "renewalPath": request.renewal_path.value,
+        "plannedCotermDate": coterm_date,
         "recommendationTrackerId": request.recommendation_tracker_id,
         "currencyCode": currency_code,
         "subscriptions": [
