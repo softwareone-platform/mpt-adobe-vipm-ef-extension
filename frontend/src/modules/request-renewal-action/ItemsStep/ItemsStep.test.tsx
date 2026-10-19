@@ -464,6 +464,43 @@ describe('ItemsStep', () => {
     expect(onQuantityChange).toHaveBeenCalledWith('SUB-1', 37);
   });
 
+  describe('undo after a partial early renewal', () => {
+    const partlyRenewed: RenewalStates = {
+      [ADOBE_SUBSCRIPTION_ID]: {
+        currentQuantity: 37,
+        renewedQuantity: 15,
+        state: 'partiallyRenewed',
+        remainingQuantity: 22,
+        earlyRenewable: true,
+        increaseAllowed: false,
+      },
+    };
+
+    it('keeps the undo action idle on the seats already renewed', () => {
+      const { getByTestId } = renderStep({
+        path: 'now',
+        quantities: { 'SUB-1': 15 },
+        renewalStates: partlyRenewed,
+      });
+
+      expect((getByTestId('undo-SUB-1') as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('restores the seats already renewed, not the seats held', () => {
+      const onQuantityChange = jest.fn();
+      const { getByTestId } = renderStep({
+        path: 'now',
+        quantities: { 'SUB-1': 37 },
+        renewalStates: partlyRenewed,
+        onQuantityChange,
+      });
+
+      fireEvent.click(getByTestId('undo-SUB-1'));
+
+      expect(onQuantityChange).toHaveBeenCalledWith('SUB-1', 15);
+    });
+  });
+
   it('lists added net-new items as new rows and prices them by quantity', () => {
     const { getByTestId } = renderStep({ netNewItems: [NET_NEW_ITEM] });
 

@@ -136,7 +136,7 @@ function toSubscriptionRows(
         commitment: TERM_COMMITMENT_LABELS[subscription.terms?.commitment ?? ''] ?? '',
         currentQuantity: line?.quantity ?? null,
         renewalQuantity: getRenewalQuantity(subscription, quantities),
-        defaultQuantity: getDefaultRenewalQuantity(subscription),
+        defaultQuantity: getDefaultRenewalQuantity(subscription, renewalStates),
         unitSP: line?.price?.unitSP ?? null,
         spxM: totalPrice(
           line?.price?.unitSP ?? null,
