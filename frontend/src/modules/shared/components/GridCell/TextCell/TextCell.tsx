@@ -10,19 +10,25 @@ export interface TextCellProps {
 }
 
 export function TextCell({ text, secondaryContent }: TextCellProps) {
+  const hasSecondaryContent =
+    secondaryContent != null && secondaryContent !== '' && typeof secondaryContent !== 'boolean';
+
   return (
     <GridCellSimple>
       <div className="text-cell">
         <RegularText as="p" size={2}>
           {text}
         </RegularText>
-        {secondaryContent != null &&
-          secondaryContent !== '' &&
-          typeof secondaryContent !== 'boolean' && (
+        {hasSecondaryContent && (
+          <>
+            {/* Not rendered between the two lines, but it keeps them apart in the
+                truncation tooltip, which the grid builds from the text content. */}
+            {' '}
             <RegularText as="p" size={1} color="grey-4">
               {secondaryContent}
             </RegularText>
-          )}
+          </>
+        )}
       </div>
     </GridCellSimple>
   );
