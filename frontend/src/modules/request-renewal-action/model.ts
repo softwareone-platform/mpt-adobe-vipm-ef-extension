@@ -52,7 +52,8 @@ export function isRenewing(subscription: Subscription, selections: RenewalSelect
  * The renewal quantities typed in the Items step, keyed by subscription id.
  *
  * Only edited subscriptions appear; ``null`` marks a cleared input awaiting a
- * value. Untouched subscriptions renew at their standing quantity.
+ * value. Untouched subscriptions renew at their standing quantity, or at the
+ * seats already early-renewed once ``withRenewedQuantities`` seeds them.
  */
 export type RenewalQuantities = Record<string, number | null>;
 
@@ -60,10 +61,18 @@ export type RenewalQuantities = Record<string, number | null>;
  * The quantity a subscription renews at unless the customer changes it.
  *
  * Adobe subscriptions hold exactly one item, and the platform keeps the line
- * quantity aligned with Adobe's standing renewal quantity.
+ * quantity aligned with Adobe's standing renewal quantity. Once an early
+ * renewal has renewed seats, leaving the line unchanged means keeping those
+ * seats, so the default is the renewed total rather than the line, which on
+ * the early path carries every seat held (see ``withHeldQuantity``): renewing
+ * the remainder is then the customer's choice, never the default.
  */
-export function getDefaultRenewalQuantity(subscription: Subscription): number | null {
-  return subscription.lines?.[0]?.quantity ?? null;
+export function getDefaultRenewalQuantity(
+  subscription: Subscription,
+  states: RenewalStates = {},
+): number | null {
+  const renewedQuantity = getRenewalState(subscription, states)?.renewedQuantity ?? 0;
+  return renewedQuantity > 0 ? renewedQuantity : (subscription.lines?.[0]?.quantity ?? null);
 }
 
 export function getRenewalQuantity(
@@ -138,6 +147,31 @@ export function withHeldQuantity(
   const [line, ...others] = subscription.lines ?? [];
   if (!state || !line || line.quantity === state.currentQuantity) return subscription;
   return { ...subscription, lines: [{ ...line, quantity: state.currentQuantity }, ...others] };
+}
+
+/**
+ * The renewal quantities with every untouched, early-renewed line at its renewed total.
+ *
+ * The steps read an untouched line at its line quantity, which on the early
+ * path is the quantity held. After a partial early renewal that default would
+ * renew the remaining seats too, so the early path seeds those lines with the
+ * seats already renewed (``getDefaultRenewalQuantity``) and the order carries
+ * no change for them unless the customer asks for one. A quantity the customer
+ * typed, a cleared input included, always wins.
+ */
+export function withRenewedQuantities(
+  subscriptions: Subscription[],
+  quantities: RenewalQuantities,
+  states: RenewalStates,
+): RenewalQuantities {
+  const renewed = Object.fromEntries(
+    subscriptions.flatMap((subscription) =>
+      getRenewalState(subscription, states)?.renewedQuantity
+        ? [[subscription.id, getDefaultRenewalQuantity(subscription, states)]]
+        : [],
+    ),
+  );
+  return { ...renewed, ...quantities };
 }
 
 /**
