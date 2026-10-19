@@ -238,7 +238,7 @@ describe('RenewalStep', () => {
       },
     });
 
-    expect(getByTestId('row-SUB-1').textContent).toContain('1000 renewed · 715 left');
+    expect(getByTestId('row-SUB-1').textContent).toContain('(1000 renewed, 715 left)');
     expect(getByTestId('row-SUB-2').textContent).not.toContain('renewed');
   });
 
