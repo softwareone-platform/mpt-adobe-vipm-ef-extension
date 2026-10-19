@@ -23,6 +23,7 @@ import {
   isRenewing,
   normalizeDiscountCode,
   withHeldQuantity,
+  withRenewedQuantities,
 } from './model';
 import type { Discount, InheritedDiscount, RenewalPathState, Subscription } from '../shared/model';
 
@@ -276,6 +277,43 @@ describe('renewal state helpers', () => {
   it('leaves the subscription untouched without a state or once it is in sync', () => {
     expect(withHeldQuantity(subscription, {})).toBe(subscription);
     expect(withHeldQuantity(subscription, states)).toBe(subscription);
+  });
+
+  it('defaults a partly early-renewed line to the seats already renewed', () => {
+    expect(getDefaultRenewalQuantity(subscription, states)).toBe(4);
+  });
+
+  it('defaults a fully early-renewed line to its renewed total', () => {
+    const renewed = { [ADOBE_ID]: { ...partial, renewedQuantity: 10, remainingQuantity: 0 } };
+
+    expect(getDefaultRenewalQuantity(subscription, renewed)).toBe(10);
+  });
+
+  it('defaults to the line quantity before any early renewal', () => {
+    const notRenewed = { [ADOBE_ID]: { ...partial, renewedQuantity: 0, remainingQuantity: 10 } };
+
+    expect(getDefaultRenewalQuantity(subscription, notRenewed)).toBe(10);
+    expect(getDefaultRenewalQuantity(subscription, {})).toBe(10);
+  });
+
+  it('seeds an untouched, early-renewed line with its renewed seats', () => {
+    const held = withHeldQuantity(subscription, states);
+
+    expect(withRenewedQuantities([held], {}, states)).toEqual({ 'SUB-1': 4 });
+  });
+
+  it('keeps the quantity the customer typed over the renewed seats, a cleared input included', () => {
+    expect(withRenewedQuantities([subscription], { 'SUB-1': 10 }, states)).toEqual({ 'SUB-1': 10 });
+    expect(withRenewedQuantities([subscription], { 'SUB-1': null }, states)).toEqual({
+      'SUB-1': null,
+    });
+  });
+
+  it('seeds nothing for a line never early-renewed', () => {
+    const notRenewed = { [ADOBE_ID]: { ...partial, renewedQuantity: 0, remainingQuantity: 10 } };
+
+    expect(withRenewedQuantities([subscription], {}, notRenewed)).toEqual({});
+    expect(withRenewedQuantities([subscription], {}, {})).toEqual({});
   });
 
   it('keeps a line the customer holds unless Adobe retired the SKU', () => {
