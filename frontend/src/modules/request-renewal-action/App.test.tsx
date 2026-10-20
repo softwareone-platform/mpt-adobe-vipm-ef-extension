@@ -431,6 +431,146 @@ describe('request-renewal-action App', () => {
     expect(reviewProps.lineQuantities).toEqual({ [SUBSCRIPTIONS[0].id]: 15 });
   });
 
+  describe('follow-up after an early renewal', () => {
+    const RENEWAL_STATE_URL = '/api/v2/agreements/AGR-1/renewal-order/renewal-state';
+    const RENEWAL_ORDER_URL = '/api/v2/agreements/AGR-1/renewal-order';
+    const ADOBE_ID = 'a1b2c3d4e5NA';
+    const NET_NEW_ITEM = {
+      itemId: 'ITM-9',
+      itemName: 'Acrobat Pro',
+      sku: '65304578CA',
+      unitSP: 234,
+      quantity: 2,
+      recommended: false,
+    };
+
+    // The previous Renew now order left the platform line on its renewed total.
+    function mockFollowUp(lineQuantity: number, renewalState?: Record<string, unknown>) {
+      const renewedLine = [
+        {
+          ...SUBSCRIPTIONS[0],
+          externalIds: { vendor: ADOBE_ID },
+          lines: [{ ...SUBSCRIPTIONS[0].lines[0], quantity: lineQuantity }],
+        },
+      ];
+      mockGet.mockImplementation((url: string) => {
+        if (url === RENEWAL_STATE_URL) {
+          const states = renewalState ? { [ADOBE_ID]: renewalState } : {};
+          return Promise.resolve({ data: { data: { subscriptions: states } } });
+        }
+        if (url === '/api/v2/agreements/AGR-1/subscriptions') {
+          return Promise.resolve({ data: { data: renewedLine } });
+        }
+        return respondTo(url, { ...PATH_STATE, lockedPath: 'now' });
+      });
+      mockPost.mockImplementation((url: string) =>
+        url === RENEWAL_ORDER_URL
+          ? Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } })
+          : respondToPost(url),
+      );
+    }
+
+    const partlyRenewed = {
+      currentQuantity: 5,
+      renewedQuantity: 3,
+      state: 'partiallyRenewed',
+      remainingQuantity: 2,
+      earlyRenewable: true,
+      increaseAllowed: false,
+    };
+
+    async function openItems() {
+      mockActiveStepIndex = 2;
+      const view = render(<App />);
+      await screen.findByText('Items step');
+      await waitFor(() => expect(itemsProps.path).toBe('now'));
+      return view;
+    }
+
+    async function placeOrder(rerender: (ui: ReactNode) => void) {
+      mockActiveStepIndex = 5;
+      rerender(<App />);
+      await screen.findByText('Review step');
+      await act(async () => {
+        await reviewProps.onPlaceOrder();
+      });
+      const [, body] = mockPost.mock.calls.find(([url]) => url === RENEWAL_ORDER_URL)!;
+      return body as { subscriptions: { renewalQuantity: number }[]; netNewItems: unknown[] };
+    }
+
+    it('defaults a partly renewed line to the seats already renewed, not the seats held', async () => {
+      mockFollowUp(3, partlyRenewed);
+
+      await openItems();
+
+      expect(itemsProps.subscriptions[0].lines?.[0].quantity).toBe(5);
+      expect(itemsProps.quantities).toEqual({ 'SUB-1': 3 });
+    });
+
+    it('renews the remaining seats only when the customer asks for them', async () => {
+      mockFollowUp(3, partlyRenewed);
+      const { rerender } = await openItems();
+
+      act(() => itemsProps.onQuantityChange('SUB-1', 5));
+      await waitFor(() => expect(itemsProps.quantities).toEqual({ 'SUB-1': 5 }));
+      const body = await placeOrder(rerender);
+
+      expect(body.subscriptions[0].renewalQuantity).toBe(5);
+    });
+
+    it('defaults a fully renewed line to its renewed total', async () => {
+      mockFollowUp(5, {
+        ...partlyRenewed,
+        renewedQuantity: 5,
+        state: 'fullyRenewed',
+        remainingQuantity: 0,
+        increaseAllowed: true,
+      });
+
+      await openItems();
+
+      expect(itemsProps.quantities).toEqual({ 'SUB-1': 5 });
+    });
+
+    it('keeps the line quantity as the default without a renewal state', async () => {
+      mockFollowUp(5);
+
+      await openItems();
+
+      expect(itemsProps.subscriptions[0].lines?.[0].quantity).toBe(5);
+      expect(itemsProps.quantities).toEqual({});
+    });
+
+    it('places only the new product when the customer keeps the renewed line as it is', async () => {
+      mockFollowUp(3, partlyRenewed);
+      const { rerender } = await openItems();
+
+      act(() => itemsProps.onNetNewItemsChange([NET_NEW_ITEM]));
+      await waitFor(() => expect(itemsProps.netNewItems).toEqual([NET_NEW_ITEM]));
+      const body = await placeOrder(rerender);
+
+      expect(body.subscriptions[0].renewalQuantity).toBe(3);
+      expect(body.netNewItems).toEqual([
+        expect.objectContaining({ offerId: '65304578CA', quantity: 2 }),
+      ]);
+    });
+
+    it('leaves the anniversary path on the line quantity', async () => {
+      mockFollowUp(3, partlyRenewed);
+      const followUp = mockGet.getMockImplementation()!;
+      mockGet.mockImplementation((url: string) =>
+        url === PATH_STATE_URL ? respondTo(url) : followUp(url),
+      );
+      mockActiveStepIndex = 2;
+      render(<App />);
+
+      await screen.findByText('Items step');
+
+      expect(itemsProps.path).toBe('anniversary');
+      expect(itemsProps.quantities).toEqual({});
+    });
+  });
+
   it('keeps the anniversary path on offer when no held SKU can auto-renew', async () => {
     mockPost.mockImplementation((url: string) =>
       respondToPost(url, { '65322587CA': false, '65322588CA': false }),

@@ -50,6 +50,7 @@ import {
   type RenewalQuantities,
   type RenewalSelections,
   withHeldQuantity,
+  withRenewedQuantities,
 } from './model';
 
 import './App.scss';
@@ -122,6 +123,16 @@ export default function App() {
         : anniversarySubscriptions,
     [renewalPath, subscriptions.data, renewalState.data, anniversarySubscriptions],
   );
+  // After a partial early renewal the line carries every seat held, so an
+  // untouched line defaults to the seats already renewed: the follow-up renews
+  // the remainder only when the customer asks for it.
+  const pathQuantities = useMemo(
+    () =>
+      renewalPath === 'now'
+        ? withRenewedQuantities(pathSubscriptions, renewalQuantities, renewalState.data)
+        : renewalQuantities,
+    [renewalPath, pathSubscriptions, renewalQuantities, renewalState.data],
+  );
   const lineQuantities = useMemo(
     () =>
       Object.fromEntries(
@@ -157,7 +168,7 @@ export default function App() {
     const plan = buildRenewalPlanRequest(
       pathSubscriptions,
       renewalSelections ?? {},
-      renewalQuantities,
+      pathQuantities,
       netNewItems,
       renewalPath,
       discountSelections,
@@ -176,7 +187,7 @@ export default function App() {
   }, [
     pathSubscriptions,
     renewalSelections,
-    renewalQuantities,
+    pathQuantities,
     netNewItems,
     renewalPath,
     discountSelections,
@@ -373,7 +384,7 @@ export default function App() {
           agreement={agreement}
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
-          quantities={renewalQuantities}
+          quantities={pathQuantities}
           netNewItems={netNewItems}
           path={renewalPath}
           renewalStates={renewalState.data}
@@ -388,7 +399,7 @@ export default function App() {
           agreement={agreement}
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
-          quantities={renewalQuantities}
+          quantities={pathQuantities}
           netNewItems={netNewItems}
           recommendedSkus={recommendedSkus}
           path={renewalPath}
@@ -407,7 +418,7 @@ export default function App() {
           agreement={agreement}
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
-          quantities={renewalQuantities}
+          quantities={pathQuantities}
           netNewItems={netNewItems}
           discountSelections={discountSelections}
           inheritedDiscounts={inheritedData}
@@ -440,7 +451,7 @@ export default function App() {
           agreement={agreement}
           subscriptions={pathSubscriptions}
           selections={renewalSelections ?? {}}
-          quantities={renewalQuantities}
+          quantities={pathQuantities}
           lineQuantities={lineQuantities}
           netNewItems={netNewItems}
           preview={renewalPreview}
