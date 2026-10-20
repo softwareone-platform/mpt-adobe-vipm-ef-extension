@@ -51,6 +51,14 @@ def adobe_env(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_load_reads_the_mpt_api_token(monkeypatch):
+    monkeypatch.setenv("MPT_API_TOKEN", "vendor-token")
+
+    settings = ExtensionSettings.load()  # act
+
+    assert settings.mpt_api_token == "vendor-token"
+
+
 def test_load_reads_product_ids(monkeypatch):
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111,PRD-2222-2222")
 

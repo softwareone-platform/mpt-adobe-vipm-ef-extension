@@ -17,6 +17,7 @@ from mpt_extension_sdk.api import (
 )
 from mpt_extension_sdk.models import Agreement, Subscription
 from mpt_extension_sdk.routing import APIRouter
+from mpt_extension_sdk.services.api_client_v2.mpt_api_client import AsyncMPTClient
 
 from adobe.errors import AdobeAPIError, AdobeError, AdobeHttpError
 from mpt_adobe_vipm_ef.constants import (
@@ -44,7 +45,7 @@ from mpt_adobe_vipm_ef.routers.api.customer import (
 )
 from mpt_adobe_vipm_ef.routers.api.decorators import log_inputs
 from mpt_adobe_vipm_ef.routers.api.discount_scope import resolve_market_segment
-from mpt_adobe_vipm_ef.services.clients import build_caller_client
+from mpt_adobe_vipm_ef.services.clients import build_caller_client, build_vendor_client
 from mpt_adobe_vipm_ef.services.discount_preview import (
     ADOBE_REQUEST_FAILED_DETAIL,
     preview_with_discounts,
@@ -66,6 +67,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
     build_renewal_order_lines,
     create_renewal_change_order,
     create_renewal_configuration_order,
+    create_renewal_no_change_order,
 )
 from mpt_adobe_vipm_ef.services.renewal_path import (
     has_active_subscriptions,
@@ -393,7 +395,9 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
     produces neither order type on its own, so it becomes a Change order
     carrying the platform's ``adobe-early-renewal-no-change`` placeholder item
     as its single line, with fulfillment executing the plan from the snapshot
-    alone.
+    alone. The placeholder's price-list row is private, so the client creates
+    that order as a draft, the vendor adds the line on validate and the client
+    then processes it.
 
     Because the early path can be ordered more than once, its snapshot
     quantities are deltas against Adobe's live ``renewedQuantity`` — what this
@@ -447,11 +451,12 @@ async def create_renewal_order(  # noqa: WPS210, WPS217
         else:
             # An unchanged early renewal, or an at-anniversary plan whose only
             # change is a discount code: neither order type stands on its own,
-            # so the Change order rides on the catalog's placeholder item and
-            # fulfilment executes the plan from the renewalPayload snapshot.
+            # so the Change order rides on the catalog's placeholder item, added
+            # by the vendor on validate, and fulfilment executes the plan from
+            # the renewalPayload snapshot.
             no_change_line = await resolve_no_change_line(ctx, agreement)
-            order = await _create_change_order(
-                ctx, agreement_id, [no_change_line], renewal_payload, body
+            order = await _create_no_change_order(
+                ctx, agreement_id, no_change_line, renewal_payload, body
             )
     return APIResponse.created(payload=order)
 
@@ -934,6 +939,15 @@ def _line_rows(line_items: list[Line], net_new_lines: list[NetNewLine]) -> dict[
     }
 
 
+def _require_caller_client(ctx: APIContext, agreement_id: str) -> AsyncMPTClient:
+    """Build the client that places the renewal order as the caller (client actor)."""
+    client = build_caller_client(ctx)
+    if client is None:
+        logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
+        raise ForbiddenError(detail="Caller authentication is required to place the order.")
+    return client
+
+
 async def _create_change_order(
     ctx: APIContext,
     agreement_id: str,
@@ -942,15 +956,39 @@ async def _create_change_order(
     body: RenewalOrderRequest,
 ) -> dict[str, object]:
     """Create and process the change order acting as the caller (client actor)."""
-    client = build_caller_client(ctx)
-    if client is None:
-        logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
-        raise ForbiddenError(detail="Caller authentication is required to place the order.")
+    client = _require_caller_client(ctx, agreement_id)
     try:
         return await create_renewal_change_order(client, agreement_id, lines, renewal_payload, body)
     except MPTHttpError as error:
         logger.warning(
             "MPT API error while placing the renewal change order on agreement %s: status=%s %s",
+            agreement_id,
+            error.status_code,
+            error,
+        )
+        raise UpstreamServiceError(detail=mpt_order_error_detail(error))
+
+
+async def _create_no_change_order(
+    ctx: APIContext,
+    agreement_id: str,
+    no_change_line: Line,
+    renewal_payload: RenewalPayload,
+    body: RenewalOrderRequest,
+) -> dict[str, object]:
+    """Create and process the draft as the caller, validating it as the vendor."""
+    caller_client = _require_caller_client(ctx, agreement_id)
+    vendor_client = build_vendor_client(ctx)
+    if vendor_client is None:
+        logger.error("MPT_API_TOKEN is not configured to validate the renewal order")
+        raise UpstreamServiceError(detail="The renewal order cannot be validated.")
+    try:
+        return await create_renewal_no_change_order(
+            caller_client, vendor_client, agreement_id, no_change_line, renewal_payload, body
+        )
+    except MPTHttpError as error:
+        logger.warning(
+            "MPT API error while placing the renewal no-change order on agreement %s: status=%s %s",
             agreement_id,
             error.status_code,
             error,
@@ -987,10 +1025,7 @@ async def _create_configuration_order(
     renewal_payload: RenewalPayload,
 ) -> dict[str, object]:
     """Create the AutoRenew-only configuration order acting as the caller (client actor)."""
-    client = build_caller_client(ctx)
-    if client is None:
-        logger.warning("Renewal order for agreement %s has no caller auth context", agreement_id)
-        raise ForbiddenError(detail="Caller authentication is required to place the order.")
+    client = _require_caller_client(ctx, agreement_id)
     try:
         return await create_renewal_configuration_order(
             client, agreement_id, subscriptions, body, renewal_payload

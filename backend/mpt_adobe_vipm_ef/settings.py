@@ -109,6 +109,7 @@ class ExtensionSettings(BaseExtensionSettings):
     airtable_api_token: str
     airtable_discounts_base_id: str
     airtable_sku_mapping_base_id: str
+    mpt_api_token: str = ""
 
     @cached_property
     def adobe_authorizations(self) -> dict[str, Authorization]:
@@ -150,6 +151,7 @@ class ExtensionSettings(BaseExtensionSettings):
             airtable_api_token=os.getenv("EXT_AIRTABLE_API_TOKEN", ""),
             airtable_discounts_base_id=os.getenv("EXT_AIRTABLE_DISCOUNTS_ID", ""),
             airtable_sku_mapping_base_id=os.getenv("EXT_AIRTABLE_SKU_MAPPING_ID", ""),
+            mpt_api_token=os.getenv("MPT_API_TOKEN", ""),
         )
 
 

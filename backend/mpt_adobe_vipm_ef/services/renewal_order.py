@@ -1,11 +1,13 @@
 import logging
 from typing import Any
 
+from mpt_api_client.exceptions import MPTError
 from mpt_extension_sdk.services.api_client_v2.mpt_api_client import AsyncMPTClient
 
 from mpt_adobe_vipm_ef.constants import (
     CHANGE_ORDER_TYPE,
     CONFIGURATION_ORDER_TYPE,
+    DRAFT_ORDER_STATUS,
     PROCESSING_ORDER_STATUS,
     RENEWAL_PAYLOAD_PARAM,
 )
@@ -120,6 +122,63 @@ async def create_renewal_change_order(
         },
     }
     return await _create_renewal_order(client, order_payload, agreement_id, request, "change")
+
+
+async def create_renewal_no_change_order(  # noqa: WPS211
+    caller_client: AsyncMPTClient,
+    vendor_client: AsyncMPTClient,
+    agreement_id: str,
+    no_change_line: Line,
+    renewal_payload: RenewalPayload,
+    request: RenewalOrderRequest,
+) -> dict[str, Any]:
+    """Place a renewal plan with no order change through the platform's native flow.
+
+    The ``adobe-early-renewal-no-change`` placeholder item stays private to the
+    client's price list, so the client cannot order it. The caller creates the
+    Change order as a ``Draft`` with no lines, carrying the ``renewalPayload``
+    snapshot; the vendor then adds the placeholder line on ``validate``, and the
+    caller moves the order to ``Processing``. A draft the vendor could not
+    validate is deleted so it does not outlive the submission with the snapshot
+    on it.
+    """
+    order_payload: dict[str, Any] = {
+        "status": DRAFT_ORDER_STATUS,
+        "type": CHANGE_ORDER_TYPE,
+        "agreement": {"id": agreement_id},
+        "parameters": {
+            "ordering": [
+                {"externalId": RENEWAL_PAYLOAD_PARAM, "value": renewal_payload.to_dict()},
+            ],
+        },
+    }
+    draft = await _create_renewal_order(
+        caller_client, order_payload, agreement_id, request, "draft change"
+    )
+    order_id = str(draft["id"])
+    try:
+        await vendor_client.commerce.orders.validate(
+            order_id, {"id": order_id, "lines": [no_change_line]}
+        )
+    except MPTError:
+        await _delete_draft(caller_client, order_id)
+        raise
+    order = await caller_client.commerce.orders.process(order_id, {"id": order_id})
+    order_data = order.to_dict()
+    logger.info(
+        "Processed renewal no-change order %s on agreement %s (status=%s)",
+        order_id,
+        agreement_id,
+        order_data.get("status"),
+    )
+    return order_data
+
+
+async def _delete_draft(client: AsyncMPTClient, order_id: str) -> None:
+    try:
+        await client.commerce.orders.delete(order_id)
+    except MPTError:
+        logger.exception("Failed to delete the renewal draft order %s", order_id)
 
 
 async def create_renewal_configuration_order(

@@ -1,4 +1,7 @@
+import http
+
 import pytest
+from mpt_api_client.exceptions import MPTHttpError
 from mpt_extension_sdk.models import Subscription
 
 from mpt_adobe_vipm_ef.models.renewal import RenewalOrderRequest
@@ -7,6 +10,7 @@ from mpt_adobe_vipm_ef.services.renewal_order import (
     build_renewal_order_lines,
     create_renewal_change_order,
     create_renewal_configuration_order,
+    create_renewal_no_change_order,
 )
 from mpt_adobe_vipm_ef.services.renewal_plan import (
     NetNewLine,
@@ -287,3 +291,134 @@ async def test_create_renewal_configuration_order_carries_the_customer_details(
     call_args, _kwargs = orders_service.create.await_args
     assert call_args[0]["notes"] == "AutoRenew opt-out"
     assert call_args[0]["externalIds"] == {"client": "234234234"}
+
+
+def _no_change_line():
+    return {"item": {"id": "ITM-NO-CHANGE"}, "quantity": 1}
+
+
+def _no_change_payload(request):
+    return build_renewal_payload(_plan(request), [], request, "USD", _COTERM_DATE)
+
+
+@pytest.fixture
+def draft_orders_service(mocker):
+    draft = mocker.Mock()
+    draft.to_dict.return_value = {"id": "ORD-0003", "status": "Draft"}
+    processed = mocker.Mock()
+    processed.to_dict.return_value = {"id": "ORD-0003", "status": "Processing"}
+    return mocker.Mock(
+        create=mocker.AsyncMock(return_value=draft),
+        process=mocker.AsyncMock(return_value=processed),
+        delete=mocker.AsyncMock(),
+    )
+
+
+@pytest.fixture
+def vendor_orders_service(mocker):
+    return mocker.Mock(validate=mocker.AsyncMock(), process=mocker.AsyncMock())
+
+
+@pytest.fixture
+def caller_client(mocker, draft_orders_service):
+    return mocker.Mock(commerce=mocker.Mock(orders=draft_orders_service))
+
+
+@pytest.fixture
+def vendor_client(mocker, vendor_orders_service):
+    return mocker.Mock(commerce=mocker.Mock(orders=vendor_orders_service))
+
+
+async def test_create_renewal_no_change_order_adds_the_placeholder_on_validate(
+    caller_client, vendor_client, draft_orders_service, vendor_orders_service
+):
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)], renewalPath="now")
+    renewal_payload = _no_change_payload(request)
+
+    result = await create_renewal_no_change_order(
+        caller_client, vendor_client, _AGREEMENT_ID, _no_change_line(), renewal_payload, request
+    )
+
+    assert result == {"id": "ORD-0003", "status": "Processing"}
+    draft_orders_service.create.assert_awaited_once_with({
+        "status": "Draft",
+        "type": "Change",
+        "agreement": {"id": _AGREEMENT_ID},
+        "parameters": {
+            "ordering": [{"externalId": "renewalPayload", "value": renewal_payload.to_dict()}],
+        },
+    })
+    vendor_orders_service.validate.assert_awaited_once_with(
+        "ORD-0003", {"id": "ORD-0003", "lines": [_no_change_line()]}
+    )
+    draft_orders_service.process.assert_awaited_once_with("ORD-0003", {"id": "ORD-0003"})
+    vendor_orders_service.process.assert_not_awaited()
+    draft_orders_service.delete.assert_not_awaited()
+
+
+async def test_create_renewal_no_change_order_carries_the_customer_details(
+    caller_client, vendor_client, draft_orders_service
+):
+    request = _request(
+        subscriptions=[_selection(quantity=_CURRENT_QUANTITY)],
+        notes="Renew now",
+        externalIds={"client": "234234234"},
+    )
+
+    await create_renewal_no_change_order(  # act
+        caller_client,
+        vendor_client,
+        _AGREEMENT_ID,
+        _no_change_line(),
+        _no_change_payload(request),
+        request,
+    )
+
+    order_payload = draft_orders_service.create.await_args.args[0]
+    assert order_payload["notes"] == "Renew now"
+    assert order_payload["externalIds"] == {"client": "234234234"}
+
+
+async def test_create_renewal_no_change_order_deletes_the_draft_when_validate_fails(
+    caller_client, vendor_client, draft_orders_service, vendor_orders_service
+):
+    vendor_orders_service.validate.side_effect = MPTHttpError(
+        http.HTTPStatus.BAD_REQUEST, "Bad Request", ""
+    )
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)])
+
+    with pytest.raises(MPTHttpError):
+        await create_renewal_no_change_order(
+            caller_client,
+            vendor_client,
+            _AGREEMENT_ID,
+            _no_change_line(),
+            _no_change_payload(request),
+            request,
+        )
+
+    draft_orders_service.delete.assert_awaited_once_with("ORD-0003")
+    draft_orders_service.process.assert_not_awaited()
+
+
+async def test_create_renewal_no_change_order_keeps_the_validate_error_when_delete_fails(
+    caller_client, vendor_client, draft_orders_service, vendor_orders_service
+):
+    validate_error = MPTHttpError(http.HTTPStatus.BAD_REQUEST, "Bad Request", "")
+    vendor_orders_service.validate.side_effect = validate_error
+    draft_orders_service.delete.side_effect = MPTHttpError(
+        http.HTTPStatus.FORBIDDEN, "Forbidden", ""
+    )
+    request = _request(subscriptions=[_selection(quantity=_CURRENT_QUANTITY)])
+
+    with pytest.raises(MPTHttpError) as exc_info:
+        await create_renewal_no_change_order(
+            caller_client,
+            vendor_client,
+            _AGREEMENT_ID,
+            _no_change_line(),
+            _no_change_payload(request),
+            request,
+        )
+
+    assert exc_info.value is validate_error
