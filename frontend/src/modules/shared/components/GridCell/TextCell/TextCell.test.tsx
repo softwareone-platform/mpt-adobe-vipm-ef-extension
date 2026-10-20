@@ -17,6 +17,18 @@ describe('TextCell', () => {
     expect(getByText('user/year')).toBeTruthy();
   });
 
+  it('keeps the two lines apart in the text the truncation tooltip reads', () => {
+    const { getByTestId } = render(<TextCell text="179.88" secondaryContent="user/year" />);
+
+    expect(getByTestId('grid-cell-simple').textContent).toBe('179.88 user/year');
+  });
+
+  it('adds no separator without a secondary content', () => {
+    const { getByTestId } = render(<TextCell text="7" />);
+
+    expect(getByTestId('grid-cell-simple').textContent).toBe('7');
+  });
+
   it('keeps a zero secondary content, such as a new quantity of none', () => {
     const { getByText } = render(<TextCell text="-10" secondaryContent={0} />);
 

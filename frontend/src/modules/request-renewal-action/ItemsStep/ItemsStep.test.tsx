@@ -437,7 +437,7 @@ describe('ItemsStep', () => {
       },
     });
 
-    expect(getByTestId('row-SUB-1').textContent).toContain('15 renewed · 22 left');
+    expect(getByTestId('row-SUB-1').textContent).toContain('(15 renewed, 22 left)');
   });
 
   it('leaves a renewal quantity above the current one alone at the anniversary', () => {
