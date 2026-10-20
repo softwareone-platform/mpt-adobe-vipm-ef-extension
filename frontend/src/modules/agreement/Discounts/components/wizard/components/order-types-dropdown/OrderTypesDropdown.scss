@@ -17,15 +17,15 @@
     justify-content: space-between;
     gap: $var-spacing-1;
     width: 100%;
-    padding: 10px $var-spacing-2;
-    border: 1px solid $var-gray-3;
-    border-radius: 4px;
+    padding: $var-spacing-1 $var-spacing-2;
+    border: 1px solid $var-gray-4;
+    border-radius: $var-radius-m;
     background: $var-brand-white;
     cursor: pointer;
     text-align: left;
 
     &:hover {
-      border-color: $var-gray-4;
+      border-color: $var-brand-primary;
     }
   }
 
