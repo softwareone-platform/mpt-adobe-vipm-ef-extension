@@ -100,6 +100,7 @@ per-file-ignores = [
   "mpt_adobe_vipm_ef/services/discount_sync.py: WPS202",
   "mpt_adobe_vipm_ef/services/discounts.py: WPS214",
   "mpt_adobe_vipm_ef/services/renewal_in_place.py: WPS202",
+  "mpt_adobe_vipm_ef/services/renewal_order.py: WPS202",
   "mpt_adobe_vipm_ef/services/renewal_plan.py: WPS202",
   "mpt_adobe_vipm_ef/services/sku_mapping.py: WPS214",
   "mpt_adobe_vipm_ef/settings.py: WPS202",
