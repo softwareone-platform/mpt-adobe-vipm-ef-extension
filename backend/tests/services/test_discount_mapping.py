@@ -478,6 +478,32 @@ def test_is_offerable_accepts_a_code_listing_no_order_type(
     assert result is True
 
 
+@pytest.mark.parametrize(
+    "applicable_order_types",
+    [
+        pytest.param([], id="no-order-types"),
+        pytest.param(None, id="missing-order-types"),
+        pytest.param(["RENEWAL"], id="other-order-types"),
+    ],
+)
+def test_is_offerable_rejects_a_switch_code_not_listing_switch(
+    applicable_order_types, code_record_factory
+):
+    record = code_record_factory(applicable_order_types=applicable_order_types)
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.SWITCH, _NOW)
+
+    assert result is False
+
+
+def test_is_offerable_accepts_a_switch_code_listing_switch(code_record_factory):
+    record = code_record_factory(applicable_order_types=["NEW", "SWITCH"])
+
+    result = discount_mapping.is_offerable(record, DiscountOrderType.SWITCH, _NOW)
+
+    assert result is True
+
+
 def test_is_offerable_extends_a_reusable_code_to_its_discount_lock(code_record_factory):
     record = code_record_factory(
         end_date="2026-07-01T00:00:00Z",

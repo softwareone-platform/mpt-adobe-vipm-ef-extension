@@ -26,6 +26,8 @@ from mpt_adobe_vipm_ef.services.discounts import (
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
 
 ValueEntry = dict[str, Any]
+# Order types a code must list explicitly; an empty list does not cover them.
+_EXPLICIT_ORDER_TYPES = frozenset((DiscountOrderType.SWITCH,))
 AdobeFlexDiscount = dict[str, Any]
 
 
@@ -98,20 +100,30 @@ def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.
 
     The row must not be retired, must not be pending enrichment (its order
     types and annual/3YC support are not curated yet), must list the order
-    type among its applicable ones (an empty list is "any order type", so it
-    restricts nothing), and ``now`` must sit inside its usable window: the
-    ``start_date``/``end_date`` range for a single-use code, extended to
-    ``discount_lock_end_date`` for a reusable one (the lock keeps a redeemed
-    code applicable past its end date). A missing or unreadable bound leaves
-    that side of the window open.
+    type among its applicable ones (see :func:`applies_to_order_type`), and
+    ``now`` must sit inside its usable window: the ``start_date``/``end_date``
+    range for a single-use code, extended to ``discount_lock_end_date`` for a
+    reusable one (the lock keeps a redeemed code applicable past its end date).
+    A missing or unreadable bound leaves that side of the window open.
     """
     fields = record["fields"]
     if fields.get("retired_at") or fields.get("enrichment_status") == ENRICHMENT_PENDING:
         return False
-    applicable = fields.get("applicable_order_types") or []
-    if applicable and order_type.value not in applicable:
+    if not applies_to_order_type(fields, order_type):
         return False
     return _is_within(now, _read_date(fields.get("start_date")), _usable_until(fields))
+
+
+def applies_to_order_type(fields: dict[str, Any], order_type: DiscountOrderType) -> bool:
+    """Return whether the code's applicable order types cover ``order_type``.
+
+    An empty list is "any order type", except for a switch order: a mid-term
+    upgrade is only offered the codes that list ``SWITCH`` explicitly.
+    """
+    applicable = fields.get("applicable_order_types") or []
+    if not applicable:
+        return order_type not in _EXPLICIT_ORDER_TYPES
+    return order_type.value in applicable
 
 
 def is_expired(fields: dict[str, Any], now: dt.datetime) -> bool:

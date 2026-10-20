@@ -297,7 +297,8 @@
     "LoadInheritedDiscounts": "Failed to load the discounts you already hold.",
     "RenewalPlanValidation": "The renewal plan could not be validated.",
     "RenewalDiscountValidation": "The selected discount codes could not be validated.",
-    "LoadUpgradeRenewalInPlace": "Failed to check whether a renewal is in place for this agreement."
+    "LoadUpgradeRenewalInPlace": "Failed to check whether a renewal is in place for this agreement.",
+    "UpgradeDiscountValidation": "The selected discount code could not be validated."
   },
   "Commitment": {
     "Title": "Request 3-year commitment",
@@ -565,6 +566,7 @@
     "Steps": {
       "Upgrade from": "Upgrade from",
       "Upgrade to": "Upgrade to",
+      "Promotions": "Promotions",
       "Split billing": "Split billing",
       "Details": "Details",
       "Review order": "Review order",
@@ -599,6 +601,13 @@
         "SelectOption": "Select a split billing option.",
         "SelectBuyer": "Select a buyer to allocate billing to.",
         "SaveFailed": "Failed to save the split billing option."
+      }
+    },
+    "Promotions": {
+      "Prompt": "Select or type a discount code for the upgraded item. The discounted price is shown below and again on Review order.",
+      "Empty": {
+        "Title": "No item to discount",
+        "Description": "Go back to the Upgrade to step and select the item to upgrade to."
       }
     },
     "UpgradeFrom": {
@@ -639,6 +648,7 @@
     },
     "Grid": {
       "Qty": "Qty",
+      "Discount code": "Discount code",
       "Terms": "Terms",
       "Unit SP": "Unit SP",
       "SPxM": "SPxM",
