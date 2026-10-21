@@ -39,4 +39,16 @@
   &__disclaimer {
     margin: 0;
   }
+
+  &__unit-price {
+    p {
+      margin: 0;
+    }
+  }
+
+  &__unit-price-value {
+    display: flex;
+    align-items: center;
+    gap: $var-spacing-1;
+  }
 }

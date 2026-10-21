@@ -1,5 +1,5 @@
 import type { Discount, SwitchPreview } from '../shared/model';
-import { getDiscountedUnitPrice, normalizeDiscountCode } from '../utils/discount';
+import { getDiscountedUnitPrice, getQuotedPrice, normalizeDiscountCode } from '../utils/discount';
 import { rankDiscounts } from '../utils/discountRanking';
 import { getMonthlyPrice, getYearlyPrice, parseUnitPrice } from '../utils/price';
 import type { TargetSubscription } from './model';
@@ -44,15 +44,10 @@ export function getQuotedUnitPrice(
   target: TargetSubscription,
   preview: SwitchPreview | null,
 ): number | null {
-  const unitSP = parseUnitPrice(target.unitSP);
-  if (!preview || unitSP == null) return null;
-  const line = (preview.lineItems ?? []).find(
+  const line = (preview?.lineItems ?? []).find(
     (item) => item.offerId === target.targetBaseOfferId,
   );
-  const partnerPrice = line?.pricing?.partnerPrice;
-  const discountedPartnerPrice = line?.pricing?.discountedPartnerPrice;
-  if (!partnerPrice || discountedPartnerPrice == null) return null;
-  return (unitSP * discountedPartnerPrice) / partnerPrice;
+  return getQuotedPrice(parseUnitPrice(target.unitSP), line?.pricing)?.unitSP ?? null;
 }
 
 /** The target row re-priced at the discounted unit SP for the switched seats. */
