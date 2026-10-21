@@ -540,6 +540,7 @@
       "Qty": "Qty",
       "Order price": "Order price *",
       "Items price": "Items price *",
+      "Discounted": "Discounted",
       "No parameters": "No parameters to display.",
       "Place order": "Place order",
       "Tabs": {
