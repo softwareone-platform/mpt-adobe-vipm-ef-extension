@@ -252,6 +252,24 @@ def create_order_mock(mocker):
 
 
 @pytest.fixture
+def vendor_client(mocker):
+    client = mocker.Mock()
+    mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.build_vendor_client",
+        return_value=client,
+    )
+    return client
+
+
+@pytest.fixture
+def create_no_change_order_mock(mocker, vendor_client):
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.create_renewal_no_change_order",
+        mocker.AsyncMock(return_value={"id": "ORD-0003", "status": "Processing"}),
+    )
+
+
+@pytest.fixture
 def create_configuration_order_mock(mocker):
     return mocker.patch(
         "mpt_adobe_vipm_ef.routers.api.renewal.create_renewal_configuration_order",
@@ -501,7 +519,10 @@ async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_chan
     fake_ctx,
     submit_deps,
     resolve_net_new_item,
+    caller_client,
+    vendor_client,
     create_order_mock,
+    create_no_change_order_mock,
     create_configuration_order_mock,
 ):
     """Renewing now with everything left as it stands is the wizard's normal case.
@@ -510,8 +531,9 @@ async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_chan
     order type stands on its own (the platform rejects a Change order without
     a quantity delta and a Configuration order without an AutoRenew flip). The
     plan is submitted as a Change order whose single line is the platform's
-    ``adobe-early-renewal-no-change`` placeholder item, and fulfilment
-    executes it from the ``renewalPayload`` snapshot.
+    ``adobe-early-renewal-no-change`` placeholder item, added by the vendor
+    on validate, and fulfilment executes it from the ``renewalPayload``
+    snapshot.
     """
     resolve_net_new_item.return_value = {
         EARLY_RENEWAL_NO_CHANGE_ITEM: {
@@ -524,11 +546,17 @@ async def test_create_renewal_order_submits_an_unchanged_early_renewal_as_a_chan
 
     result = await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
-    assert result.payload == {"id": "ORD-0001", "status": "Processing"}
+    assert result.payload == {"id": "ORD-0003", "status": "Processing"}
+    create_order_mock.assert_not_awaited()
     create_configuration_order_mock.assert_not_awaited()
-    call_args, _ = create_order_mock.await_args
-    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
-    assert call_args[3].to_dict()["renewalPath"] == "now"
+    call_args, _ = create_no_change_order_mock.await_args
+    assert call_args[:4] == (
+        caller_client,
+        vendor_client,
+        _AGREEMENT_ID,
+        {"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1},
+    )
+    assert call_args[4].to_dict()["renewalPath"] == "now"
 
 
 async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_change_order(
@@ -537,6 +565,7 @@ async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_ch
     resolve_net_new_item,
     adobe_call,
     create_order_mock,
+    create_no_change_order_mock,
     create_configuration_order_mock,
 ):
     """A discount code is the plan's only change, so it rides on the placeholder item."""
@@ -552,11 +581,12 @@ async def test_create_renewal_order_submits_a_code_only_anniversary_plan_as_a_ch
 
     result = await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
-    assert result.payload == {"id": "ORD-0001", "status": "Processing"}
+    assert result.payload == {"id": "ORD-0003", "status": "Processing"}
+    create_order_mock.assert_not_awaited()
     create_configuration_order_mock.assert_not_awaited()
-    call_args, _ = create_order_mock.await_args
-    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
-    payload = call_args[3].to_dict()
+    call_args, _ = create_no_change_order_mock.await_args
+    assert call_args[3] == {"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}
+    payload = call_args[4].to_dict()
     assert payload["renewalPath"] == "anniversary"
     assert payload["subscriptions"][0]["flexDiscountCodes"] == ["CODE-1"]
 
@@ -589,7 +619,11 @@ async def test_create_renewal_order_rejects_codes_for_a_subscription_missing_fro
 
 
 async def test_create_renewal_order_fails_an_unchanged_early_renewal_without_the_item(
-    fake_ctx, submit_deps, resolve_net_new_item, create_order_mock, create_configuration_order_mock
+    fake_ctx,
+    submit_deps,
+    resolve_net_new_item,
+    create_no_change_order_mock,
+    create_configuration_order_mock,
 ):
     """A catalog missing the placeholder item cannot submit the unchanged plan."""
     resolve_net_new_item.return_value = {}
@@ -598,7 +632,7 @@ async def test_create_renewal_order_fails_an_unchanged_early_renewal_without_the
     with pytest.raises(UpstreamServiceError, match="placeholder item"):
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
 
-    create_order_mock.assert_not_awaited()
+    create_no_change_order_mock.assert_not_awaited()
     create_configuration_order_mock.assert_not_awaited()
 
 
@@ -690,7 +724,7 @@ async def test_create_renewal_order_counts_renewed_seats_toward_the_three_yc_flo
 
 
 async def test_create_renewal_order_keeps_an_already_covered_subscription_in_the_snapshot(
-    fake_ctx, submit_deps, resolve_net_new_item, create_order_mock, adobe_call
+    fake_ctx, submit_deps, resolve_net_new_item, create_no_change_order_mock, adobe_call
 ):
     """A subscription a previous order fully renewed still rides the snapshot.
 
@@ -710,9 +744,9 @@ async def test_create_renewal_order_keeps_an_already_covered_subscription_in_the
 
     await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)  # act
 
-    call_args, _ = create_order_mock.await_args
-    assert call_args[2] == [{"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}]
-    subscription_snapshot = call_args[3].to_dict()["subscriptions"][0]
+    call_args, _ = create_no_change_order_mock.await_args
+    assert call_args[3] == {"item": {"id": _NO_CHANGE_ITEM_ID}, "quantity": 1}
+    subscription_snapshot = call_args[4].to_dict()["subscriptions"][0]
     assert subscription_snapshot["renew"] is True
     assert subscription_snapshot["renewalQuantity"] == 0
 
@@ -1108,6 +1142,56 @@ async def test_create_renewal_order_surfaces_the_platform_rejection_detail(
         await create_renewal_order(_AGREEMENT_ID, fake_ctx, _body())
 
     assert "agreement is in status Updating" in exc_info.value.detail
+
+
+def _no_change_body(resolve_net_new_item):
+    resolve_net_new_item.return_value = {
+        EARLY_RENEWAL_NO_CHANGE_ITEM: {
+            "id": _NO_CHANGE_ITEM_ID,
+            "name": "Early renewal (no changes)",
+            "externalId": EARLY_RENEWAL_NO_CHANGE_ITEM,
+        },
+    }
+    return _body(renew=True, quantity=_CURRENT_QUANTITY, path="now")
+
+
+async def test_create_renewal_order_requires_caller_auth_for_a_no_change_order(
+    fake_ctx, submit_deps, resolve_net_new_item, create_no_change_order_mock, mocker
+):
+    mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.build_caller_client",
+        return_value=None,
+    )
+
+    with pytest.raises(ForbiddenError):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _no_change_body(resolve_net_new_item))
+
+    create_no_change_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_requires_the_vendor_token_for_a_no_change_order(
+    fake_ctx, submit_deps, resolve_net_new_item, create_no_change_order_mock, mocker
+):
+    mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.renewal.build_vendor_client",
+        return_value=None,
+    )
+
+    with pytest.raises(UpstreamServiceError, match="cannot be validated"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _no_change_body(resolve_net_new_item))
+
+    create_no_change_order_mock.assert_not_awaited()
+
+
+async def test_create_renewal_order_maps_no_change_order_mpt_errors(
+    fake_ctx, submit_deps, resolve_net_new_item, create_no_change_order_mock
+):
+    create_no_change_order_mock.side_effect = MPTHttpError(
+        http.HTTPStatus.BAD_REQUEST, "Bad Request", ""
+    )
+
+    with pytest.raises(UpstreamServiceError):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, _no_change_body(resolve_net_new_item))
 
 
 async def test_create_renewal_order_rejects_non_active_agreement(

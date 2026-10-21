@@ -178,7 +178,11 @@ frontend/                    TypeScript plug UI (esbuild)
     that repeats the current quantities and AutoRenew decisions, becomes a
     change order whose single line is the catalog's
     `adobe-early-renewal-no-change` placeholder item, with fulfilment executing
-    the plan from the snapshot alone
+    the plan from the snapshot alone. The placeholder's price-list row is
+    private, so clients cannot order it: the client creates that order as a
+    `Draft` with no lines, and the extension, acting with the vendor's
+    `MPT_API_TOKEN`, adds the placeholder line on `validate`; the client then
+    `process`es the order (a draft that fails validation is deleted)
   - `events/order.py` — order event router (fulfilment)
   - `plugs.py` — plug routes that expose plug metadata to the frontend, serving
     only the plugs the `EXT_FEATURES` flags leave enabled (see
