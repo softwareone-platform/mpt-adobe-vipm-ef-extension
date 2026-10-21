@@ -59,6 +59,23 @@ describe('useRenewalDiscountValidation', () => {
     await waitFor(() => expect(result.current.status).toBe('success'));
   });
 
+  it('publishes the quote the API returns inside its data envelope', async () => {
+    const quote = {
+      lineItems: [
+        { subscriptionId: 'adobe-sub-1', pricing: { partnerPrice: 273.48, discountedPartnerPrice: 246.13 } },
+      ],
+    };
+    mockPost.mockResolvedValue({ data: { data: { preview: quote, eligibility: {} } } });
+    const onPreview = jest.fn();
+    const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678', onPreview));
+
+    await act(async () => {
+      await result.current.validateDiscounts(PLAN);
+    });
+
+    expect(onPreview).toHaveBeenLastCalledWith(quote);
+  });
+
   it('skips the preview at the anniversary, where fulfilment validates the codes', async () => {
     const { result } = renderHook(() => useRenewalDiscountValidation('AGR-1234-5678'));
 
@@ -104,7 +121,7 @@ describe('useRenewalDiscountValidation', () => {
     );
 
     mockPost.mockResolvedValue({
-      data: { preview: { lineItems: [{ offerId: 'STALE' }] } },
+      data: { data: { preview: { lineItems: [{ offerId: 'STALE' }] } } },
     });
     await act(async () => {
       const stale = result.current.validateDiscounts(PLAN);

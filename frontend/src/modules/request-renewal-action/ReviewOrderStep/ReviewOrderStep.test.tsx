@@ -98,6 +98,7 @@ const SUBSCRIPTIONS: Subscription[] = [
   {
     id: 'SUB-1',
     name: 'Subscription One',
+    externalIds: { vendor: 'adobe-sub-1' },
     autoRenew: true,
     terms: { period: '1y', commitment: '1y' },
     lines: [
@@ -105,7 +106,7 @@ const SUBSCRIPTIONS: Subscription[] = [
         id: 'ALI-1',
         quantity: 10,
         item: { id: 'ITM-1', name: 'Item One', externalIds: { vendor: 'OFFER-1' } },
-        price: { unitSP: 120, markup: 10 },
+        price: { unitSP: 120 },
       },
     ],
   },
@@ -204,16 +205,79 @@ describe('ReviewOrderStep', () => {
     expect(row.textContent).toContain('1,920.00');
   });
 
-  it('prices a line from Adobe’s quote, with the line’s markup applied', () => {
+  it('carries the discount Adobe quoted onto the list price, with no markup on the line', () => {
     const { getByTestId } = renderStep({
       quantities: { 'SUB-1': 16 },
       preview: {
-        lineItems: [{ offerId: 'OFFER-1', pricing: { discountedPartnerPrice: 100 } }],
+        lineItems: [
+          {
+            subscriptionId: 'adobe-sub-1',
+            pricing: { partnerPrice: 100, discountedPartnerPrice: 90 },
+          },
+        ],
       },
     });
 
     const row = getByTestId('row-SUB-1');
-    expect(row.textContent).toContain('110.00');
+    expect(row.textContent).toContain('108.00');
+    expect(row.textContent).toContain('648.00');
+    expect(row.textContent).toContain('Discounted');
+  });
+
+  it('matches the quote line by SKU when Adobe leaves the subscription id empty', () => {
+    const { getByTestId } = renderStep({
+      quantities: { 'SUB-1': 16 },
+      preview: {
+        lineItems: [
+          { offerId: 'OFFER-1', pricing: { partnerPrice: 100, discountedPartnerPrice: 50 } },
+        ],
+      },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('60.00');
+  });
+
+  it('keeps the list price, unmarked, when the quote applied no discount', () => {
+    const { getByTestId, queryByTestId } = renderStep({
+      quantities: { 'SUB-1': 16 },
+      preview: {
+        lineItems: [
+          {
+            subscriptionId: 'adobe-sub-1',
+            pricing: { partnerPrice: 902.28, discountedPartnerPrice: 902.28 },
+          },
+        ],
+      },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('120.00');
+    expect(queryByTestId('review-order-step-discounted-price')).toBeNull();
+  });
+
+  it('keeps the list price when the quote line is not priced', () => {
+    const { getByTestId, queryByTestId } = renderStep({
+      quantities: { 'SUB-1': 16 },
+      preview: { lineItems: [{ subscriptionId: 'adobe-sub-1', pricing: {} }] },
+    });
+
+    expect(getByTestId('row-SUB-1').textContent).toContain('120.00');
+    expect(queryByTestId('review-order-step-discounted-price')).toBeNull();
+  });
+
+  it('prices a net-new product from the quote by its SKU', () => {
+    const { getByTestId } = renderStep({
+      netNewItems: [NET_NEW_ITEM],
+      preview: {
+        lineItems: [
+          { offerId: 'OFFER-3', pricing: { partnerPrice: 200, discountedPartnerPrice: 180 } },
+        ],
+      },
+    });
+
+    const row = getByTestId('row-ITM-3');
+    expect(row.textContent).toContain('216.00');
+    expect(row.textContent).toContain('432.00');
+    expect(row.textContent).toContain('Discounted');
   });
 
   it('keeps the stored price when Adobe quoted nothing', () => {

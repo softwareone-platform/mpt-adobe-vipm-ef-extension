@@ -173,7 +173,10 @@ def test_skips_a_renewal_order_with_an_unusable_creation_date():
     assert result is None
 
 
-async def test_load_renewal_in_place_reads_the_customer_orders_and_subscriptions(adobe_call):
+async def test_load_renewal_in_place_reads_the_customer_orders_and_subscriptions(
+    adobe_call, frozen_clock
+):
+    frozen_clock.move_to(_TODAY)
     adobe_call.answers = [
         {"cotermDate": "2027-10-20"},
         [_renewal_order("2026-09-28T10:00:00Z")],

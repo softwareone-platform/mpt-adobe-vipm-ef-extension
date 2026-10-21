@@ -233,23 +233,27 @@ describe('readRenewalPreview', () => {
   it('reads the quote out of the preview response', () => {
     const preview = { lineItems: [{ offerId: 'OFFER-1', quantity: 5 }] };
 
-    expect(readRenewalPreview({ preview, eligibility: {} })).toEqual(preview);
+    expect(readRenewalPreview({ data: { preview, eligibility: {} } })).toEqual(preview);
   });
 
   it('reads a quote whose lines cannot be read as an empty quote', () => {
-    expect(readRenewalPreview({ preview: { lineItems: 'nope' } })).toEqual({ lineItems: [] });
-    expect(readRenewalPreview({ preview: {} })).toEqual({ lineItems: [] });
+    expect(readRenewalPreview({ data: { preview: { lineItems: 'nope' } } })).toEqual({ lineItems: [] });
+    expect(readRenewalPreview({ data: { preview: {} } })).toEqual({ lineItems: [] });
   });
 
   it('drops a line that carries nothing', () => {
     const preview = { lineItems: [null, { offerId: 'OFFER-1' }] };
 
-    expect(readRenewalPreview({ preview })).toEqual({ lineItems: [{ offerId: 'OFFER-1' }] });
+    expect(readRenewalPreview({ data: { preview } })).toEqual({ lineItems: [{ offerId: 'OFFER-1' }] });
   });
 
   it('reads a plan with nothing to quote as no quote', () => {
-    expect(readRenewalPreview({ preview: null, eligibility: {} })).toBeNull();
+    expect(readRenewalPreview({ data: { preview: null, eligibility: {} } })).toBeNull();
     expect(readRenewalPreview(null)).toBeNull();
+  });
+
+  it('reads nothing from a body without the data envelope', () => {
+    expect(readRenewalPreview({ preview: { lineItems: [] } })).toBeNull();
   });
 });
 
