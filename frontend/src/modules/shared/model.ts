@@ -491,16 +491,17 @@ export interface RenewalPreview {
 }
 
 /**
- * Read the Adobe quote out of a preview response.
+ * Read the Adobe quote out of a preview response body.
  *
- * The endpoint answers with the quote under ``preview`` alongside the
- * eligibility it derives, and returns it as ``null`` for a plan that has
+ * The API wraps every payload in its ``data`` envelope; the preview endpoints
+ * answer with the quote under ``data.preview`` (the renewal preview alongside
+ * the eligibility it derives), and return it as ``null`` for a plan that has
  * nothing to quote, such as one that only takes renewed seats back. A quote
  * whose lines are not readable is read as no quote at all, so the wizard falls
  * back to the prices the Marketplace already holds rather than failing.
  */
-export function readRenewalPreview(payload: unknown): RenewalPreview | null {
-  const preview = (payload as { preview?: RenewalPreview } | null)?.preview;
+export function readRenewalPreview(body: unknown): RenewalPreview | null {
+  const preview = (body as { data?: { preview?: RenewalPreview } | null } | null)?.data?.preview;
   if (!preview) {
     return null;
   }

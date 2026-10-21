@@ -26,7 +26,7 @@ describe('useSwitchDiscountValidation', () => {
   });
 
   it('previews the switch and publishes the quote', async () => {
-    mockPost.mockResolvedValue({ data: { preview: QUOTE } });
+    mockPost.mockResolvedValue({ data: { data: { preview: QUOTE } } });
     const onPreview = jest.fn();
     const { result } = renderHook(() =>
       useSwitchDiscountValidation('AGR-1', 'SUB-1', onPreview),
@@ -75,7 +75,7 @@ describe('useSwitchDiscountValidation', () => {
   });
 
   it('drops the quote and the outcome on reset', async () => {
-    mockPost.mockResolvedValue({ data: { preview: QUOTE } });
+    mockPost.mockResolvedValue({ data: { data: { preview: QUOTE } } });
     const onPreview = jest.fn();
     const { result } = renderHook(() =>
       useSwitchDiscountValidation('AGR-1', 'SUB-1', onPreview),
@@ -106,7 +106,7 @@ describe('useSwitchDiscountValidation', () => {
     });
     act(() => result.current.reset());
     await act(async () => {
-      resolvePost({ data: { preview: QUOTE } });
+      resolvePost({ data: { data: { preview: QUOTE } } });
       await pending;
     });
 

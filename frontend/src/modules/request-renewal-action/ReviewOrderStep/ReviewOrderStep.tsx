@@ -8,6 +8,7 @@ import {
   GridFieldDefinition,
   useGridInMemory,
 } from '@softwareone-platform/sdk-react-ui-v0/grid';
+import { Chip } from '@softwareone-platform/sdk-react-ui-v0/chip';
 import { InlineNotification } from '@softwareone-platform/sdk-react-ui-v0/notification';
 import { Tab, Tabs } from '@softwareone-platform/sdk-react-ui-v0/tabs';
 import { MediumText, RegularText } from '@softwareone-platform/sdk-react-ui-v0/text';
@@ -24,7 +25,9 @@ import { WizardHighlights } from '../../shared/components/WizardHighlights/Wizar
 import { TERM_COMMITMENT_LABELS, TERM_PERIOD_LABELS } from '../../shared/constants';
 import type { Agreement, ProductItem, RenewalPreview, Subscription } from '../../shared/model';
 import { getItemLink, getSubscriptionLink } from '../../utils/link';
-import { applyMarkup, formatOptionalPrice, formatPrice } from '../../utils/price';
+import { getQuotedPrice } from '../../utils/discount';
+import { formatOptionalPrice, formatPrice } from '../../utils/price';
+import { getPartialSku } from '../../utils/sku';
 import { formatQuantityDelta } from '../../utils/quantity';
 import {
   getRenewalQuantity,
@@ -66,6 +69,7 @@ interface Row {
   delta: number | null;
   newQuantity: number | null;
   unitSP: number | null;
+  discounted: boolean;
   spxM: number | null;
   spxY: number | null;
   newSpxM: number | null;
@@ -81,20 +85,35 @@ function sumTotals(rows: Row[], pick: (row: Row) => number | null): number | nul
   return totals.length ? totals.reduce((sum, total) => sum + total, 0) : null;
 }
 
-function quotedUnitSP(
+function roundToCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * A row's unit SP as Adobe's quote prices it, falling back to its list price.
+ *
+ * The quote line is found by the Adobe subscription a renewing row renews, or
+ * else by SKU: Adobe can leave the subscription id empty and changes the
+ * offer id's level suffix, so SKUs are compared as partial SKUs. A SKU belongs
+ * to one row only, since a net-new product is never one the agreement holds.
+ */
+function quotedRowPrice(
   preview: RenewalPreview | null,
-  adobeSubscriptionId: string | undefined,
-  sku: string | undefined,
-  markup: number | null | undefined,
-): number | null {
-  if (!preview || markup == null) {
-    return null;
-  }
-  const line = (preview.lineItems ?? []).find((item) =>
-    adobeSubscriptionId ? item.subscriptionId === adobeSubscriptionId : item.offerId === sku,
-  );
-  const unitPP = line?.pricing?.discountedPartnerPrice;
-  return unitPP == null ? null : applyMarkup(unitPP, markup);
+  listUnitSP: number | null,
+  sku: string,
+  adobeSubscriptionId?: string,
+): { unitSP: number | null; discounted: boolean } {
+  const lines = preview?.lineItems ?? [];
+  const bySubscription = adobeSubscriptionId
+    ? lines.find((item) => item.subscriptionId === adobeSubscriptionId)
+    : undefined;
+  const line =
+    bySubscription ??
+    lines.find((item) => Boolean(sku) && getPartialSku(item.offerId ?? '') === getPartialSku(sku));
+  const quoted = getQuotedPrice(listUnitSP, line?.pricing);
+  return quoted
+    ? { unitSP: roundToCents(quoted.unitSP), discounted: quoted.discounted }
+    : { unitSP: listUnitSP, discounted: false };
 }
 
 function toSubscriptionRows(
@@ -111,13 +130,12 @@ function toSubscriptionRows(
     const newQuantity = renews ? (getRenewalQuantity(subscription, quantities) ?? 0) : 0;
     const change = newQuantity - currentQuantity;
     const delta = change === 0 ? null : change;
-    const unitSP =
-      quotedUnitSP(
-        preview,
-        subscription.externalIds?.vendor,
-        line?.item.externalIds?.vendor,
-        line?.price?.markup,
-      ) ?? line?.price?.unitSP ?? null;
+    const { unitSP, discounted } = quotedRowPrice(
+      preview,
+      line?.price?.unitSP ?? null,
+      line?.item.externalIds?.vendor ?? '',
+      subscription.externalIds?.vendor,
+    );
     return {
       id: subscription.id,
       kind: 'subscription' as const,
@@ -134,6 +152,7 @@ function toSubscriptionRows(
       delta,
       newQuantity,
       unitSP,
+      discounted,
       spxM: totalPrice(unitSP, delta, 12),
       spxY: totalPrice(unitSP, delta, 1),
       newSpxM: totalPrice(unitSP, newQuantity, 12),
@@ -142,26 +161,34 @@ function toSubscriptionRows(
   });
 }
 
-function toNetNewRows(netNewItems: NetNewItem[], offset: number): Row[] {
-  return netNewItems.map((item, index) => ({
-    id: item.itemId,
-    kind: 'net-new' as const,
-    position: offset + index + 1,
-    itemId: item.itemId,
-    itemName: item.itemName,
-    sku: item.sku,
-    subscriptionId: '',
-    subscriptionName: '',
-    terms: TERM_PERIOD_LABELS[item.terms?.period ?? ''] ?? '—',
-    commitment: TERM_COMMITMENT_LABELS[item.terms?.commitment ?? ''] ?? '',
-    delta: item.quantity,
-    newQuantity: item.quantity,
-    unitSP: item.unitSP,
-    spxM: totalPrice(item.unitSP, item.quantity, 12),
-    spxY: totalPrice(item.unitSP, item.quantity, 1),
-    newSpxM: totalPrice(item.unitSP, item.quantity, 12),
-    newSpxY: totalPrice(item.unitSP, item.quantity, 1),
-  }));
+function toNetNewRows(
+  netNewItems: NetNewItem[],
+  offset: number,
+  preview: RenewalPreview | null,
+): Row[] {
+  return netNewItems.map((item, index) => {
+    const { unitSP, discounted } = quotedRowPrice(preview, item.unitSP, item.sku);
+    return {
+      id: item.itemId,
+      kind: 'net-new' as const,
+      position: offset + index + 1,
+      itemId: item.itemId,
+      itemName: item.itemName,
+      sku: item.sku,
+      subscriptionId: '',
+      subscriptionName: '',
+      terms: TERM_PERIOD_LABELS[item.terms?.period ?? ''] ?? '—',
+      commitment: TERM_COMMITMENT_LABELS[item.terms?.commitment ?? ''] ?? '',
+      delta: item.quantity,
+      newQuantity: item.quantity,
+      unitSP,
+      discounted,
+      spxM: totalPrice(unitSP, item.quantity, 12),
+      spxY: totalPrice(unitSP, item.quantity, 1),
+      newSpxM: totalPrice(unitSP, item.quantity, 12),
+      newSpxY: totalPrice(unitSP, item.quantity, 1),
+    };
+  });
 }
 
 function toTotalRow(rows: Row[]): Row {
@@ -179,6 +206,7 @@ function toTotalRow(rows: Row[]): Row {
     delta: null,
     newQuantity: null,
     unitSP: null,
+    discounted: false,
     spxM: sumTotals(rows, (row) => row.spxM),
     spxY: sumTotals(rows, (row) => row.spxY),
     newSpxM: sumTotals(rows, (row) => row.newSpxM),
@@ -273,15 +301,17 @@ const columns: GridColumnDefinition<Row>[] = [
     title: i18n.t('Renewal:Grid:Unit SP'),
     fields: ['unitSP'],
     initialWidth: 120,
-    cell: (row) =>
-      row.kind === 'total' || row.unitSP == null ? (
-        <GridCellSimple />
+    cell: (row) => {
+      if (row.kind === 'total' || row.unitSP == null) return <GridCellSimple />;
+      return row.discounted ? (
+        <DiscountedUnitPriceCell unitSP={row.unitSP} />
       ) : (
         <TextCell
           text={formatPrice(row.unitSP)}
           secondaryContent={i18n.t('Renewal:Grid:Unit SP basis')}
         />
-      ),
+      );
+    },
   },
   {
     name: 'spxM',
@@ -302,6 +332,25 @@ const columns: GridColumnDefinition<Row>[] = [
     ),
   },
 ];
+
+/** A unit SP Adobe quoted below its list price: a discount code applied to the line. */
+function DiscountedUnitPriceCell({ unitSP }: { unitSP: number }) {
+  return (
+    <GridCellSimple>
+      <div className="review-order-step__unit-price" data-testid="review-order-step-discounted-price">
+        <div className="review-order-step__unit-price-value">
+          <RegularText as="p" size={2}>
+            {formatPrice(unitSP)}
+          </RegularText>
+          <Chip label={i18n.t('Renewal:Review:Discounted')} color="success" />
+        </div>
+        <RegularText as="p" size={1} color="grey-4">
+          {i18n.t('Renewal:Grid:Unit SP basis')}
+        </RegularText>
+      </div>
+    </GridCellSimple>
+  );
+}
 
 const fields: GridFieldDefinition[] = [
   { name: 'itemName', title: i18n.t('Common:Item name') },
@@ -341,7 +390,10 @@ export function ReviewOrderStep({
       lineQuantities,
       preview,
     );
-    const lineRows = [...subscriptionRows, ...toNetNewRows(netNewItems, subscriptionRows.length)];
+    const lineRows = [
+      ...subscriptionRows,
+      ...toNetNewRows(netNewItems, subscriptionRows.length, preview),
+    ];
     return [...lineRows, toTotalRow(lineRows)];
   }, [subscriptions, selections, quantities, lineQuantities, netNewItems, preview]);
 

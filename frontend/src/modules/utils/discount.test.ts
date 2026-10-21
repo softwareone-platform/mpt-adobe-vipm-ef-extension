@@ -1,4 +1,9 @@
-import { appliesToOrderType, formatDiscountValue, getDiscountedUnitPrice } from './discount';
+import {
+  appliesToOrderType,
+  formatDiscountValue,
+  getDiscountedUnitPrice,
+  getQuotedPrice,
+} from './discount';
 
 import type { Discount } from '../shared/model';
 
@@ -82,5 +87,28 @@ describe('appliesToOrderType', () => {
 
   it('leaves out a code restricted to other order types', () => {
     expect(appliesToOrderType({ ...discount, applicableOrderTypes: ['RENEWAL'] }, 'SWITCH')).toBe(false);
+  });
+});
+
+describe('getQuotedPrice', () => {
+  it('carries the quoted discount onto the list selling price', () => {
+    const quoted = getQuotedPrice(1266.53, { partnerPrice: 902.28, discountedPartnerPrice: 812.05 });
+
+    expect(quoted?.unitSP).toBeCloseTo(1139.87, 2);
+    expect(quoted?.discounted).toBe(true);
+  });
+
+  it('keeps the list price, undiscounted, when Adobe applied nothing', () => {
+    expect(getQuotedPrice(1266.53, { partnerPrice: 902.28, discountedPartnerPrice: 902.28 })).toEqual({
+      unitSP: 1266.53,
+      discounted: false,
+    });
+  });
+
+  it('answers null for a line it cannot price', () => {
+    expect(getQuotedPrice(null, { partnerPrice: 100, discountedPartnerPrice: 90 })).toBeNull();
+    expect(getQuotedPrice(100, undefined)).toBeNull();
+    expect(getQuotedPrice(100, { partnerPrice: 0, discountedPartnerPrice: 90 })).toBeNull();
+    expect(getQuotedPrice(100, { partnerPrice: 100 })).toBeNull();
   });
 });

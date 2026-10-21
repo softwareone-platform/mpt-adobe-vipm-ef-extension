@@ -1,6 +1,6 @@
 import { i18n } from '../../i18n/translations';
 
-import type { Discount, DiscountOrderType } from '../shared/model';
+import type { Discount, DiscountOrderType, RenewalPreviewLine } from '../shared/model';
 import { formatCurrency } from './price';
 
 function clampPercentage(value: number): number {
@@ -22,6 +22,28 @@ export function getDiscountedUnitPrice(unitSP: number, discount: Discount): numb
     default:
       return null;
   }
+}
+
+/**
+ * A list unit SP carried through the discount Adobe quoted for its line.
+ *
+ * Adobe's quotes hold purchase prices, so the discount it applied reaches the
+ * selling price as the ratio of the discounted to the list purchase price:
+ * the line's markup cancels out and never has to be known. ``discounted``
+ * tells a line Adobe priced below its list price. Answers null when the line
+ * is not priced, so the caller keeps the list price.
+ */
+export function getQuotedPrice(
+  unitSP: number | null | undefined,
+  pricing: RenewalPreviewLine['pricing'],
+): { unitSP: number; discounted: boolean } | null {
+  const partnerPrice = pricing?.partnerPrice;
+  const discountedPartnerPrice = pricing?.discountedPartnerPrice;
+  if (unitSP == null || !partnerPrice || discountedPartnerPrice == null) return null;
+  return {
+    unitSP: (unitSP * discountedPartnerPrice) / partnerPrice,
+    discounted: discountedPartnerPrice < partnerPrice,
+  };
 }
 
 export function formatDiscountValue(discount: Discount): string {
