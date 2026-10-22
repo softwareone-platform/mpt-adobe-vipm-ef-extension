@@ -215,17 +215,24 @@ def matches_commitment(record: AirtableRecord, commitment: Commitment | None) ->
 
 
 def exclude_out_of_country(
-    records: list[AirtableRecord], value_records: list[AirtableRecord], country: str
+    records: list[AirtableRecord],
+    value_records: list[AirtableRecord],
+    country: str,
+    currency: str | None = None,
 ) -> list[AirtableRecord]:
-    """Drop codes not offered in the customer's country.
+    """Drop codes not offered in the customer's country and currency.
 
     The Discount Values rows are the support matrix: a code is offered in a
-    country when it has a value row for it, or a country-agnostic (percentage)
-    row. A code with no value rows at all is kept — the shortlist errs towards
+    country when it has a value row for it in the agreement currency, or a
+    country-agnostic (percentage) row. Adobe rejects a fixed code priced only in
+    another currency. An unknown currency falls back to the country-only rule,
+    and a code with no value rows at all is kept — the shortlist errs towards
     showing on a data gap rather than hiding it (asymmetry rule).
     """
     priced = {_value_code(record) for record in value_records}
-    offered = {_value_code(record) for record in value_records if _offered_in(record, country)}
+    offered = {
+        _value_code(record) for record in value_records if _offered_in(record, country, currency)
+    }
     return [
         record
         for record in records
@@ -249,10 +256,19 @@ def _value_code(value_record: AirtableRecord) -> str:
     return str(value_record["fields"].get("code", ""))
 
 
-def _offered_in(value_record: AirtableRecord, country: str) -> bool:
-    """Whether a value row prices its code in the country (blank = country-agnostic)."""
-    row_country = value_record["fields"].get("country")
-    return not row_country or row_country == country
+def _offered_in(value_record: AirtableRecord, country: str, currency: str | None) -> bool:
+    """Whether a value row prices its code in the country and currency.
+
+    A blank country is country-agnostic; a blank row currency or an unknown
+    agreement currency leaves the currency unconstrained.
+    """
+    fields = value_record["fields"]
+    row_country = fields.get("country")
+    if not row_country:
+        return True
+    row_currency = fields.get("currency")
+    currency_matches = not currency or not row_currency or row_currency == currency
+    return row_country == country and currency_matches
 
 
 def build_update_fields(body: DiscountCodeUpdateRequest, now: dt.datetime) -> dict[str, Any]:
