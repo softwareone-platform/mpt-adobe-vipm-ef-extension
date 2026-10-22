@@ -273,6 +273,16 @@ The `frontend/` package is a TypeScript plug UI bundled with esbuild into
 hooks are tested with jest. See [contributing.md](contributing.md) and
 [local-development.md](local-development.md) for the build and watch commands.
 
+Each module builds to `static/<module>/index-<hash>.js`, where the hash comes
+from the bundle content. The static route sends no `Cache-Control`, so a fixed
+file name would let browsers keep running a cached wizard after a release.
+`routers/plugs.py` resolves each plug `href` to the hashed bundle at startup,
+so a release that changes a wizard publishes a new URL. Watch builds keep the
+plain `index.js` and remove hashed bundles left by a release build. With no
+hashed bundle, the plug falls back to `index.js`. Because the `href` is read
+when the backend starts, restart the backend after a frontend build to publish
+the new name.
+
 ## Discount synchronization flow
 
 The open Adobe flexible discount catalogue is synchronized daily into the
