@@ -60,7 +60,8 @@ def test_app_generates_open_discount_sync_schedule_metadata():
     ]
 
 
-def test_app_generates_agreement_plug_metadata(monkeypatch):  # noqa: WPS218
+def test_app_generates_agreement_plug_metadata(monkeypatch, tmp_path):  # noqa: WPS218
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
     monkeypatch.setenv(
         "EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM", "PRD-2222-2222": "EDU"})

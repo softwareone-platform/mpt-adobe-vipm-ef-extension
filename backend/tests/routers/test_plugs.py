@@ -1,6 +1,60 @@
 import json
+import os
 
-from mpt_adobe_vipm_ef.routers.plugs import agreement_plugs
+from mpt_adobe_vipm_ef.routers.plugs import agreement_plugs, bundle_href
+
+
+def write_bundle(base_path, module, bundle_name, mtime=None):
+    bundle = base_path / "static" / module / bundle_name
+    bundle.parent.mkdir(parents=True, exist_ok=True)
+    bundle.write_text("bundle")
+    if mtime is not None:
+        os.utime(bundle, (mtime, mtime))
+
+
+def test_bundle_href_uses_hashed_bundle(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    write_bundle(tmp_path, "agreement", "index-ABC123.js")
+    write_bundle(tmp_path, "agreement", "index-ABC123.js.map")
+
+    result = bundle_href("agreement")
+
+    assert result == "/static/agreement/index-ABC123.js"
+
+
+def test_bundle_href_prefers_latest_hashed_bundle(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    write_bundle(tmp_path, "agreement", "index-NEW222.js", mtime=2)
+    write_bundle(tmp_path, "agreement", "index-OLD111.js", mtime=1)
+
+    result = bundle_href("agreement")
+
+    assert result == "/static/agreement/index-NEW222.js"
+
+
+def test_bundle_href_falls_back_to_plain_bundle(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    write_bundle(tmp_path, "agreement", "index.js")
+
+    result = bundle_href("agreement")
+
+    assert result == "/static/agreement/index.js"
+
+
+def test_bundle_href_without_build(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    result = bundle_href("agreement")
+
+    assert result == "/static/agreement/index.js"
+
+
+def test_plug_href_uses_hashed_bundle(plug_env, tmp_path):
+    write_bundle(tmp_path, "request-renewal-action", "index-RENEW1.js")
+
+    plug = agreement_plugs()[6]  # act
+
+    assert plug.href == "/static/request-renewal-action/index-RENEW1.js"
 
 
 def test_agreement_plug_metadata(plug_env):

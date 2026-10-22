@@ -342,8 +342,12 @@ def sync_setup(fake_ctx, fake_subscriptions, patch_caller_client):
 
 
 @pytest.fixture
-def plug_env(monkeypatch):
-    """Provide the product configuration plug metadata is built from, with no feature flags."""
+def plug_env(monkeypatch, tmp_path):
+    """Provide the product configuration plug metadata is built from, with no feature flags.
+
+    The working directory moves to an empty folder, so no built bundle is hashed.
+    """
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MPT_PRODUCTS_IDS", "PRD-1111-1111")
     monkeypatch.setenv("EXT_PRODUCT_SEGMENTS", json.dumps({"PRD-1111-1111": "COM"}))
     monkeypatch.delenv("EXT_FEATURES", raising=False)

@@ -21,8 +21,22 @@ if (entryPoints.length === 0) {
   process.exit(0);
 }
 
+// Release builds put a content hash in each bundle name (index-<hash>.js), so a new
+// release gets a new plug URL and browsers can't reuse a cached wizard. Watch builds
+// keep index.js and drop hashed bundles left by a previous release build, so the
+// backend serves the bundle being watched.
+const hashedBundle = /^index-[A-Z0-9]+\.js(\.map)?$/;
+
 mkdirSync(outdir, { recursive: true });
-if (!watch) {
+if (watch) {
+  for (const dirent of readdirSync(outdir, { withFileTypes: true })) {
+    if (!dirent.isDirectory()) continue;
+    const moduledir = path.join(outdir, dirent.name);
+    for (const entry of readdirSync(moduledir)) {
+      if (hashedBundle.test(entry)) rmSync(path.join(moduledir, entry), { force: true });
+    }
+  }
+} else {
   for (const entry of readdirSync(outdir)) {
     rmSync(path.join(outdir, entry), { recursive: true, force: true });
   }
@@ -33,7 +47,7 @@ const ctx = await context({
   define: {
     'process.env.NODE_ENV': env,
   },
-  entryNames: '[dir]/index',
+  entryNames: watch ? '[dir]/index' : '[dir]/index-[hash]',
   entryPoints,
   format: 'iife',
   loader: {
