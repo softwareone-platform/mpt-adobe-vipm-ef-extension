@@ -79,16 +79,19 @@ async def list_discount_codes(ctx: APIContext) -> APIResponse:  # noqa: WPS210
 async def _exclude_out_of_country(
     store: DiscountStore, scope: DiscountScope, records: list[AirtableRecord]
 ) -> list[AirtableRecord]:
-    """Drop codes not offered in the customer's country, using the value rows.
+    """Drop codes not offered in the customer's country and currency, using the value rows.
 
     The gate is skipped when the customer country is unknown: it would hide every
     per-country code with no backstop, so the shortlist errs towards showing them.
+    An unknown agreement currency keeps the country-only rule.
     """
     if not scope.country:
         return records
     codes = [discount_mapping.record_code(record) for record in records]
     value_records = await store_call(store.list_values, codes, scope.market_segment)
-    return discount_mapping.exclude_out_of_country(records, value_records, scope.country)
+    return discount_mapping.exclude_out_of_country(
+        records, value_records, scope.country, scope.currency
+    )
 
 
 @discounts_router.get(path="/{discount_id}", name="discount-codes-get")

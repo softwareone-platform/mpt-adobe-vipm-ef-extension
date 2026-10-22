@@ -392,6 +392,36 @@ async def test_list_drops_a_code_not_offered_in_the_customer_country(
 
 
 @freeze_time("2026-07-21T12:00:00Z")
+async def test_list_drops_a_code_not_priced_in_the_agreement_currency(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [code_record_factory()]
+    fake_store.list_values.return_value = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "US", "currency": "GBP"}},
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 0
+
+
+@freeze_time("2026-07-21T12:00:00Z")
+async def test_list_keeps_a_code_priced_in_the_agreement_currency(
+    agreement, fake_store, code_record_factory
+):
+    fake_store.list_codes.return_value = [code_record_factory()]
+    fake_store.list_values.return_value = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "US", "currency": "USD"}},
+    ]
+    ctx = FakeDiscountContext(agreement, query={"orderType": "RENEWAL"})
+
+    result = await list_discount_codes(ctx=ctx)
+
+    assert result.paginated_result.total == 1
+
+
+@freeze_time("2026-07-21T12:00:00Z")
 async def test_list_skips_the_country_gate_when_the_country_is_unknown(
     fake_store, code_record_factory
 ):
