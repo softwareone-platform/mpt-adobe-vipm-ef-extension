@@ -766,6 +766,61 @@ def test_exclude_out_of_country_keeps_a_code_with_no_value_rows(code_record_fact
     assert result == [record]
 
 
+def test_exclude_out_of_country_drops_a_code_priced_only_in_another_currency(code_record_factory):
+    record = code_record_factory()
+    value_records = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "US", "currency": "GBP"}},
+    ]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US", "USD")
+
+    assert result == []
+
+
+def test_exclude_out_of_country_keeps_a_code_priced_in_the_agreement_currency(code_record_factory):
+    record = code_record_factory()
+    value_records = [
+        {"id": "recV1", "fields": {"code": "SUMMER25", "country": "US", "currency": "GBP"}},
+        {"id": "recV2", "fields": {"code": "SUMMER25", "country": "US", "currency": "USD"}},
+    ]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US", "USD")
+
+    assert result == [record]
+
+
+def test_exclude_out_of_country_keeps_a_percentage_code_whatever_the_currency(
+    code_record_factory,
+):
+    record = code_record_factory()
+    value_records = [{"id": "recV", "fields": {"code": "SUMMER25", "value": 20}}]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US", "USD")
+
+    assert result == [record]
+
+
+def test_exclude_out_of_country_keeps_a_code_with_no_value_rows_and_a_known_currency(
+    code_record_factory,
+):
+    record = code_record_factory()
+
+    result = discount_mapping.exclude_out_of_country([record], [], "US", "USD")
+
+    assert result == [record]
+
+
+def test_exclude_out_of_country_ignores_the_currency_when_it_is_unknown(code_record_factory):
+    record = code_record_factory()
+    value_records = [
+        {"id": "recV", "fields": {"code": "SUMMER25", "country": "US", "currency": "GBP"}},
+    ]
+
+    result = discount_mapping.exclude_out_of_country([record], value_records, "US", None)
+
+    assert result == [record]
+
+
 @freeze_time("2026-07-21T12:00:00Z")
 def test_filter_offerable_applies_the_context_gates(code_record_factory):
     hit = code_record_factory(target_offer_ids="65322651CA")
