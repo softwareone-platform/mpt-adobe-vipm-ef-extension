@@ -15,6 +15,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     has_discount_code_change,
     has_renewed_removal,
     require_discount_code_change,
+    require_no_code_on_covered_subscription,
     require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
@@ -364,6 +365,29 @@ def test_build_renewal_payload_keeps_a_fully_covered_subscription_with_a_zero_de
     assert result.subscriptions[0].renew is True
 
 
+@pytest.mark.parametrize(
+    ("renewed_quantity", "expected_codes"),
+    [
+        (_CURRENT_QUANTITY, []),
+        (4, ["BLACK_FRIDAY"]),
+    ],
+)
+def test_build_renewal_payload_keeps_codes_off_a_line_with_nothing_to_renew(
+    renewed_quantity, expected_codes
+):
+    """A code on a fully covered line is never ordered, so it must not be redeemed."""
+    request = _request(
+        subscriptions=[_selection(quantity=_CURRENT_QUANTITY, codes=["BLACK_FRIDAY"])],
+        renewalPath="now",
+    )
+
+    result = build_renewal_payload(
+        _plan(request, renewed_quantity=renewed_quantity), [], request, "USD", _COTERM_DATE
+    )
+
+    assert result.subscriptions[0].flex_discount_codes == expected_codes
+
+
 def test_build_renewal_payload_snapshots_the_removal_of_a_renewed_subscription():
     """Taking back a mistaken early renewal rides the snapshot as a removal.
 
@@ -416,6 +440,36 @@ def test_require_no_renewed_seat_reduction_rejects_a_total_below_the_renewed_sea
 
     with pytest.raises(ValidationError, match="cannot renew fewer seats"):
         require_no_renewed_seat_reduction(_plan(request, renewed_quantity=8))
+
+
+def test_require_no_code_on_covered_subscription_rejects_a_code_on_a_zero_delta():
+    """A fully covered line is never ordered, so its code could never be applied."""
+    request = _request(
+        subscriptions=[_selection(quantity=_CURRENT_QUANTITY, codes=["BLACK_FRIDAY"])],
+        renewalPath="now",
+    )
+
+    with pytest.raises(ValidationError, match="discount code cannot be applied"):
+        require_no_code_on_covered_subscription(_plan(request, renewed_quantity=_CURRENT_QUANTITY))
+
+
+@pytest.mark.parametrize(
+    ("selection", "renewed_quantity"),
+    [
+        (_selection(quantity=_CURRENT_QUANTITY, codes=["BLACK_FRIDAY"]), 4),
+        (_selection(quantity=_CURRENT_QUANTITY), _CURRENT_QUANTITY),
+        (_selection(quantity=_CURRENT_QUANTITY, clear=True), _CURRENT_QUANTITY),
+        (_selection(renew=False, quantity=0, codes=["BLACK_FRIDAY"]), 4),
+    ],
+)
+def test_require_no_code_on_covered_subscription_accepts_applicable_plans(
+    selection, renewed_quantity
+):
+    request = _request(subscriptions=[selection], renewalPath="now")
+
+    require_no_code_on_covered_subscription(  # act
+        _plan(request, renewed_quantity=renewed_quantity)
+    )
 
 
 def test_has_renewed_removal_flags_a_switched_off_renewed_subscription():

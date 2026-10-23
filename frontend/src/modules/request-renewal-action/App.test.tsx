@@ -735,6 +735,44 @@ describe('request-renewal-action App', () => {
     expect(mockGet.mock.calls.filter(([url]) => url === inheritedUrl)).toHaveLength(2);
   });
 
+  it('places the order without the held reusable the customer left pre-filled', async () => {
+    const inheritedUrl = '/api/v2/agreements/AGR-1/renewal-order/inherited-discounts';
+    const heldCode = { offerId: '65322587CA01A12', code: 'HELD-CODE', eligible: true };
+    mockGet.mockImplementation((url: string) =>
+      url === inheritedUrl
+        ? Promise.resolve({ data: { data: { inheritedDiscounts: [heldCode] } } })
+        : respondTo(url),
+    );
+    mockPost.mockImplementation((url: string) =>
+      url === '/api/v2/agreements/AGR-1/renewal-order'
+        ? Promise.resolve({ data: { data: { id: 'ORD-1', status: 'Processing' } } })
+        : respondToPost(url),
+    );
+    mockActiveStepIndex = 3;
+    const { rerender } = render(<App />);
+    await waitFor(() =>
+      expect(promotionsProps.discountSelections).toEqual({ 'SUB-1': 'HELD-CODE' }),
+    );
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    await screen.findByText('Review step');
+    await act(async () => {
+      await reviewProps.onPlaceOrder();
+    });
+
+    const [, body] = mockPost.mock.calls.find(
+      ([url]) => url === '/api/v2/agreements/AGR-1/renewal-order',
+    )!;
+    expect((body as { subscriptions: unknown[] }).subscriptions[0]).toEqual({
+      id: 'SUB-1',
+      offerId: '65322587CA',
+      renew: true,
+      renewalQuantity: 37,
+      flexDiscountCodes: [],
+    });
+  });
+
   it('stores the order details in the wizard state', async () => {
     mockActiveStepIndex = 4;
     render(<App />);
