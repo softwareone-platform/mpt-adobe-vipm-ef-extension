@@ -85,6 +85,7 @@ from mpt_adobe_vipm_ef.services.renewal_plan import (  # noqa: WPS235
     build_renewal_payload,
     has_renewed_removal,
     require_discount_code_change,
+    require_no_code_on_covered_subscription,
     require_no_renewed_seat_reduction,
     require_renewal_changes,
     require_renewal_selections,
@@ -643,7 +644,7 @@ async def _resolve_submission_plan(
     discount codes each subscription already holds (which tell a code-only
     plan apart from a no-op) and — on the early path — the renewed quantities
     behind the snapshot's deltas, with the plan rejected right here if it asks
-    to take renewed seats back.
+    to take renewed seats back or applies a code to an already covered line.
     """
     adobe_subscriptions = await _load_adobe_subscriptions(ctx, agreement.id)
     non_renewable_skus = await _load_non_renewable_skus(ctx, agreement, adobe_subscriptions)
@@ -656,6 +657,7 @@ async def _resolve_submission_plan(
     if renewal_path is RenewalPath.NOW:
         plan_subscriptions = _resolve_renewed_quantities(plan_subscriptions, adobe_subscriptions)
         require_no_renewed_seat_reduction(plan_subscriptions)
+        require_no_code_on_covered_subscription(plan_subscriptions)
     return plan_subscriptions
 
 
@@ -672,7 +674,8 @@ async def _resolve_adobe_plan_data(
     row takes the quantity previous RENEWAL orders already renewed — the
     baseline behind each quoted delta, and what marks a switched-off row as
     the removal of a renewed subscription — with the plan rejected right here
-    if it keeps renewing but asks for fewer seats than already renewed. At the
+    if it keeps renewing but asks for fewer seats than already renewed, or
+    applies a code to a line those seats already cover. At the
     anniversary only renewing lines need anything (the offer id), so a
     lapse-only or net-new-only plan skips the Adobe call there.
     """
@@ -687,6 +690,7 @@ async def _resolve_adobe_plan_data(
     if renewal_path is RenewalPath.NOW:
         plan_subscriptions = _resolve_renewed_quantities(plan_subscriptions, adobe_subscriptions)
         require_no_renewed_seat_reduction(plan_subscriptions)
+        require_no_code_on_covered_subscription(plan_subscriptions)
     return plan_subscriptions
 
 
