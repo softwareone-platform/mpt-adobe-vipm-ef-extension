@@ -783,6 +783,19 @@ async def test_create_renewal_order_rejects_a_total_below_the_renewed_seats(
     create_order_mock.assert_not_awaited()
 
 
+async def test_create_renewal_order_rejects_a_code_on_an_already_covered_subscription(
+    fake_ctx, submit_deps, create_order_mock, adobe_call
+):
+    """A fully covered line is never ordered, so its code could never be applied."""
+    adobe_call.returns = _renewed_subscriptions_payload(_CURRENT_QUANTITY)
+    body = _body(quantity=_CURRENT_QUANTITY, codes=["BLACK_FRIDAY"], path="now")
+
+    with pytest.raises(ValidationError, match="discount code cannot be applied"):
+        await create_renewal_order(_AGREEMENT_ID, fake_ctx, body)
+
+    create_order_mock.assert_not_awaited()
+
+
 async def test_create_renewal_order_snapshots_the_removal_of_a_renewed_subscription(
     fake_ctx, submit_deps, create_order_mock, create_configuration_order_mock, adobe_call
 ):
@@ -1814,6 +1827,19 @@ async def test_preview_renewal_plan_rejects_a_total_below_the_renewed_seats(
         await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
 
     # Only the subscriptions load ran: the plan never reached the quote.
+    assert len(adobe_call.calls) == 1
+
+
+async def test_preview_renewal_plan_rejects_a_code_on_an_already_covered_subscription(
+    fake_ctx, renewal_agreement, renewing_subscription, adobe_call
+):
+    """A fully covered line leaves the quote, so its code could never be applied."""
+    adobe_call.returns = _renewed_subscriptions_payload(_CURRENT_QUANTITY)
+    body = _preview_body(quantity=_CURRENT_QUANTITY, codes=["BLACK_FRIDAY"], path="now")
+
+    with pytest.raises(ValidationError, match="discount code cannot be applied"):
+        await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, body)
+
     assert len(adobe_call.calls) == 1
 
 
