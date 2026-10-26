@@ -206,6 +206,27 @@ def require_no_renewed_seat_reduction(plan_subscriptions: list[PlanSubscription]
             )
 
 
+def require_no_code_on_covered_subscription(plan_subscriptions: list[PlanSubscription]) -> None:
+    """Reject an early-renewal plan that applies a code to an already covered subscription.
+
+    A renewing subscription whose ``renewal_delta`` is zero was fully renewed
+    by a previous early-renewal order: it is left out of the quote and of the
+    RENEWAL order, so a discount code picked for it could never be applied.
+    The plan is rejected rather than submitted with the code silently
+    dropped. Only bites where ``renewed_quantity`` was stamped, which is the
+    now path alone.
+    """
+    for plan in plan_subscriptions:
+        if plan.selection.renew and plan.selection.flex_discount_codes and not renewal_delta(plan):
+            subscription_id = plan.selection.id
+            raise ValidationError(
+                detail=(
+                    f"Subscription {subscription_id} is already early-renewed, so a "
+                    "discount code cannot be applied to it."
+                ),
+            )
+
+
 def has_renewed_removal(plan_subscriptions: list[PlanSubscription]) -> bool:
     """Whether the plan removes a subscription a previous early renewal covered.
 
@@ -383,7 +404,10 @@ def build_renewal_payload(
     RETURN order — and how large it is — rather than as a plain lapse.
     Each renewing entry rides only the flexible discount codes the customer
     applied to that line, matching Adobe's auto-renewal preference object, and
-    ``clearFlexDiscountCodes`` when the customer removed the line's code; a
+    ``clearFlexDiscountCodes`` when the customer removed the line's code. A
+    line with nothing left to renew (a zero delta on the now path) carries no
+    code: it is never ordered, so its code would be recorded as redeemed
+    without ever being applied. A
     net-new entry carries its own codes the same way, so fulfilment applies
     each code to the line it was picked for and nothing else. The net-new
     products carry their full offer ids (resolved from the Airtable SKU
@@ -406,7 +430,9 @@ def build_renewal_payload(
                 "renewalQuantity": max(renewal_delta(plan), 0),
                 "renewedQuantity": plan.renewed_quantity,
                 "flexDiscountCodes": (
-                    list(plan.selection.flex_discount_codes) if plan.selection.renew else []
+                    list(plan.selection.flex_discount_codes)
+                    if plan.selection.renew and renewal_delta(plan) > 0
+                    else []
                 ),
                 "clearFlexDiscountCodes": (
                     plan.selection.renew

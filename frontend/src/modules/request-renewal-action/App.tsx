@@ -50,6 +50,7 @@ import {
   type RenewalQuantities,
   type RenewalSelections,
   withHeldQuantity,
+  withoutInheritedDiscounts,
   withRenewedQuantities,
 } from './model';
 
@@ -104,6 +105,10 @@ export default function App() {
   const renewalState = useRenewalState(agreementId);
   const pathState = useRenewalPathState(agreementId);
   const inheritedDiscounts = useInheritedDiscounts(agreementId);
+  const inheritedSelections = useMemo(
+    () => buildInheritedDiscountSelections(subscriptions.data, inheritedDiscounts.data),
+    [subscriptions.data, inheritedDiscounts.data],
+  );
   const anniversarySubscriptions = useMemo(
     () =>
       subscriptions.data.filter((subscription) =>
@@ -171,7 +176,7 @@ export default function App() {
       pathQuantities,
       netNewItems,
       renewalPath,
-      discountSelections,
+      withoutInheritedDiscounts(discountSelections, inheritedSelections),
     );
     const placed = await submitOrder({
       ...plan,
@@ -191,6 +196,7 @@ export default function App() {
     netNewItems,
     renewalPath,
     discountSelections,
+    inheritedSelections,
     orderDetails,
     recommendations.data,
     submitOrder,
@@ -234,17 +240,15 @@ export default function App() {
   // customer has not chosen a code, so a later override is never overwritten.
   const inheritedSeeded = useRef(false);
   const inheritedLoaded = inheritedDiscounts.status === 'success';
-  const inheritedData = inheritedDiscounts.data;
   useEffect(() => {
     if (inheritedSeeded.current || !inheritedLoaded || !subscriptionsLoaded) {
       return;
     }
     inheritedSeeded.current = true;
-    const defaults = buildInheritedDiscountSelections(subscriptionData, inheritedData);
-    if (Object.keys(defaults).length > 0) {
-      setDiscountSelections((current) => ({ ...defaults, ...current }));
+    if (Object.keys(inheritedSelections).length > 0) {
+      setDiscountSelections((current) => ({ ...inheritedSelections, ...current }));
     }
-  }, [inheritedLoaded, inheritedData, subscriptionsLoaded, subscriptionData]);
+  }, [inheritedLoaded, inheritedSelections, subscriptionsLoaded]);
 
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
@@ -421,7 +425,7 @@ export default function App() {
           quantities={pathQuantities}
           netNewItems={netNewItems}
           discountSelections={discountSelections}
-          inheritedDiscounts={inheritedData}
+          inheritedDiscounts={inheritedDiscounts.data}
           inheritedDiscountsFailed={inheritedDiscounts.status === 'error'}
           onRetryInheritedDiscounts={inheritedDiscounts.refresh}
           path={renewalPath}
