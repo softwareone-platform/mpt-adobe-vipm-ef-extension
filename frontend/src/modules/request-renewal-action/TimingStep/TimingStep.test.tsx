@@ -46,16 +46,8 @@ declare const setTimeZone: (timeZone: string | undefined) => void;
 
 const agreement: Agreement = { id: 'AGR-1111-1111', name: 'Agreement Name' };
 
-function dateInDays(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 const pathState: RenewalPathState = {
-  anniversaryDate: dateInDays(7),
+  anniversaryDate: '2026-10-28',
   window: 'open',
   windowOpensDays: 30,
   windowClosesDays: 2,
@@ -67,7 +59,7 @@ const renderStep = (props: Partial<Parameters<typeof TimingStep>[0]> = {}) =>
   render(
     <TimingStep
       agreement={agreement}
-      renewalDate={dateInDays(7)}
+      renewalDate="2026-10-28"
       path="anniversary"
       onPathChange={jest.fn()}
       pathState={pathState}
@@ -76,6 +68,18 @@ const renderStep = (props: Partial<Parameters<typeof TimingStep>[0]> = {}) =>
   );
 
 describe('TimingStep', () => {
+  const browserTimeZone = process.env.TZ;
+
+  beforeEach(() => {
+    // UTC is October 22, but the Pacific calendar date is still October 21.
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-22T05:00:00Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    setTimeZone(browserTimeZone);
+  });
+
   it('renders the heading and the wizard highlights', () => {
     const { getByText, getByTestId } = renderStep();
 
@@ -92,26 +96,21 @@ describe('TimingStep', () => {
 
   it('counts a renewal date one day out in the singular', () => {
     const { getByText } = renderStep({
-      pathState: { ...pathState, anniversaryDate: dateInDays(1) },
+      pathState: { ...pathState, anniversaryDate: '2026-10-22' },
     });
 
     expect(getByText(/\(1 day away\)/)).toBeTruthy();
   });
 
   describe('with the browser in another time zone', () => {
-    const browserTimeZone = process.env.TZ;
-
-    afterEach(() => {
-      jest.useRealTimers();
-      setTimeZone(browserTimeZone);
-    });
-
     it.each([
       ['Australia/Perth', '2026-09-30T17:00:00Z', 15],
       ['Pacific/Honolulu', '2026-10-01T09:30:00Z', 14],
-    ])('counts the days away from the Pacific date in %s', (timeZone, now, days) => {
+      ['UTC', '2026-10-01T06:59:59Z', 15],
+      ['UTC', '2026-10-01T07:00:00Z', 14],
+    ])('counts the days away from the Pacific date in %s at %s', (timeZone, now, days) => {
       setTimeZone(timeZone);
-      jest.useFakeTimers().setSystemTime(new Date(now));
+      jest.setSystemTime(new Date(now));
 
       const { getByText } = renderStep({
         pathState: { ...pathState, anniversaryDate: '2026-10-15' },
@@ -123,8 +122,8 @@ describe('TimingStep', () => {
 
   it('states the anniversary Adobe reports, not the stored agreement parameter', () => {
     const { getByText } = renderStep({
-      renewalDate: dateInDays(30),
-      pathState: { ...pathState, anniversaryDate: dateInDays(7) },
+      renewalDate: '2026-11-20',
+      pathState: { ...pathState, anniversaryDate: '2026-10-28' },
     });
 
     expect(getByText(/\(7 days away\)/)).toBeTruthy();
