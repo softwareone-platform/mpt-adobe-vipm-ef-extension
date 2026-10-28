@@ -50,7 +50,6 @@ import {
   type RenewalQuantities,
   type RenewalSelections,
   withHeldQuantity,
-  withoutInheritedDiscounts,
   withRenewedQuantities,
 } from './model';
 
@@ -105,10 +104,6 @@ export default function App() {
   const renewalState = useRenewalState(agreementId);
   const pathState = useRenewalPathState(agreementId);
   const inheritedDiscounts = useInheritedDiscounts(agreementId);
-  const inheritedSelections = useMemo(
-    () => buildInheritedDiscountSelections(subscriptions.data, inheritedDiscounts.data),
-    [subscriptions.data, inheritedDiscounts.data],
-  );
   const anniversarySubscriptions = useMemo(
     () =>
       subscriptions.data.filter((subscription) =>
@@ -176,7 +171,7 @@ export default function App() {
       pathQuantities,
       netNewItems,
       renewalPath,
-      withoutInheritedDiscounts(discountSelections, inheritedSelections),
+      discountSelections,
     );
     const placed = await submitOrder({
       ...plan,
@@ -196,7 +191,6 @@ export default function App() {
     netNewItems,
     renewalPath,
     discountSelections,
-    inheritedSelections,
     orderDetails,
     recommendations.data,
     submitOrder,
@@ -236,19 +230,22 @@ export default function App() {
   }, [subscriptionsLoaded, subscriptionData]);
 
   // Pre-fill each renewing line with the reusable the customer already holds, so
-  // it auto-applies without an explicit pick. Seeded once, and only where the
-  // customer has not chosen a code, so a later override is never overwritten.
+  // it is sent on the line: Adobe applies only the codes an order carries.
+  // Seeded once, and only where the customer has not chosen a code, so a later
+  // override is never overwritten.
   const inheritedSeeded = useRef(false);
   const inheritedLoaded = inheritedDiscounts.status === 'success';
+  const inheritedData = inheritedDiscounts.data;
   useEffect(() => {
     if (inheritedSeeded.current || !inheritedLoaded || !subscriptionsLoaded) {
       return;
     }
     inheritedSeeded.current = true;
-    if (Object.keys(inheritedSelections).length > 0) {
-      setDiscountSelections((current) => ({ ...inheritedSelections, ...current }));
+    const defaults = buildInheritedDiscountSelections(subscriptionData, inheritedData);
+    if (Object.keys(defaults).length > 0) {
+      setDiscountSelections((current) => ({ ...defaults, ...current }));
     }
-  }, [inheritedLoaded, inheritedSelections, subscriptionsLoaded]);
+  }, [inheritedLoaded, inheritedData, subscriptionsLoaded, subscriptionData]);
 
   if (status === 'error' || (status === 'success' && !agreement)) {
     return (
@@ -417,6 +414,11 @@ export default function App() {
     },
     {
       title: t('Renewal:Steps:Promotions'),
+      // The held reusables are seeded into the selections once they load, so
+      // Next waits while they are read: a code seeded later would skip the
+      // validation. A failed read never blocks the renewal; the step says the
+      // customer goes on without them, and a Retry blocks Next again.
+      nextButton: { isDisabled: inheritedDiscounts.status === 'loading' },
       render: () => (
         <PromotionsStep
           agreement={agreement}
@@ -425,7 +427,7 @@ export default function App() {
           quantities={pathQuantities}
           netNewItems={netNewItems}
           discountSelections={discountSelections}
-          inheritedDiscounts={inheritedDiscounts.data}
+          inheritedDiscounts={inheritedData}
           inheritedDiscountsFailed={inheritedDiscounts.status === 'error'}
           onRetryInheritedDiscounts={inheritedDiscounts.refresh}
           path={renewalPath}
