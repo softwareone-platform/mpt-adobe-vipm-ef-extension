@@ -538,6 +538,7 @@ describe('PromotionsStep', () => {
 
     const notice = await findByTestId('promotions-step-inherited-error');
     expect(notice.textContent).toContain('Failed to load the discounts you already hold.');
+    expect(notice.textContent).toContain('they will not be included in this renewal');
     fireEvent.click(getByText('Retry'));
 
     expect(onRetryInheritedDiscounts).toHaveBeenCalled();

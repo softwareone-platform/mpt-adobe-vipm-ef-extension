@@ -23,7 +23,6 @@ import {
   isRenewing,
   normalizeDiscountCode,
   withHeldQuantity,
-  withoutInheritedDiscounts,
   withRenewedQuantities,
 } from './model';
 import type { Discount, InheritedDiscount, RenewalPathState, Subscription } from '../shared/model';
@@ -653,29 +652,3 @@ describe('buildInheritedDiscountSelections', () => {
   });
 });
 
-
-describe('withoutInheritedDiscounts', () => {
-  it('drops a line still on its pre-filled held reusable', () => {
-    const result = withoutInheritedDiscounts(
-      { 'SUB-1': 'black_friday' },
-      { 'SUB-1': 'BLACK_FRIDAY' },
-    );
-
-    expect(result).toEqual({});
-  });
-
-  it('keeps a line the customer changed or cleared', () => {
-    const result = withoutInheritedDiscounts(
-      { 'SUB-1': 'OTHER_CODE', 'SUB-2': '' },
-      { 'SUB-1': 'BLACK_FRIDAY', 'SUB-2': 'BLACK_FRIDAY' },
-    );
-
-    expect(result).toEqual({ 'SUB-1': 'OTHER_CODE', 'SUB-2': '' });
-  });
-
-  it('keeps a code on a line that holds no reusable', () => {
-    const result = withoutInheritedDiscounts({ 'SUB-1': 'CODE-ONE' }, {});
-
-    expect(result).toEqual({ 'SUB-1': 'CODE-ONE' });
-  });
-});

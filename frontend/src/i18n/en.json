@@ -499,6 +499,7 @@
       "Custom code": "Discount code",
       "Add code": "Add code",
       "Inherited": "Inherited",
+      "Inherited unavailable": "You can retry, or continue without them: they will not be included in this renewal.",
       "Ineligible inherited": "Reusable discounts you already hold no longer qualify for this renewal and were not applied: {{codes}}.",
       "Unknown code": "The code you have entered, {{code}}, is not known. You can ask your sales team to add it as a known code or submit the order anyway. Any invalid codes will cause the order to fail.",
       "Empty": {
