@@ -428,27 +428,6 @@ export function buildInheritedDiscountSelections(
   return selections;
 }
 
-/**
- * Drop the lines still on the held reusable they were pre-filled with.
- *
- * Adobe applies a held reusable by itself, so sending it as an explicit code
- * would make fulfilment record it as a fresh redemption and, at the
- * anniversary, pin it on the subscription. A line left on its pre-filled code
- * is sent as untouched; one the customer changed or cleared keeps its pick.
- */
-export function withoutInheritedDiscounts(
-  discountSelections: DiscountSelections,
-  inheritedSelections: DiscountSelections,
-): DiscountSelections {
-  return Object.fromEntries(
-    Object.entries(discountSelections).filter(
-      ([rowId, code]) =>
-        !(rowId in inheritedSelections) ||
-        normalizeDiscountCode(code) !== normalizeDiscountCode(inheritedSelections[rowId]),
-    ),
-  );
-}
-
 export function findDiscountByCode(code: string, discounts: Discount[]): Discount | undefined {
   const wanted = normalizeDiscountCode(code);
   return discounts.find((discount) => normalizeDiscountCode(discount.code) === wanted);
