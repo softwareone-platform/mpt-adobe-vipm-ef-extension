@@ -118,7 +118,9 @@ frontend/                    TypeScript plug UI (esbuild)
     the renewal: Adobe's `2136` (no auto-renewal subscriptions) and `2164`
     (every subscription already renewed) read as no inherited discounts, any
     other Adobe error is an upstream error, and the
-    Promotions step shows it with a Retry.
+    Promotions step shows it with a Retry, or lets the customer continue
+    without the held discounts. Its Next waits only while the lookup is in
+    flight, so a code is never pre-filled after the step was validated.
     `path-state` reports whether a renewal can be planned at all — Adobe takes
     a renewal order and a scheduled net-new subscription only from 30 to 2
     days before the renewal date, counted by the date in Pacific time

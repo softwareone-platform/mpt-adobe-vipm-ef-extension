@@ -517,7 +517,8 @@ export function PromotionsStep({
             data-testid="promotions-step-inherited-error"
           >
             <InlineNotification status="error">
-              {t('Errors:LoadInheritedDiscounts')}
+              {t('Errors:LoadInheritedDiscounts')}{' '}
+              {t('Renewal:Promotions:Inherited unavailable')}
             </InlineNotification>
             <Button onClick={onRetryInheritedDiscounts}>
               {t('Common:Retry')}

@@ -68,7 +68,8 @@ The lookup is advisory: Adobe re-validates every applied code on the real
 `PREVIEW_RENEWAL` (with line items) and at submit, so a failure never blocks
 the renewal. Any other Adobe error is reported as an upstream error, and the
 wizard's Promotions step says the held discounts could not be loaded, with a
-Retry.
+Retry; the customer can also continue without them, and they are then not
+included in the renewal. Next waits only while the lookup is in flight.
 
 ## Airtable discount-store synchronization
 
