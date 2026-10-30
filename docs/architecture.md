@@ -200,9 +200,11 @@ frontend/                    TypeScript plug UI (esbuild)
     wraps the Airtable API with discount-specific queries (list, find, create,
     update codes and values, list the open rows and retire them in batches). The extension keeps a local copy of the Adobe
     flexible discount catalogue in an Airtable base with three tables: `Discount
-    Codes` (one row per code, open and closed), `Discount Values` (per-country
-    amount) and `Discount Redemptions` (one row per code redeemed by a
-    customer).
+    Codes` (open codes keyed by `(code, market_segment)`, closed codes by
+    `(code, market_segment, target_customer_id)`), `Discount Values`
+    (per-country amount; a closed code's rows carry its `target_customer_id`, so
+    each customer holding the code reads and rewrites only its own value) and
+    `Discount Redemptions` (one row per code redeemed by a customer).
   - `regions.py` — Adobe region metadata: resolves the region of a storefront
     country and the countries of a region from the packaged
     `mpt_adobe_vipm_ef/data/region_country_mapping.json`.
@@ -230,8 +232,9 @@ frontend/                    TypeScript plug UI (esbuild)
     region's countries (each region only once per run), and mirrors the open
     `GET /v3/flex-discounts` listing of every market segment (COM, EDU, GOV).
     Open rows are keyed by `(code, market_segment)` and owned by this sync
-    (`source = "API"`); enrichment fields stay untouched for operations to
-    curate. Each run ends with an expiry review that retires the open rows out
+    (`source = "API"`); the upsert picks the open row by source among the
+    closed rows sharing the code, and skips a code that only has closed rows.
+    Enrichment fields stay untouched for operations to curate. Each run ends with an expiry review that retires the open rows out
     of their usable window, while the upsert un-retires a row Adobe reports as
     usable again.
   - `inherited_discounts.py` — maps Adobe's automated `PREVIEW_RENEWAL` (the
@@ -339,7 +342,10 @@ Airtable discount store via the scheduled task defined in
 
 Open codes are keyed by `(code, market_segment)` in the Airtable store and
 remain visible to all customers in that segment. Closed codes target a specific
-customer and are authored/curated manually through the discount management API;
+customer and are keyed by `(code, market_segment, target_customer_id)`: Adobe
+issues the same closed code to many customers, so each one can hold it with its
+own value, while a closed code cannot take the name of an open code of the same
+segment. They are authored/curated manually through the discount management API;
 their `source` records the authoring account type (`"Operations"` or
 `"Vendor"`; `"Client"` marks a client-sourced row this API never writes, and
 legacy rows carry `"Ops/Vendor"`), and their `retired_at` belongs to that API's

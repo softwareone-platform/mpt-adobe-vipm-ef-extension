@@ -44,7 +44,7 @@ The Airtable discount store is required for discount code management. It holds t
 | Environment Variable | Default | Example | Description |
 | --- | --- | --- | --- |
 | `EXT_AIRTABLE_API_TOKEN` | - | `patXXXXXXXXXXXXXX` | Airtable API key for the discount store; required for discount code management and scheduled sync |
-| `EXT_AIRTABLE_DISCOUNTS_ID` | - | `appXXXXXXXXXXXXXX` | Airtable base ID for the discount store; must contain `Discount Codes`, `Discount Values`, and `Discount Redemptions` tables |
+| `EXT_AIRTABLE_DISCOUNTS_ID` | - | `appXXXXXXXXXXXXXX` | Airtable base ID for the discount store; must contain `Discount Codes`, `Discount Values` (with a `target_customer_id` column), and `Discount Redemptions` tables |
 
 The discount store is built on demand via `DiscountStore.from_settings(settings)`, which fails fast when either variable is unset. The scheduled sync (`/schedules/discounts/open-sync`) runs daily at midnight UTC (`cron: 0 0 * * *`) and requires both variables to be configured.
 
