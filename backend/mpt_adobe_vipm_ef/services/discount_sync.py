@@ -264,16 +264,20 @@ def _sync_target_segment(
 def _upsert_open_discount(
     store: DiscountStore, discount: dict[str, Any], market_segment: str
 ) -> bool:
-    """Upsert one open discount row and its per-country values."""
+    """Upsert one open discount row and its per-country values.
+
+    The segment can hold one closed row of the code per customer besides its
+    open row, so the open row is picked by source. Without one, any closed row
+    of the code keeps the open code out of the store.
+    """
     code = str(discount.get("code") or "")
     if not code:
         logger.warning("Skipping an Adobe flex discount without code: %s", discount.get("id"))
         return False
     now = dt.datetime.now(tz=dt.UTC)
-    existing = store.find_code(code, market_segment)
-    if existing is None:
-        store.create_code(build_open_code_fields(discount, market_segment, now))
-    elif is_closed(existing):
+    rows = store.find_codes(code, market_segment)
+    existing = next((row for row in rows if not is_closed(row)), None)
+    if existing is None and rows:
         logger.warning(
             "Skipping Adobe flex discount %s: a closed code %s already exists in segment %s",
             discount.get("id"),
@@ -281,6 +285,8 @@ def _upsert_open_discount(
             market_segment,
         )
         return False
+    if existing is None:
+        store.create_code(build_open_code_fields(discount, market_segment, now))
     else:
         store.update_code(existing["id"], build_open_update_fields(discount, now, existing))
     for entry in open_discount_values(discount):

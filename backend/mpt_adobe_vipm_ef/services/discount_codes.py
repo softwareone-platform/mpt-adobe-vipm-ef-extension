@@ -73,19 +73,20 @@ async def require_visible_record(
     return record
 
 
-# In-process locks keyed by ``(code, market_segment)``. Airtable has no unique
-# constraint, so the duplicate check and the insert must run as one critical
-# section to keep concurrent creates from leaving two rows for the same pair.
-# Entries are reference-counted and dropped once no request holds them.
-_create_locks: dict[tuple[str, str], "asyncio.Lock"] = {}
-_create_lock_waiters: dict[tuple[str, str], int] = {}
+# In-process locks keyed by ``(code, market_segment, customer_id)``, the key of
+# a closed code. Airtable has no unique constraint, so the duplicate check and
+# the insert must run as one critical section to keep concurrent creates from
+# leaving two rows for the same key. Entries are reference-counted and dropped
+# once no request holds them.
+_create_locks: dict[tuple[str, str, str], "asyncio.Lock"] = {}
+_create_lock_waiters: dict[tuple[str, str, str], int] = {}
 _create_registry_guard = asyncio.Lock()
 
 
 @asynccontextmanager
 async def guard_code_creation(scope: DiscountScope, code: str) -> AsyncIterator[None]:
-    """Serialize the check-then-create of one ``(code, market_segment)`` pair."""
-    key = (code, scope.market_segment)
+    """Serialize the check-then-create of one ``(code, market_segment, customer_id)`` key."""
+    key = (code, scope.market_segment, scope.customer_id)
     async with _create_registry_guard:
         lock = _create_locks.setdefault(key, asyncio.Lock())
         _create_lock_waiters[key] = _create_lock_waiters.get(key, 0) + 1
@@ -101,13 +102,26 @@ async def guard_code_creation(scope: DiscountScope, code: str) -> AsyncIterator[
 
 
 async def reject_duplicate_code(store: DiscountStore, scope: DiscountScope, code: str) -> None:
-    """Enforce uniqueness of ``(code, market_segment)``, including open codes."""
-    existing = await store_call(store.find_code, code, scope.market_segment)
-    if existing is not None:
+    """Enforce uniqueness of a closed code per ``(code, market_segment, customer_id)``.
+
+    A closed code is customer-specific: Adobe issues the same closed code to many
+    customers, so another customer's closed row of the code does not conflict.
+    An open row of the code does, whoever the customer: a closed code cannot take
+    the name of an open code in the same market segment.
+    """
+    existing = await store_call(store.find_codes, code, scope.market_segment)
+    if any(_conflicts_with(record, scope.customer_id) for record in existing):
         raise ValidationError(
             detail="A discount with this code already exists in the market segment.",
             errors=[ErrorDetail(pointer="#/code", detail="Duplicate code.")],
         )
+
+
+def _conflicts_with(record: AirtableRecord, customer_id: str) -> bool:
+    """Whether an existing row of the code blocks a new closed code for the customer."""
+    if not discount_mapping.is_closed(record):
+        return True
+    return record["fields"].get("target_customer_id") == customer_id
 
 
 def resolve_value_fields(
@@ -118,7 +132,18 @@ def resolve_value_fields(
     Fixed-type discounts are priced per country and currency, resolved from
     the agreement scope. A percentage is country-agnostic — its row carries
     the bare value, mirroring how Adobe reports open percentage discounts.
+    Either way the row carries the customer the closed code targets, so the
+    same code holds its own value for every customer that holds it.
     """
+    value_fields = _priced_value_fields(scope, code, body)
+    value_fields["target_customer_id"] = scope.customer_id
+    return value_fields
+
+
+def _priced_value_fields(
+    scope: DiscountScope, code: str, body: DiscountCodeUpdateRequest
+) -> dict[str, Any]:
+    """Build the value row's code, segment and amount, priced per country for fixed types."""
     if body.discount_type is DiscountType.PERCENTAGE:
         return discount_mapping.build_value_fields(
             code, scope.market_segment, None, None, body.amount
@@ -160,12 +185,14 @@ async def serialize_page(
     codes = [discount_mapping.record_code(record) for record in page]
     if redemptions is None:
         value_records, redemption_records = await asyncio.gather(
-            store_call(store.list_values, codes, scope.market_segment),
+            store_call(store.list_values, codes, scope.market_segment, scope.customer_id),
             store_call(store.list_redemptions, codes, scope.customer_id),
         )
         redemptions = discount_mapping.redemptions_by_code(redemption_records)
     else:
-        value_records = await store_call(store.list_values, codes, scope.market_segment)
+        value_records = await store_call(
+            store.list_values, codes, scope.market_segment, scope.customer_id
+        )
     values_by_code = discount_mapping.group_values(value_records)
     return [
         discount_mapping.to_api_payload(

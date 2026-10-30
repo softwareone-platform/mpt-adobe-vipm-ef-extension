@@ -116,14 +116,18 @@ def test_get_code_reraises_http_errors_without_response(mocker, table, store):
         store.get_code("rec1")
 
 
-def test_find_code_queries_by_code_and_segment(api, table, store):
-    table.first.return_value = {"id": "rec1", "fields": {}}
+def test_find_codes_returns_every_row_of_the_code_in_the_segment(api, table, store):
+    rows = [
+        {"id": "rec1", "fields": {"source": "API"}},
+        {"id": "rec2", "fields": {"source": "Operations"}},
+    ]
+    table.all.return_value = rows
 
-    result = store.find_code("SUMMER25", _MARKET_SEGMENT)
+    result = store.find_codes("SUMMER25", _MARKET_SEGMENT)
 
-    assert result == {"id": "rec1", "fields": {}}
+    assert result == rows
     api.return_value.table.assert_called_once_with(_BASE_ID, CODES_TABLE)
-    table.first.assert_called_once_with(
+    table.all.assert_called_once_with(
         formula=AND(
             EQ(Field("Code"), "SUMMER25"),
             EQ(Field("market_segment"), _MARKET_SEGMENT),
@@ -183,16 +187,16 @@ def test_update_code_updates_row_with_typecast(table, store):
 
 
 def test_list_values_returns_empty_without_codes(api, store):
-    result = store.list_values([], _MARKET_SEGMENT)
+    result = store.list_values([], _MARKET_SEGMENT, _CUSTOMER_ID)
 
     assert result == []
     api.return_value.table.assert_not_called()
 
 
-def test_list_values_queries_rows_for_codes(api, table, store):
+def test_list_values_queries_the_open_and_customer_rows_for_codes(api, table, store):
     table.all.return_value = [{"id": "recVal1", "fields": {}}]
 
-    result = store.list_values(["SUMMER25", "WINTER10"], _MARKET_SEGMENT)
+    result = store.list_values(["SUMMER25", "WINTER10"], _MARKET_SEGMENT, _CUSTOMER_ID)
 
     assert result == [{"id": "recVal1", "fields": {}}]
     api.return_value.table.assert_called_once_with(_BASE_ID, VALUES_TABLE)
@@ -203,22 +207,27 @@ def test_list_values_queries_rows_for_codes(api, table, store):
                 EQ(Field("code"), "SUMMER25"),
                 EQ(Field("code"), "WINTER10"),
             ),
+            OR(
+                EQ(Field("target_customer_id"), BLANK()),
+                EQ(Field("target_customer_id"), _CUSTOMER_ID),
+            ),
         )
     )
 
 
-def test_replace_value_creates_before_deleting_existing_rows(table, store):
+def test_replace_value_creates_before_deleting_the_customer_rows(table, store):
     table.all.return_value = [
         {"id": "recVal1", "fields": {}},
         {"id": "recVal2", "fields": {}},
     ]
 
-    store.replace_value("SUMMER25", _MARKET_SEGMENT, {"value": 20})  # act
+    store.replace_value("SUMMER25", _MARKET_SEGMENT, _CUSTOMER_ID, {"value": 20})  # act
 
     table.all.assert_called_once_with(
         formula=AND(
             EQ(Field("code"), "SUMMER25"),
             EQ(Field("market_segment"), _MARKET_SEGMENT),
+            EQ(Field("target_customer_id"), _CUSTOMER_ID),
         )
     )
     table.create.assert_called_once_with({"value": 20}, typecast=True)
@@ -230,13 +239,13 @@ def test_replace_value_creates_before_deleting_existing_rows(table, store):
 def test_replace_value_only_creates_when_no_rows_exist(table, store):
     table.all.return_value = []
 
-    store.replace_value("SUMMER25", _MARKET_SEGMENT, {"value": 20})  # act
+    store.replace_value("SUMMER25", _MARKET_SEGMENT, _CUSTOMER_ID, {"value": 20})  # act
 
     table.batch_delete.assert_not_called()
     table.create.assert_called_once_with({"value": 20}, typecast=True)
 
 
-def test_replace_country_value_creates_before_deleting_existing_rows(table, store):
+def test_replace_country_value_creates_before_deleting_the_open_rows(table, store):
     table.all.return_value = [{"id": "recVal1", "fields": {}}]
 
     store.replace_country_value("SUMMER25", _MARKET_SEGMENT, "US", {"value": 20})  # act
@@ -246,6 +255,7 @@ def test_replace_country_value_creates_before_deleting_existing_rows(table, stor
             EQ(Field("code"), "SUMMER25"),
             EQ(Field("market_segment"), _MARKET_SEGMENT),
             EQ(Field("country"), "US"),
+            EQ(Field("target_customer_id"), BLANK()),
         )
     )
     table.create.assert_called_once_with({"value": 20}, typecast=True)
@@ -273,6 +283,7 @@ def test_replace_country_value_matches_blank_country_rows_without_country(table,
             EQ(Field("code"), "SUMMER25"),
             EQ(Field("market_segment"), _MARKET_SEGMENT),
             EQ(Field("country"), BLANK()),
+            EQ(Field("target_customer_id"), BLANK()),
         )
     )
     table.create.assert_called_once_with({"value": 20}, typecast=True)
