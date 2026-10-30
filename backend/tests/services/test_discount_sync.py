@@ -116,7 +116,7 @@ def region_mapping(mocker):
 @pytest.fixture
 def store(mocker):
     fake_store = mocker.Mock()
-    fake_store.find_code.return_value = None
+    fake_store.find_codes.return_value = []
     fake_store.list_open_codes.return_value = []
     store_class = mocker.patch("mpt_adobe_vipm_ef.services.discount_sync.DiscountStore")
     store_class.from_settings.return_value = fake_store
@@ -187,7 +187,7 @@ async def test_sync_writes_the_per_country_values(ctx, store, adobe_client):
 
 
 async def test_sync_updates_existing_open_rows(ctx, store, adobe_client, code_record_factory):
-    store.find_code.return_value = code_record_factory(source="API")
+    store.find_codes.return_value = [code_record_factory(source="API")]
 
     await discount_sync.sync_open_discounts(ctx)
 
@@ -205,13 +205,33 @@ async def test_sync_updates_existing_open_rows(ctx, store, adobe_client, code_re
 async def test_sync_never_touches_closed_rows_sharing_the_code(
     ctx, store, adobe_client, code_record_factory, closed_source
 ):
-    store.find_code.return_value = code_record_factory(source=closed_source)
+    store.find_codes.return_value = [
+        code_record_factory(source=closed_source, target_customer_id="CUST-001"),
+        code_record_factory(source=closed_source, target_customer_id="CUST-002"),
+    ]
 
     await discount_sync.sync_open_discounts(ctx)
 
     store.create_code.assert_not_called()
     store.update_code.assert_not_called()
     store.replace_country_value.assert_not_called()
+
+
+async def test_sync_updates_the_open_row_among_the_closed_rows_sharing_the_code(
+    ctx, store, adobe_client, code_record_factory
+):
+    open_row = {**code_record_factory(source="API", target_customer_id=None), "id": "recOpen"}
+    store.find_codes.return_value = [
+        code_record_factory(source="Operations", target_customer_id="CUST-001"),
+        open_row,
+        code_record_factory(source="Vendor", target_customer_id="CUST-002"),
+    ]
+
+    await discount_sync.sync_open_discounts(ctx)
+
+    store.create_code.assert_not_called()
+    assert {update.args[0] for update in store.update_code.call_args_list} == {"recOpen"}
+    assert store.replace_country_value.call_count == len(_SEGMENTS)
 
 
 async def test_sync_skips_authorizations_without_adobe_credentials(
@@ -383,9 +403,9 @@ async def test_sync_un_retires_a_code_adobe_reports_as_usable_again(
     discount = _flex_discount()
     discount["endDate"] = "2999-12-31T23:59:59Z"
     adobe_client.discount.list_flex_discounts.return_value = [discount]
-    store.find_code.return_value = code_record_factory(
-        source="API", retired_at="2026-07-01T00:00:00Z"
-    )
+    store.find_codes.return_value = [
+        code_record_factory(source="API", retired_at="2026-07-01T00:00:00Z")
+    ]
 
     await discount_sync.sync_open_discounts(ctx)
 
@@ -423,8 +443,9 @@ class FakeCodeStore:
         self.by_id = {row["id"]: row for row in self.rows.values()}
         self.updates = []
 
-    def find_code(self, code, market_segment):
-        return self.rows.get((code, market_segment))
+    def find_codes(self, code, market_segment):
+        record = self.rows.get((code, market_segment))
+        return [] if record is None else [record]
 
     def create_code(self, fields):
         segment = fields["market_segment"]

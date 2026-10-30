@@ -1,10 +1,12 @@
 """Airtable-backed data store for discount code management (Discount Management TDR).
 
 The extension keeps a local copy of the Adobe flexible discount catalogue in an
-Airtable base with three tables: ``Discount Codes`` (one row per code, open and
-closed), ``Discount Values`` (one amount per country for fixed types, a single
-country-less row for percentages) and ``Discount Redemptions``
-(one row per code redeemed by a customer). This module wraps the Airtable API
+Airtable base with three tables: ``Discount Codes`` (open codes keyed by
+``(code, market_segment)``, closed codes by ``(code, market_segment,
+target_customer_id)``), ``Discount Values`` (one amount per country for fixed
+types, a single country-less row for percentages; a closed code's rows carry
+its ``target_customer_id``, an open code's leave it blank) and ``Discount
+Redemptions`` (one row per code redeemed by a customer). This module wraps the Airtable API
 with the queries the discount-codes endpoints need; all methods are synchronous
 and callers run them in a thread.
 """
@@ -96,13 +98,17 @@ class DiscountStore:
                 return None
             raise
 
-    def find_code(self, code: str, market_segment: str) -> AirtableRecord | None:
-        """Return the code row keyed by ``(code, market_segment)``, or None."""
+    def find_codes(self, code: str, market_segment: str) -> list[AirtableRecord]:
+        """Return every row of the code in the segment, retired ones included.
+
+        The segment holds at most one open row per code, but one closed row per
+        customer the code targets.
+        """
         formula = AND(
             EQ(Field(CODE_FIELD), code),
             EQ(Field("market_segment"), market_segment),
         )
-        return self._table(CODES_TABLE).first(formula=formula)
+        return self._table(CODES_TABLE).all(formula=formula)
 
     def list_open_codes(self) -> list[AirtableRecord]:
         """Return the open (sync-owned) code rows still in scope.
@@ -133,22 +139,39 @@ class DiscountStore:
         """Update an existing code row."""
         return self._table(CODES_TABLE).update(record_id, fields, typecast=True)
 
-    def list_values(self, codes: list[str], market_segment: str) -> list[AirtableRecord]:
-        """Return the per-country value rows for the given codes."""
+    def list_values(
+        self, codes: list[str], market_segment: str, customer_id: str
+    ) -> list[AirtableRecord]:
+        """Return the per-country value rows of the given codes visible to the customer.
+
+        Open codes' rows (blank ``target_customer_id``) are visible to every
+        customer of the segment; closed codes' rows only to the customer they
+        target, so another customer's value of the same code is left out.
+        """
         if not codes:
             return []
         formula = AND(
             EQ(Field("market_segment"), market_segment),
             _any_equals("code", codes),
+            OR(
+                EQ(Field("target_customer_id"), BLANK()),
+                EQ(Field("target_customer_id"), customer_id),
+            ),
         )
         return self._table(VALUES_TABLE).all(formula=formula)
 
-    def replace_value(self, code: str, market_segment: str, fields: dict[str, Any]) -> None:
-        """Rewrite the value rows of a closed code with a single fresh row."""
+    def replace_value(
+        self, code: str, market_segment: str, customer_id: str, fields: dict[str, Any]
+    ) -> None:
+        """Rewrite the value rows of a customer's closed code with a single fresh row.
+
+        The rows of the same code held by other customers are preserved.
+        """
         values_table = self._table(VALUES_TABLE)
         formula = AND(
             EQ(Field("code"), code),
             EQ(Field("market_segment"), market_segment),
+            EQ(Field("target_customer_id"), customer_id),
         )
         existing = values_table.all(formula=formula)
         values_table.create(fields, typecast=True)
@@ -162,18 +185,21 @@ class DiscountStore:
         country: str | None,
         fields: dict[str, Any],
     ) -> None:
-        """Rewrite the value rows of a code for one country with a single fresh row.
+        """Rewrite the value rows of an open code for one country with a single fresh row.
 
         The Adobe synchronization stores one row per country, so unlike
         :meth:`replace_value` the rows of the other countries are preserved.
         A country-agnostic (percentage) value passes no country and lands on
-        the single blank-country row.
+        the single blank-country row. Only open rows (blank
+        ``target_customer_id``) are matched: closed rows of the same code keep
+        their values.
         """
         values_table = self._table(VALUES_TABLE)
         formula = AND(
             EQ(Field("code"), code),
             EQ(Field("market_segment"), market_segment),
             EQ(Field("country"), country or BLANK()),
+            EQ(Field("target_customer_id"), BLANK()),
         )
         existing = values_table.all(formula=formula)
         values_table.create(fields, typecast=True)

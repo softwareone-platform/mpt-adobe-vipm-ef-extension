@@ -40,11 +40,11 @@ def _agreement_payload():
     }
 
 
-def _scope(payload):
+def _scope(payload, customer_id=_CUSTOMER_ID):
     return DiscountScope(
         agreement=Agreement.from_payload(payload),
         market_segment=_MARKET_SEGMENT,
-        customer_id=_CUSTOMER_ID,
+        customer_id=customer_id,
     )
 
 
@@ -95,6 +95,7 @@ def test_resolve_value_fields_builds_row_from_scope():
         "country": "US",
         "currency": "USD",
         "value": 20,
+        "target_customer_id": _CUSTOMER_ID,
     }
 
 
@@ -107,6 +108,7 @@ def test_resolve_value_fields_percentage_is_country_agnostic():
         "code": _CODE,
         "market_segment": _MARKET_SEGMENT,
         "value": 20,
+        "target_customer_id": _CUSTOMER_ID,
     }
 
 
@@ -120,6 +122,7 @@ def test_resolve_value_fields_percentage_needs_no_licensee_country():
         "code": _CODE,
         "market_segment": _MARKET_SEGMENT,
         "value": 20,
+        "target_customer_id": _CUSTOMER_ID,
     }
 
 
@@ -184,11 +187,23 @@ async def test_guard_code_creation_allows_distinct_pairs_concurrently():
     assert entered is True
 
 
+async def test_guard_code_creation_allows_distinct_customers_of_one_code_concurrently():
+    inside = asyncio.Event()
+
+    _, entered = await asyncio.gather(
+        _hold_code(_scope(_agreement_payload()), inside, _CODE),
+        _enter_after(_scope(_agreement_payload(), customer_id="CUST-002"), inside, _CODE),
+    )
+
+    assert entered is True
+
+
 async def test_guard_code_creation_cleans_up_registry():
     scope = _scope(_agreement_payload())
+    key = (_CODE, _MARKET_SEGMENT, _CUSTOMER_ID)
 
     async with discount_codes.guard_code_creation(scope, _CODE):
-        assert (_CODE, _MARKET_SEGMENT) in discount_codes._create_locks
+        assert key in discount_codes._create_locks
 
-    assert (_CODE, _MARKET_SEGMENT) not in discount_codes._create_locks
-    assert (_CODE, _MARKET_SEGMENT) not in discount_codes._create_lock_waiters
+    assert key not in discount_codes._create_locks
+    assert key not in discount_codes._create_lock_waiters
