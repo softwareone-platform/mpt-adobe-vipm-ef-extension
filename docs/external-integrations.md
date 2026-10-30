@@ -75,10 +75,13 @@ included in the renewal. Next waits only while the lookup is in flight.
 
 The Airtable discount store (`EXT_AIRTABLE_DISCOUNTS_ID`) holds three tables:
 
-- **Discount Codes** — one row per code (open and closed), keyed by
-  `(code, market_segment)`; carries the code attributes (name, description,
-  dates, reusability, target/qualifying offer IDs, enrichment status)
-- **Discount Values** — per-country discount amount rows, linked to the code row
+- **Discount Codes** — one row per code: open codes keyed by
+  `(code, market_segment)`, closed codes by
+  `(code, market_segment, target_customer_id)`; carries the code attributes
+  (name, description, dates, reusability, target/qualifying offer IDs,
+  enrichment status)
+- **Discount Values** — per-country discount amount rows of a code; a closed
+  code's rows carry its `target_customer_id`, an open code's leave it blank
 - **Discount Redemptions** — one row per code redeemed by a customer, tracking
   when the code was first applied
 
@@ -91,7 +94,8 @@ codes atomically:
 3. Closed codes (`source = "Operations"`, `"Vendor"` or `"Client"`, or the
    legacy `"Ops/Vendor"` on rows authored before the split) are never
    overwritten by the sync
-4. Per-country values are replaced atomically (one row per country)
+4. Per-country values are replaced atomically (one row per country), touching
+   only the open rows (blank `target_customer_id`)
 
 Every run then closes with an expiry review of the stored open rows, so the
 store keeps up with codes whose window has moved or that Adobe has dropped from

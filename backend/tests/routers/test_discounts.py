@@ -28,6 +28,7 @@ _FAKE_JWT = "fake-token"
 _AGREEMENT_ID = "AGR-1234-5678"
 _PRODUCT_ID = "PRD-1111-1111"
 _CUSTOMER_ID = "CUST-001"
+_OTHER_CUSTOMER_ID = "CUST-002"
 _RECORD_ID = "rec123"
 _TARGET_OFFER_ID = "65322651CA02A12"
 
@@ -145,7 +146,7 @@ def fake_store(mocker, code_record_factory):
     store = mocker.Mock()
     store.list_codes.return_value = [code_record_factory()]
     store.get_code.return_value = code_record_factory()
-    store.find_code.return_value = None
+    store.find_codes.return_value = []
     store.create_code.return_value = code_record_factory()
     store.update_code.return_value = code_record_factory()
     store.replace_value.return_value = None
@@ -174,6 +175,7 @@ async def test_list_returns_paginated_codes_with_values(agreement, fake_store):
     assert result.payload[0]["code"] == "SUMMER25"
     assert result.payload[0]["values"] == expected_values
     fake_store.list_codes.assert_called_once_with("COM", _CUSTOMER_ID)
+    fake_store.list_values.assert_called_once_with(["SUMMER25"], "COM", _CUSTOMER_ID)
 
 
 @freeze_time("2026-07-21T12:00:00Z")
@@ -530,12 +532,44 @@ async def test_create_rejects_client_accounts(agreement, fake_store):
         await create_discount_code(ctx=ctx, body=_create_body())
 
 
-async def test_create_rejects_duplicate_codes(agreement, fake_store, code_record_factory):
+@pytest.mark.parametrize(
+    "existing_fields",
+    [
+        {"source": "Operations", "target_customer_id": _CUSTOMER_ID},
+        {"source": "API", "target_customer_id": None},
+        {"source": "API", "target_customer_id": None, "retired_at": "2026-07-01T00:00:00Z"},
+    ],
+)
+async def test_create_rejects_duplicate_codes(
+    agreement, fake_store, code_record_factory, existing_fields
+):
     ctx = FakeDiscountContext(agreement)
-    fake_store.find_code.return_value = code_record_factory()
+    fake_store.find_codes.return_value = [code_record_factory(**existing_fields)]
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError) as error:
         await create_discount_code(ctx=ctx, body=_create_body())
+
+    assert error.value.errors[0].detail == "Duplicate code."
+    fake_store.find_codes.assert_called_once_with("SUMMER25", "COM")
+    fake_store.create_code.assert_not_called()
+    fake_store.replace_value.assert_not_called()
+
+
+async def test_create_allows_a_closed_code_another_customer_holds(
+    agreement, fake_store, code_record_factory
+):
+    ctx = FakeDiscountContext(agreement)
+    fake_store.find_codes.return_value = [
+        code_record_factory(source="Operations", target_customer_id=_OTHER_CUSTOMER_ID),
+    ]
+
+    result = await create_discount_code(ctx=ctx, body=_create_body())
+
+    assert result.status_code == http.HTTPStatus.CREATED
+    created_fields = fake_store.create_code.call_args.args[0]
+    assert created_fields["target_customer_id"] == _CUSTOMER_ID
+    replace_args = fake_store.replace_value.call_args.args
+    assert replace_args[:3] == ("SUMMER25", "COM", _CUSTOMER_ID)
 
 
 async def test_create_returns_created_payload(agreement, fake_store):
@@ -560,10 +594,13 @@ async def test_create_stores_code_and_value_row(agreement, fake_store):
         "code": "SUMMER25",
         "market_segment": "COM",
         "value": 20,
+        "target_customer_id": _CUSTOMER_ID,
     }
     assert created_fields["market_segment"] == "COM"
     assert created_fields["target_customer_id"] == _CUSTOMER_ID
-    fake_store.replace_value.assert_called_once_with("SUMMER25", "COM", expected_value_fields)
+    fake_store.replace_value.assert_called_once_with(
+        "SUMMER25", "COM", _CUSTOMER_ID, expected_value_fields
+    )
 
 
 @pytest.mark.parametrize(
@@ -621,7 +658,9 @@ async def test_update_rewrites_code_and_value_rows(agreement, fake_store):
     updated_fields = fake_store.update_code.call_args.args[1]
     assert updated_fields["name"] == "Summer 2025 v2"
     assert "Code" not in updated_fields
-    fake_store.replace_value.assert_called_once()
+    replace_args = fake_store.replace_value.call_args.args
+    assert replace_args[:3] == ("SUMMER25", "COM", _CUSTOMER_ID)
+    assert replace_args[3]["target_customer_id"] == _CUSTOMER_ID
 
 
 async def test_delete_soft_deletes_closed_code(agreement, fake_store):

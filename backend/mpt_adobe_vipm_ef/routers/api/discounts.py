@@ -88,7 +88,9 @@ async def _exclude_out_of_country(
     if not scope.country:
         return records
     codes = [discount_mapping.record_code(record) for record in records]
-    value_records = await store_call(store.list_values, codes, scope.market_segment)
+    value_records = await store_call(
+        store.list_values, codes, scope.market_segment, scope.customer_id
+    )
     return discount_mapping.exclude_out_of_country(
         records, value_records, scope.country, scope.currency
     )
@@ -130,7 +132,9 @@ async def create_discount_code(  # noqa: WPS210
                 body, scope.market_segment, scope.customer_id, now, source
             ),
         )
-        await store_call(store.replace_value, body.code, scope.market_segment, value_fields)
+        await store_call(
+            store.replace_value, body.code, scope.market_segment, scope.customer_id, value_fields
+        )
     payload = discount_mapping.to_api_payload(record, [value_entry(value_fields)], None)
     return APIResponse.created(payload=payload)
 
@@ -157,7 +161,9 @@ async def update_discount_code(  # noqa: WPS210
     updated = await store_call(
         store.update_code, record["id"], discount_mapping.build_update_fields(body, now)
     )
-    await store_call(store.replace_value, code, scope.market_segment, value_fields)
+    await store_call(
+        store.replace_value, code, scope.market_segment, scope.customer_id, value_fields
+    )
     payload = discount_mapping.to_api_payload(updated, [value_entry(value_fields)], None)
     return APIResponse.ok(payload=payload)
 
