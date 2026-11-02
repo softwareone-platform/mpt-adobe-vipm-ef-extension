@@ -31,7 +31,7 @@ const NAVIGATION: StepNavigationProperties = {
   steps: [],
 } as unknown as StepNavigationProperties;
 
-function renderStep(overrides: Partial<DiscountDraft> = {}) {
+function renderStep(overrides: Partial<DiscountDraft> = {}, submitError?: string) {
   const updateDraft = jest.fn();
   const draft: DiscountDraft = {
     ...EMPTY_DRAFT,
@@ -49,6 +49,7 @@ function renderStep(overrides: Partial<DiscountDraft> = {}) {
       updateDraft={updateDraft}
       customerId="1005847693"
       segment="Commercial"
+      submitError={submitError}
     />,
   );
 
@@ -145,5 +146,13 @@ describe("DefinitionStep", () => {
 
     expect(target).toBe(NAVIGATION.targetStepIndex);
     expect(screen.queryByTestId("validation-error")).not.toBeInTheDocument();
+  });
+
+  it("shows why the last Save failed", () => {
+    renderStep({}, "Request failed with status code 500");
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent(
+      "Request failed with status code 500",
+    );
   });
 });

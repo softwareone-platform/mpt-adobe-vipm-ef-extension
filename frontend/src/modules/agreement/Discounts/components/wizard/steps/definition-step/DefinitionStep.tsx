@@ -1,4 +1,5 @@
 import { Input } from "@softwareone-platform/sdk-react-ui-v0/input";
+import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import { useCallback, useEffect } from "react";
@@ -44,6 +45,8 @@ export interface DefinitionStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /** Edit mode only: why the last Save failed, a rule of another step or the API. */
+  submitError?: string;
   /**
    * Edit mode only: saves and closes instead of advancing. It has to run from
    * here rather than the step's `nextButton.onAction`, which the SDK ignores
@@ -63,6 +66,7 @@ export function DefinitionStep({
   updateDraft,
   customerId,
   segment,
+  submitError = "",
   onSave,
   isCodeLocked = false,
 }: DefinitionStepProps) {
@@ -99,6 +103,12 @@ export function DefinitionStep({
           })}
         </RegularText>
       </header>
+
+      {submitError && (
+        <InlineNotification status="error">
+          {submitError}
+        </InlineNotification>
+      )}
 
       <div className="wizard-step__fields">
         <Input

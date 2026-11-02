@@ -335,3 +335,31 @@ export function validateReviewFields(draft: DiscountDraft): DiscountFieldErrors 
 export function validateReview(draft: DiscountDraft): string | null {
   return firstMessage(validateReviewFields(draft), REVIEW_ORDER);
 }
+
+export type DiscountStep = "definition" | "validity" | "scope";
+
+const FIELD_STEP: Record<DiscountField, DiscountStep> = {
+  code: "definition",
+  name: "definition",
+  category: "definition",
+  discountType: "definition",
+  value: "definition",
+  // The value row needs it, so it belongs with the type and the value.
+  currency: "definition",
+  startDate: "validity",
+  endDate: "validity",
+  discountLockEndDate: "validity",
+  targetItems: "scope",
+  prerequisiteItems: "scope",
+  applicableOrderTypes: "scope",
+};
+
+/**
+ * The step holding the rule `validateReview` reports first, or null when the
+ * draft is valid, so a Save that fails on one step can open the one at fault.
+ */
+export function firstInvalidStep(draft: DiscountDraft): DiscountStep | null {
+  const errors = validateReviewFields(draft);
+  const field = REVIEW_ORDER.find((name) => errors[name]);
+  return field ? FIELD_STEP[field] : null;
+}
