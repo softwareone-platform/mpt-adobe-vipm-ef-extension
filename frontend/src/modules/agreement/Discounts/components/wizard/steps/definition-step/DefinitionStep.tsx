@@ -1,10 +1,11 @@
 import { Input } from "@softwareone-platform/sdk-react-ui-v0/input";
-import { Select } from "@softwareone-platform/sdk-react-ui-v0/select";
+import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { SingleSelectDropdown } from "../../components/single-select-dropdown/SingleSelectDropdown";
 import { i18n } from "../../../../../../../i18n/translations";
 import { MAX_TEXT_LENGTH, validateDefinitionFields } from "../../discountValidation";
 import { useFieldErrors } from "../../useFieldErrors";
@@ -44,6 +45,8 @@ export interface DefinitionStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /** Edit mode only: why the last Save failed, a rule of another step or the API. */
+  submitError?: string;
   /**
    * Edit mode only: saves and closes instead of advancing. It has to run from
    * here rather than the step's `nextButton.onAction`, which the SDK ignores
@@ -63,6 +66,7 @@ export function DefinitionStep({
   updateDraft,
   customerId,
   segment,
+  submitError = "",
   onSave,
   isCodeLocked = false,
 }: DefinitionStepProps) {
@@ -99,6 +103,12 @@ export function DefinitionStep({
           })}
         </RegularText>
       </header>
+
+      {submitError && (
+        <InlineNotification status="error">
+          {submitError}
+        </InlineNotification>
+      )}
 
       <div className="wizard-step__fields">
         <Input
@@ -146,9 +156,8 @@ export function DefinitionStep({
           value={draft.description}
         />
 
-        <Select
+        <SingleSelectDropdown
           controlLabel={t("Agreement:Discounts:Wizard:Fields:Category")}
-          cssPosition="fixed"
           errorMessage={errors.category}
           name="category"
           onChange={(value: string) => editField({ category: value as DiscountCategory })}
@@ -159,10 +168,9 @@ export function DefinitionStep({
         />
 
         <div className="definition-step__value-row">
-          <Select
+          <SingleSelectDropdown
             className="definition-step__discount-type"
             controlLabel={t("Agreement:Discounts:Wizard:Fields:DiscountType")}
-            cssPosition="fixed"
             errorMessage={errors.discountType}
             name="discountType"
             onChange={(value: string) => editField({ discountType: value as DiscountType })}

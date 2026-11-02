@@ -33,6 +33,7 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    @extend %regular2;
 
     &--placeholder {
       color: $var-gray-4;
@@ -44,6 +45,7 @@
     align-items: center;
     padding: 4px $var-spacing-2;
     cursor: pointer;
+    @extend %regular2;
 
     &:hover {
       background-color: $var-gray-2;

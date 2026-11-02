@@ -1,5 +1,6 @@
 import { Checkbox } from "@softwareone-platform/sdk-react-ui-v0/checkbox";
 import { DatePicker } from "@softwareone-platform/sdk-react-ui-v0/date-picker";
+import { InlineNotification } from "@softwareone-platform/sdk-react-ui-v0/notification";
 import { MediumText, RegularText } from "@softwareone-platform/sdk-react-ui-v0/text";
 import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import { useCallback, useEffect } from "react";
@@ -21,6 +22,8 @@ export interface ValidityStepProps {
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /** Edit mode only: why the last Save failed, a rule of another step or the API. */
+  submitError?: string;
   /** Edit mode only: saves and closes instead of advancing. */
   onSave?: () => Promise<number>;
 }
@@ -30,6 +33,7 @@ export function ValidityStep({
   updateDraft,
   customerId,
   segment,
+  submitError = "",
   onSave,
 }: ValidityStepProps) {
   const { t } = useTranslation();
@@ -63,6 +67,12 @@ export function ValidityStep({
           })}
         </RegularText>
       </header>
+
+      {submitError && (
+        <InlineNotification status="error">
+          {submitError}
+        </InlineNotification>
+      )}
 
       <div className="wizard-step__fields">
         <fieldset className="validity-step__period">
