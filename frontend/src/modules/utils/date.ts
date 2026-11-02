@@ -34,6 +34,30 @@ export function formatDateOnly(value?: string | null): string | undefined {
   return value ? value.slice(0, 10) : undefined;
 }
 
+/**
+ * The SDK DatePicker reads a string value with `new Date`, which takes a bare
+ * `YYYY-MM-DD` as UTC midnight (the day before, west of UTC). Adding a time
+ * without an offset makes it the local midnight of that day instead.
+ */
+export function toPickerValue(day: string): string {
+  return DATE_ONLY.test(day) ? `${day}T00:00:00` : day;
+}
+
+/**
+ * The SDK DatePicker emits the picked day's local midnight as a UTC instant
+ * (`toISOString`), which falls on the day before east of UTC. Reading it back
+ * in local time recovers the picked day as `YYYY-MM-DD`.
+ */
+export function toCalendarDay(value: string): string {
+  const date = new Date(value);
+  if (!value || DATE_ONLY.test(value) || Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }

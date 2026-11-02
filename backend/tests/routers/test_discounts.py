@@ -64,8 +64,8 @@ def _body_payload(**overrides):
         "category": "STANDARD",
         "discountType": "PERCENTAGE",
         "value": 20,
-        "startDate": "2026-06-01T00:00:00Z",
-        "endDate": "2026-08-31T23:59:59Z",
+        "startDate": "2026-06-01",
+        "endDate": "2026-08-31",
         "targetOfferIds": [_TARGET_OFFER_ID],
         "applicableOrderTypes": ["RENEWAL"],
     }
