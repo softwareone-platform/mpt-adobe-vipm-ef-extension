@@ -55,7 +55,7 @@ const LOCK = "2026-12-31";
 
 declare const setTimeZone: (timeZone: string | undefined) => void;
 
-function renderStep(overrides: Partial<DiscountDraft> = {}) {
+function renderStep(overrides: Partial<DiscountDraft> = {}, submitError?: string) {
   const updateDraft = jest.fn();
   const draft: DiscountDraft = {
     ...EMPTY_DRAFT,
@@ -70,6 +70,7 @@ function renderStep(overrides: Partial<DiscountDraft> = {}) {
       updateDraft={updateDraft}
       customerId="1005847693"
       segment="Commercial"
+      submitError={submitError}
     />,
   );
 
@@ -280,5 +281,19 @@ describe("ValidityStep", () => {
     const target = await runNext();
 
     expect(target).toBe(NAVIGATION.targetStepIndex);
+  });
+
+  it("shows why the last Save failed", () => {
+    renderStep({}, "Request failed with status code 500");
+
+    expect(screen.getByTestId("validation-error")).toHaveTextContent(
+      "Request failed with status code 500",
+    );
+  });
+
+  it("shows no banner while no Save has failed", () => {
+    renderStep();
+
+    expect(screen.queryByTestId("validation-error")).not.toBeInTheDocument();
   });
 });

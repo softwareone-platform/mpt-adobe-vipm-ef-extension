@@ -11,8 +11,14 @@ import {
   toDraft,
   toUpdatePayload,
 } from '../agreement/Discounts/components/wizard/discountDraft';
-import { validateReview } from '../agreement/Discounts/components/wizard/discountValidation';
-import { editSteps } from '../agreement/Discounts/components/wizard/editSteps';
+import {
+  firstInvalidStep,
+  validateReview,
+} from '../agreement/Discounts/components/wizard/discountValidation';
+import {
+  EDIT_STEP_INDEX,
+  editSteps,
+} from '../agreement/Discounts/components/wizard/editSteps';
 import { useAdobeCustomer } from '../shared/hooks/useAdobeCustomer';
 import { useAgreementId } from '../shared/hooks/useAgreementId';
 import { useCreateDiscountRequest } from '../shared/hooks/useCreateDiscountRequest';
@@ -20,6 +26,7 @@ import { useDiscountById } from '../shared/hooks/useDiscountById';
 import { useSettings } from '../shared/hooks/useSettings';
 import { canManageDiscountCodes } from '../utils/security';
 import { getProduct } from '../utils/settings';
+import { scrollStepToTop } from '../utils/window';
 
 import type { DiscountDraft } from '../agreement/Discounts/components/wizard/discountDraft';
 import type { Discount } from '../shared/model';
@@ -143,6 +150,13 @@ export default function App() {
     const invalid = validateReview(draft);
     setValidationError(invalid ?? '');
     if (invalid) {
+      // The step that ran Save already passed its own rules, so the broken one
+      // lives on another step: open it, so the banner shows where the fix goes.
+      const step = firstInvalidStep(draft);
+      if (step) {
+        setActiveStepIndex(EDIT_STEP_INDEX[step]);
+        scrollStepToTop();
+      }
       return -1;
     }
     isSaving.current = true;
@@ -156,9 +170,10 @@ export default function App() {
     return -1;
   }, [close, draft, existingDiscount]);
 
-  // Next button fires `onSave` (this callback) directly — `registerOnNextCallback` is bypassed
-  // by the SDK. In create mode the Review step already submitted, so this only
-  // closes with the earlier outcome.
+  // On the last step the SDK fires `onSave` (this callback) right after the
+  // step's `registerOnNextCallback`, whatever that callback returned. In create
+  // mode the Review step already submitted, so this only closes with the
+  // earlier outcome.
   const onFinish = useCallback(async () => {
     if (isEdit) {
       await onEditSave();
