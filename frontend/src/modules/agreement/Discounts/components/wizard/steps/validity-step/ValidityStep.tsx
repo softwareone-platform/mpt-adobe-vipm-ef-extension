@@ -5,6 +5,7 @@ import { useStepActions } from "@softwareone-platform/sdk-react-ui-v0/wizard";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
+import { toCalendarDay, toPickerValue } from "../../../../../../utils/date";
 import { validateValidityFields } from "../../discountValidation";
 import { useFieldErrors } from "../../useFieldErrors";
 
@@ -69,27 +70,29 @@ export function ValidityStep({
             {t("Agreement:Discounts:Wizard:Fields:ValidityPeriod")}
           </legend>
           <div className="validity-step__period-inputs">
+            {/* The draft holds calendar days; the pickers get and give back the
+                local midnight of that day, so no time zone moves the date. */}
             <DatePicker<string>
               errorMessage={errors.startDate}
               name="startDate"
-              onChange={(startDate: string) => editField({ startDate })}
+              onChange={(startDate: string) => editField({ startDate: toCalendarDay(startDate) })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               popoverCssPosition="fixed"
               testId="discount-start-date"
-              value={draft.startDate}
+              value={toPickerValue(draft.startDate)}
               variant={errors.startDate ? "error" : "default"}
             />
             <DatePicker<string>
               errorMessage={errors.endDate}
               // Chaining the bounds makes the ordering rules hard to break in
               // the UI; validateValidity stays the authority.
-              minDate={draft.startDate || undefined}
+              minDate={draft.startDate ? toPickerValue(draft.startDate) : undefined}
               name="endDate"
-              onChange={(endDate: string) => editField({ endDate })}
+              onChange={(endDate: string) => editField({ endDate: toCalendarDay(endDate) })}
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               popoverCssPosition="fixed"
               testId="discount-end-date"
-              value={draft.endDate}
+              value={toPickerValue(draft.endDate)}
               variant={errors.endDate ? "error" : "default"}
             />
           </div>
@@ -120,14 +123,16 @@ export function ValidityStep({
               // Kept mounted but inert when the code is single-use, so the row
               // does not reflow. Any value left here is dropped on serialization.
               isDisabled={!draft.reusable}
-              minDate={draft.endDate || undefined}
+              minDate={draft.endDate ? toPickerValue(draft.endDate) : undefined}
               name="discountLockEndDate"
-              onChange={(discountLockEndDate: string) => editField({ discountLockEndDate })}
+              onChange={(discountLockEndDate: string) =>
+                editField({ discountLockEndDate: toCalendarDay(discountLockEndDate) })
+              }
               placeholder={t("Agreement:Discounts:Wizard:Fields:DatePlaceholder")}
               popoverCssPosition="fixed"
               testId="discount-lock-end-date"
               variant={errors.discountLockEndDate ? "error" : "default"}
-              value={draft.discountLockEndDate}
+              value={toPickerValue(draft.discountLockEndDate)}
             />
           </div>
         </div>

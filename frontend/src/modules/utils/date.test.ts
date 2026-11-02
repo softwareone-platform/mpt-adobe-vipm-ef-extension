@@ -9,6 +9,8 @@ import {
   formatDateOnly,
   formatReviewDate,
   formatTime,
+  toCalendarDay,
+  toPickerValue,
 } from './date';
 
 describe('formatDate', () => {
@@ -118,5 +120,54 @@ describe('formatTime', () => {
     it('returns a dash for invalid calendar dates', () => {
       expect(formatReviewDate('2026-02-30')).toBe(EM_DASH);
     });
+  });
+});
+
+describe('date picker boundary', () => {
+  const browserTimeZone = process.env.TZ;
+
+  afterEach(() => {
+    setTimeZone(browserTimeZone);
+  });
+
+  it.each(['Australia/Perth', 'UTC', 'America/New_York'])(
+    'hands the picker the local midnight of a calendar day in %s',
+    (timeZone) => {
+      setTimeZone(timeZone);
+
+      const shown = new Date(toPickerValue('2026-10-29'));
+
+      expect([shown.getFullYear(), shown.getMonth(), shown.getDate(), shown.getHours()]).toEqual([
+        2026, 9, 29, 0,
+      ]);
+    },
+  );
+
+  it.each([
+    ['Australia/Perth', '2026-10-28T16:00:00.000Z'],
+    ['UTC', '2026-10-29T00:00:00.000Z'],
+    ['America/New_York', '2026-10-29T04:00:00.000Z'],
+  ])('reads the day picked in %s back from the instant %s', (timeZone, emitted) => {
+    setTimeZone(timeZone);
+
+    expect(toCalendarDay(emitted)).toBe('2026-10-29');
+  });
+
+  it.each(['Australia/Perth', 'America/New_York'])(
+    'keeps the day through a round trip in %s',
+    (timeZone) => {
+      setTimeZone(timeZone);
+      const emitted = new Date(toPickerValue('2026-12-31')).toISOString();
+
+      expect(toCalendarDay(emitted)).toBe('2026-12-31');
+    },
+  );
+
+  it.each(['', 'not-a-date'])('passes %p through unchanged', (value) => {
+    expect([toPickerValue(value), toCalendarDay(value)]).toEqual([value, value]);
+  });
+
+  it('keeps a value that is already a calendar day', () => {
+    expect(toCalendarDay('2026-10-29')).toBe('2026-10-29');
   });
 });
