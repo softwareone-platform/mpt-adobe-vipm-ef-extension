@@ -54,8 +54,8 @@ def _update_body(**overrides):
         "category": "STANDARD",
         "discountType": "PERCENTAGE",
         "value": 20,
-        "startDate": "2026-06-01T00:00:00Z",
-        "endDate": "2026-08-31T23:59:59Z",
+        "startDate": "2026-06-01",
+        "endDate": "2026-08-31",
         "targetOfferIds": ["65322651CA02A12"],
         "applicableOrderTypes": ["RENEWAL"],
     }

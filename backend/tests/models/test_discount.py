@@ -1,4 +1,7 @@
+import datetime as dt
+
 import pytest
+from pydantic import ValidationError
 
 from mpt_adobe_vipm_ef.models.discount import (
     DiscountCodeCreateRequest,
@@ -8,6 +11,9 @@ from mpt_adobe_vipm_ef.models.discount import (
 _TARGET_OFFER_ID = "65322651CA02A12"
 _PERCENTAGE_VALUE = 20
 _PERCENTAGE_ABOVE_LIMIT = 101
+_START_DAY = dt.date.fromisoformat("2026-06-01")
+_END_DAY = dt.date.fromisoformat("2026-08-31")
+_LOCK_END_DAY = dt.date.fromisoformat("2026-12-31")
 
 
 def _payload(**overrides):
@@ -17,8 +23,8 @@ def _payload(**overrides):
         "category": "STANDARD",
         "discountType": "PERCENTAGE",
         "value": 20,
-        "startDate": "2026-06-01T00:00:00Z",
-        "endDate": "2026-08-31T23:59:59Z",
+        "startDate": "2026-06-01",
+        "endDate": "2026-08-31",
         "reusable": False,
         "targetOfferIds": [_TARGET_OFFER_ID],
         "applicableOrderTypes": ["RENEWAL"],
@@ -68,7 +74,72 @@ def test_fixed_discount_with_currency_is_accepted():
 
 def test_start_date_must_precede_end_date():
     with pytest.raises(ValueError, match="before the end date"):
-        DiscountCodeUpdateRequest.model_validate(_payload(startDate="2026-09-01T00:00:00Z"))
+        DiscountCodeUpdateRequest.model_validate(_payload(startDate="2026-09-01"))
+
+
+@pytest.mark.parametrize(
+    "dates",
+    [
+        pytest.param({}, id="plain-days"),
+        pytest.param({"endDate": "2026-08-31T00:00:00.000Z"}, id="end-as-timestamp"),
+        pytest.param({"startDate": "2026-06-01T00:00:00Z"}, id="start-as-timestamp"),
+        pytest.param(
+            {"startDate": "2026-06-01T00:00:00.000Z", "endDate": "2026-08-31T00:00:00.000Z"},
+            id="both-as-timestamps",
+        ),
+    ],
+)
+def test_dates_in_any_form_are_read_as_calendar_days(dates):
+    result = DiscountCodeUpdateRequest.model_validate(_payload(**dates))
+
+    assert (result.start_date, result.end_date) == (_START_DAY, _END_DAY)
+
+
+def test_lock_end_date_as_timestamp_with_plain_period_is_read_as_calendar_day():
+    result = DiscountCodeUpdateRequest.model_validate(
+        _payload(reusable=True, discountLockEndDate="2026-12-31T00:00:00.000Z")
+    )
+
+    assert result.discount_lock_end_date == _LOCK_END_DAY
+
+
+@pytest.mark.parametrize(
+    "dates",
+    [
+        pytest.param({"startDate": "2026-05-31T16:00:00.000Z"}, id="start"),
+        pytest.param({"endDate": "2026-08-30T16:00:00.000Z"}, id="end"),
+        pytest.param(
+            {"reusable": True, "discountLockEndDate": "2026-12-30T16:00:00.000Z"},
+            id="lock-end",
+        ),
+    ],
+)
+def test_timestamp_off_midnight_utc_is_rejected(dates):
+    with pytest.raises(ValidationError, match="zero time"):
+        DiscountCodeUpdateRequest.model_validate(_payload(**dates))
+
+
+@pytest.mark.parametrize(
+    ("dates", "message"),
+    [
+        pytest.param(
+            {"startDate": "2026-09-01T00:00:00Z"}, "before the end date", id="start-after-end"
+        ),
+        pytest.param(
+            {"startDate": "2026-08-31", "endDate": "2026-08-31T00:00:00.000Z"},
+            "before the end date",
+            id="start-on-end",
+        ),
+        pytest.param(
+            {"reusable": True, "discountLockEndDate": "2026-08-31T00:00:00.000Z"},
+            "after the end date",
+            id="lock-on-end",
+        ),
+    ],
+)
+def test_date_order_is_enforced_across_mixed_forms(dates, message):
+    with pytest.raises(ValidationError, match=message):
+        DiscountCodeUpdateRequest.model_validate(_payload(**dates))
 
 
 def test_reusable_requires_lock_end_date():
@@ -79,20 +150,20 @@ def test_reusable_requires_lock_end_date():
 def test_non_reusable_rejects_lock_end_date():
     with pytest.raises(ValueError, match="not allowed for non-reusable"):
         DiscountCodeUpdateRequest.model_validate(
-            _payload(reusable=False, discountLockEndDate="2028-03-31T23:59:59Z")
+            _payload(reusable=False, discountLockEndDate="2028-03-31")
         )
 
 
 def test_lock_end_date_must_follow_end_date():
     with pytest.raises(ValueError, match="after the end date"):
         DiscountCodeUpdateRequest.model_validate(
-            _payload(reusable=True, discountLockEndDate="2026-07-01T00:00:00Z")
+            _payload(reusable=True, discountLockEndDate="2026-07-01")
         )
 
 
 def test_lock_end_date_derives_reusability():
     result = DiscountCodeUpdateRequest.model_validate(
-        _payload(reusable=True, discountLockEndDate="2028-03-31T23:59:59Z")
+        _payload(reusable=True, discountLockEndDate="2028-03-31")
     )
 
     assert result.is_reusable is True

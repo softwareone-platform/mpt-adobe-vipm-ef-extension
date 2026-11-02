@@ -25,8 +25,8 @@ def create_body():
         "category": "STANDARD",
         "discountType": "PERCENTAGE",
         "value": 20,
-        "startDate": "2026-06-01T00:00:00Z",
-        "endDate": "2026-08-31T23:59:59Z",
+        "startDate": "2026-06-01",
+        "endDate": "2026-08-31",
         "targetOfferIds": [_TARGET_OFFER_ID],
         "applicableOrderTypes": ["RENEWAL"],
     })
@@ -78,6 +78,29 @@ def test_build_update_fields_serializes_wizard_fields(create_body):
         "updated_at": "2026-07-21T12:00:00+00:00",
     }
     assert "Code" not in result
+
+
+def test_build_update_fields_stores_the_period_as_calendar_days(create_body):
+    result = discount_mapping.build_update_fields(create_body, _NOW)
+
+    stored_dates = {
+        key: result[key] for key in ("start_date", "end_date", "discount_lock_end_date")
+    }
+    assert stored_dates == {
+        "start_date": "2026-06-01",
+        "end_date": "2026-08-31",
+        "discount_lock_end_date": None,
+    }
+
+
+def test_build_update_fields_stores_the_lock_end_date_as_a_calendar_day(create_body):
+    body = create_body.model_copy(
+        update={"reusable": True, "discount_lock_end_date": dt.date.fromisoformat("2026-12-31")}
+    )
+
+    result = discount_mapping.build_update_fields(body, _NOW)
+
+    assert result["discount_lock_end_date"] == "2026-12-31"
 
 
 @pytest.fixture
@@ -220,6 +243,9 @@ def test_build_open_code_fields_never_retires_a_new_row(flex_discount):
         pytest.param({"end_date": "2026-08-31T23:59:59Z"}, False, id="inside-window"),
         pytest.param({"end_date": "2026-07-01T00:00:00Z"}, True, id="past-end-date"),
         pytest.param({"end_date": "2026-07-21T12:00:00Z"}, False, id="ends-right-now"),
+        pytest.param({"end_date": "2026-07-21T11:59:59Z"}, True, id="ended-earlier-today"),
+        pytest.param({"end_date": "2026-07-21"}, False, id="date-only-ends-today"),
+        pytest.param({"end_date": "2026-07-20"}, True, id="date-only-ended-yesterday"),
         pytest.param({"end_date": None}, False, id="no-end-date"),
         pytest.param({"end_date": "not-a-date"}, False, id="unreadable-end-date"),
         pytest.param(
@@ -239,6 +265,16 @@ def test_build_open_code_fields_never_retires_a_new_row(flex_discount):
             },
             True,
             id="reusable-past-lock",
+        ),
+        pytest.param(
+            {"end_date": "2026-06-01", "reusable": True, "discount_lock_end_date": "2026-07-21"},
+            False,
+            id="reusable-date-only-lock-ends-today",
+        ),
+        pytest.param(
+            {"end_date": "2026-06-01", "reusable": True, "discount_lock_end_date": "2026-07-20"},
+            True,
+            id="reusable-date-only-lock-ended-yesterday",
         ),
     ],
 )
@@ -430,6 +466,11 @@ def test_is_offerable_accepts_an_enriched_code(code_record_factory):
     [
         pytest.param({"start_date": "2026-07-21T12:00:00Z"}, id="starts-now"),
         pytest.param({"end_date": "2026-07-21T12:00:00Z"}, id="ends-now"),
+        pytest.param({"end_date": "2026-07-21"}, id="date-only-ends-today"),
+        pytest.param(
+            {"end_date": "2026-06-01", "reusable": True, "discount_lock_end_date": "2026-07-21"},
+            id="date-only-lock-ends-today",
+        ),
     ],
 )
 def test_is_offerable_accepts_the_bounds_of_the_validity_window(
@@ -448,6 +489,7 @@ def test_is_offerable_accepts_the_bounds_of_the_validity_window(
         pytest.param({"applicable_order_types": ["NEW", "SWITCH"]}, id="other-order-types"),
         pytest.param({"start_date": "2026-08-01T00:00:00Z"}, id="not-started"),
         pytest.param({"end_date": "2026-07-01T00:00:00Z"}, id="expired"),
+        pytest.param({"end_date": "2026-07-20"}, id="date-only-expired"),
         pytest.param({"retired_at": "2026-07-01T00:00:00Z"}, id="retired"),
         pytest.param({"enrichment_status": "PENDING"}, id="pending-enrichment"),
     ],
@@ -619,6 +661,47 @@ def test_exclude_redeemed_keeps_a_code_the_customer_has_not_redeemed(code_record
     record = code_record_factory(reusable=False)
 
     result = discount_mapping.exclude_redeemed([record], {})
+
+    assert result == [record]
+
+
+@pytest.mark.parametrize(
+    "end_date",
+    [
+        pytest.param("2026-07-21T12:00:00Z", id="ends-now"),
+        pytest.param("2026-07-21", id="date-only-ends-today"),
+    ],
+)
+def test_exclude_unheld_past_end_date_keeps_a_code_through_its_end(end_date, code_record_factory):
+    record = code_record_factory(end_date=end_date)
+
+    result = discount_mapping.exclude_unheld_past_end_date([record], {}, _NOW)
+
+    assert result == [record]
+
+
+@pytest.mark.parametrize(
+    "end_date",
+    [
+        pytest.param("2026-07-21T11:59:59Z", id="ended-earlier-today"),
+        pytest.param("2026-07-20", id="date-only-ended-yesterday"),
+    ],
+)
+def test_exclude_unheld_past_end_date_drops_an_unheld_code_past_its_end(
+    end_date, code_record_factory
+):
+    record = code_record_factory(end_date=end_date)
+
+    result = discount_mapping.exclude_unheld_past_end_date([record], {}, _NOW)
+
+    assert not result
+
+
+def test_exclude_unheld_past_end_date_keeps_a_redeemed_code_past_its_end(code_record_factory):
+    record = code_record_factory(end_date="2026-07-20")
+    redemptions = {"SUMMER25": discount_mapping.Redemption("2026-07-01T00:00:00Z", "ORD-1")}
+
+    result = discount_mapping.exclude_unheld_past_end_date([record], redemptions, _NOW)
 
     assert result == [record]
 

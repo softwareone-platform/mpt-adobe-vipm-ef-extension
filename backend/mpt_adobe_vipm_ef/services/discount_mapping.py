@@ -104,7 +104,8 @@ def is_offerable(record: AirtableRecord, order_type: DiscountOrderType, now: dt.
     ``now`` must sit inside its usable window: the ``start_date``/``end_date``
     range for a single-use code, extended to ``discount_lock_end_date`` for a
     reusable one (the lock keeps a redeemed code applicable past its end date).
-    A missing or unreadable bound leaves that side of the window open.
+    An upper bound stored as a bare day covers that whole day (UTC). A missing
+    or unreadable bound leaves that side of the window open.
     """
     fields = record["fields"]
     if fields.get("retired_at") or fields.get("enrichment_status") == ENRICHMENT_PENDING:
@@ -279,10 +280,10 @@ def build_update_fields(body: DiscountCodeUpdateRequest, now: dt.datetime) -> di
         "adobe_discount_id": body.adobe_discount_id or "",
         "category": body.category.value,
         "discount_type": body.discount_type.value,
-        "start_date": _iso(body.start_date),
-        "end_date": _iso(body.end_date),
+        "start_date": body.start_date.isoformat(),
+        "end_date": body.end_date.isoformat(),
         "reusable": body.is_reusable,
-        "discount_lock_end_date": _iso(body.discount_lock_end_date),
+        "discount_lock_end_date": _calendar_day(body.discount_lock_end_date),
         "target_offer_ids": _CSV_SEPARATOR.join(body.target_offer_ids),
         "qualifying_offer_ids": _CSV_SEPARATOR.join(body.qualifying_offer_ids),
         "applicable_order_types": [order_type.value for order_type in body.applicable_order_types],
@@ -498,7 +499,7 @@ def exclude_unheld_past_end_date(
 
 
 def _is_past_end_date(record: AirtableRecord, now: dt.datetime) -> bool:
-    end_date = _read_date(record["fields"].get("end_date"))
+    end_date = _read_end_date(record["fields"].get("end_date"))
     return end_date is not None and end_date < now
 
 
@@ -580,10 +581,10 @@ def _adobe_iso(raw_date: Any) -> str | None:
 
 def _usable_until(fields: dict[str, Any]) -> dt.datetime | None:
     """The last moment the code can be applied, honouring the discount lock."""
-    end_date = _read_date(fields.get("end_date"))
+    end_date = _read_end_date(fields.get("end_date"))
     if not fields.get("reusable"):
         return end_date
-    return _read_date(fields.get("discount_lock_end_date")) or end_date
+    return _read_end_date(fields.get("discount_lock_end_date")) or end_date
 
 
 def _is_within(moment: dt.datetime, start: dt.datetime | None, end: dt.datetime | None) -> bool:
@@ -603,11 +604,35 @@ def _read_date(raw_date: Any) -> dt.datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.UTC)
 
 
+def _read_end_date(raw_date: Any) -> dt.datetime | None:
+    """Read an upper-bound cell; a calendar day stays usable until it ends in UTC.
+
+    Airtable stores the bounds as date-only cells, so Adobe's ``23:59:59Z`` end
+    comes back as the bare day. A bound with a time of day is kept as is.
+    """
+    end_date = _read_date(raw_date)
+    if end_date is None or not _is_calendar_day(raw_date):
+        return end_date
+    return dt.datetime.combine(end_date.date(), dt.time.max, tzinfo=dt.UTC)
+
+
+def _is_calendar_day(raw_date: str) -> bool:
+    try:
+        dt.date.fromisoformat(raw_date)
+    except ValueError:
+        return False
+    return True
+
+
 def _iso(moment: dt.datetime | None) -> str | None:
     if moment is None:
         return None
     aware = moment if moment.tzinfo else moment.replace(tzinfo=dt.UTC)
     return aware.astimezone(dt.UTC).isoformat()
+
+
+def _calendar_day(day: dt.date | None) -> str | None:
+    return None if day is None else day.isoformat()
 
 
 def _split_csv(raw_csv: Any) -> list[str]:

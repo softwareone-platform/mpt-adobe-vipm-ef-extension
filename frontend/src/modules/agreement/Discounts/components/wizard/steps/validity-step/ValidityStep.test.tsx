@@ -1,3 +1,6 @@
+/**
+ * @jest-environment ./test/timezone-environment.cjs
+ */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
@@ -46,9 +49,11 @@ const NAVIGATION: StepNavigationProperties = {
   targetStepIndex: 2,
 } as unknown as StepNavigationProperties;
 
-const START = "2026-06-01T00:00:00.000Z";
-const END = "2026-08-31T00:00:00.000Z";
-const LOCK = "2026-12-31T00:00:00.000Z";
+const START = "2026-06-01";
+const END = "2026-08-31";
+const LOCK = "2026-12-31";
+
+declare const setTimeZone: (timeZone: string | undefined) => void;
 
 function renderStep(overrides: Partial<DiscountDraft> = {}) {
   const updateDraft = jest.fn();
@@ -94,15 +99,54 @@ describe("ValidityStep", () => {
     expect(screen.getByText("Discount lock end date")).toBeInTheDocument();
   });
 
-  it.each([
-    ["discount-start-date", "startDate"],
-    ["discount-end-date", "endDate"],
-  ])("writes the %s picker into the draft", (testId, field) => {
-    const { updateDraft } = renderStep();
+  describe("with the browser in another time zone", () => {
+    const browserTimeZone = process.env.TZ;
 
-    fireEvent.change(screen.getByTestId(testId), { target: { value: LOCK } });
+    afterEach(() => {
+      setTimeZone(browserTimeZone);
+    });
 
-    expect(updateDraft).toHaveBeenCalledWith({ [field]: LOCK });
+    // The picker emits the local midnight of the picked day as a UTC instant.
+    const pickedMidJuly = [
+      ["Australia/Perth", "2026-07-14T16:00:00.000Z"],
+      ["America/New_York", "2026-07-15T04:00:00.000Z"],
+    ];
+    const pickers = [
+      ["discount-start-date", "startDate"],
+      ["discount-end-date", "endDate"],
+      ["discount-lock-end-date", "discountLockEndDate"],
+    ];
+
+    it.each(
+      pickedMidJuly.flatMap(([timeZone, emitted]) =>
+        pickers.map(([testId, field]) => [testId, timeZone, emitted, field]),
+      ),
+    )("writes the day picked in %s in %s into the draft", (testId, timeZone, emitted, field) => {
+      setTimeZone(timeZone);
+      const { updateDraft } = renderStep({ reusable: true });
+
+      fireEvent.change(screen.getByTestId(testId), { target: { value: emitted } });
+
+      expect(updateDraft).toHaveBeenCalledWith({ [field]: "2026-07-15" });
+    });
+
+    it.each(pickedMidJuly.map(([timeZone]) => timeZone))(
+      "gives the pickers the local midnight of each stored day in %s",
+      (timeZone) => {
+        setTimeZone(timeZone);
+        renderStep({ reusable: true, discountLockEndDate: LOCK });
+
+        const shown = ["discount-start-date", "discount-end-date", "discount-lock-end-date"].map(
+          (testId) => new Date((screen.getByTestId(testId) as HTMLInputElement).value),
+        );
+
+        expect(shown.map((date) => date.toDateString())).toEqual([
+          new Date(2026, 5, 1).toDateString(),
+          new Date(2026, 7, 31).toDateString(),
+          new Date(2026, 11, 31).toDateString(),
+        ]);
+      },
+    );
   });
 
   it("starts with reusable off and the period empty on a fresh draft", () => {

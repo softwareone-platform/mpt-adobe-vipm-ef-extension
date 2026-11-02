@@ -1,5 +1,6 @@
-import { ANY_ORDER_TYPE, EMPTY_DRAFT, toCreatePayload } from "./discountDraft";
+import { ANY_ORDER_TYPE, EMPTY_DRAFT, toCreatePayload, toDraft, toUpdatePayload } from "./discountDraft";
 
+import type { Discount } from "../../../../shared/model";
 import type { DiscountDraft } from "./discountDraft";
 
 function draftWith(overrides: Partial<DiscountDraft> = {}): DiscountDraft {
@@ -10,8 +11,8 @@ function draftWith(overrides: Partial<DiscountDraft> = {}): DiscountDraft {
     category: "STANDARD",
     discountType: "PERCENTAGE",
     value: "8",
-    startDate: "2026-01-01T00:00:00Z",
-    endDate: "2027-10-31T23:59:59Z",
+    startDate: "2026-01-01",
+    endDate: "2027-10-31",
     targetItems: "ITEM-001",
     applicableOrderTypes: ["RENEWAL"],
     ...overrides,
@@ -121,7 +122,7 @@ describe("toCreatePayload", () => {
 
   it("drops a stale lock date when the code is no longer reusable", () => {
     const payload = toCreatePayload(
-      draftWith({ reusable: false, discountLockEndDate: "2026-12-31T00:00:00Z" }),
+      draftWith({ reusable: false, discountLockEndDate: "2026-12-31" }),
     );
 
     expect(payload).not.toHaveProperty("discountLockEndDate");
@@ -129,9 +130,55 @@ describe("toCreatePayload", () => {
 
   it("sends the lock date for reusable codes", () => {
     const payload = toCreatePayload(
-      draftWith({ reusable: true, discountLockEndDate: "2026-12-31T00:00:00Z" }),
+      draftWith({ reusable: true, discountLockEndDate: "2026-12-31" }),
     );
 
-    expect(payload.discountLockEndDate).toBe("2026-12-31T00:00:00Z");
+    expect(payload.discountLockEndDate).toBe("2026-12-31");
+  });
+});
+
+describe("toDraft", () => {
+  const stored: Discount = {
+    id: "recDUMMY",
+    code: "DUMMYCODE123",
+    name: "Dummy Discount",
+    category: "STANDARD",
+    discountType: "PERCENTAGE",
+    startDate: "2026-10-29",
+    endDate: "2026-12-30",
+    reusable: true,
+    discountLockEndDate: "2027-06-29",
+    targetOfferIds: ["65304578CA"],
+    applicableOrderTypes: ["RENEWAL"],
+    values: [{ currency: "USD", value: 20 }],
+  };
+
+  it("seeds the stored days into the draft", () => {
+    const draft = toDraft(stored, "USD");
+
+    expect([draft.startDate, draft.endDate, draft.discountLockEndDate]).toEqual([
+      "2026-10-29",
+      "2026-12-30",
+      "2027-06-29",
+    ]);
+  });
+
+  it("keeps only the day of a stored timestamp", () => {
+    const draft = toDraft(
+      { ...stored, startDate: "2026-10-29T00:00:00+00:00", endDate: "2026-12-30T00:00:00.000Z" },
+      "USD",
+    );
+
+    expect([draft.startDate, draft.endDate]).toEqual(["2026-10-29", "2026-12-30"]);
+  });
+
+  it("sends the same days back on a save with no change", () => {
+    const payload = toUpdatePayload(toDraft(stored, "USD"));
+
+    expect([payload.startDate, payload.endDate, payload.discountLockEndDate]).toEqual([
+      "2026-10-29",
+      "2026-12-30",
+      "2027-06-29",
+    ]);
   });
 });
