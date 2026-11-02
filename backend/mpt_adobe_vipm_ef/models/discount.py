@@ -95,7 +95,13 @@ def _clean_offer_ids(offer_ids: list[str]) -> list[str]:
 
 
 class DiscountCodeUpdateRequest(BaseSchema):
-    """Write payload for a closed discount code, without the immutable code."""
+    """Write payload for a closed discount code, without the immutable code.
+
+    The start, end and lock end dates are calendar days. A timestamp is only
+    accepted at midnight, whatever its offset, and keeps the day it names; one
+    with a time of day is rejected, so a local midnight sent as a UTC instant
+    can't shift the day.
+    """
 
     name: str = Field(min_length=MIN_LENGTH, max_length=MAX_LENGTH)
     description: str | None = None
@@ -115,13 +121,13 @@ class DiscountCodeUpdateRequest(BaseSchema):
         min_length=CURRENCY_CODE_LENGTH,
         max_length=CURRENCY_CODE_LENGTH,
     )
-    start_date: dt.datetime = Field(
+    start_date: dt.date = Field(
         serialization_alias="startDate",
         validation_alias="startDate",
     )
-    end_date: dt.datetime = Field(serialization_alias="endDate", validation_alias="endDate")
+    end_date: dt.date = Field(serialization_alias="endDate", validation_alias="endDate")
     reusable: bool = False
-    discount_lock_end_date: dt.datetime | None = Field(
+    discount_lock_end_date: dt.date | None = Field(
         default=None,
         serialization_alias="discountLockEndDate",
         validation_alias="discountLockEndDate",

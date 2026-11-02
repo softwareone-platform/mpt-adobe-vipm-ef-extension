@@ -1,3 +1,5 @@
+import { formatDateOnly } from "../../../../utils/date";
+
 import type { Discount, DiscountOrderType, DiscountType } from "../../../../shared/model";
 
 export type DiscountCategory = "STANDARD" | "INTRO";
@@ -18,7 +20,9 @@ export type OrderTypeSelection = DiscountOrderType | typeof ANY_ORDER_TYPE;
  * form is always representable; coercion to the wire types happens once, in
  * {@link toCreatePayload}. `value` is a string because an `<input type="number">`
  * yields `""` while the user is typing, and the two item lists are raw text
- * because splitting a CSV on every keystroke would fight the caret.
+ * because splitting a CSV on every keystroke would fight the caret. The three
+ * dates are calendar days (`YYYY-MM-DD`), converted at the date pickers, so
+ * the day picked is the day sent whatever the browser's time zone.
  */
 export interface DiscountDraft {
   code: string;
@@ -156,10 +160,10 @@ export function toDraft(discount: Discount, agreementCurrency: string): Discount
     discountType: (discount.discountType as DiscountType | "") ?? "PERCENTAGE",
     value: valueEntry?.value != null ? String(valueEntry.value) : "",
     currency: valueEntry?.currency ?? agreementCurrency ?? "",
-    startDate: discount.startDate ?? "",
-    endDate: discount.endDate ?? "",
+    startDate: formatDateOnly(discount.startDate) ?? "",
+    endDate: formatDateOnly(discount.endDate) ?? "",
     reusable: discount.reusable ?? false,
-    discountLockEndDate: discount.discountLockEndDate ?? "",
+    discountLockEndDate: formatDateOnly(discount.discountLockEndDate) ?? "",
     targetItems: (discount.targetOfferIds ?? []).join(", "),
     prerequisiteItems: (discount.qualifyingOfferIds ?? []).join(", "),
     applicableOrderTypes: applicable.length === 0 ? [ANY_ORDER_TYPE] : applicable,

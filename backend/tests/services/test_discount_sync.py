@@ -3,6 +3,7 @@ from http import HTTPStatus
 from types import MappingProxyType, SimpleNamespace
 
 import pytest
+from freezegun import freeze_time
 from mpt_extension_sdk.errors.pipeline import FailError
 from requests import HTTPError
 
@@ -367,6 +368,19 @@ async def test_sync_keeps_a_reusable_code_whose_discount_lock_is_still_open(
             discount_lock_end_date="2999-12-31T23:59:59Z",
         )
     ]
+
+    await discount_sync.sync_open_discounts(ctx)
+
+    retired_ids, _ = store.retire_codes.call_args.args
+    assert not retired_ids
+
+
+@freeze_time("2026-08-31T12:00:00Z")
+async def test_sync_keeps_an_open_code_on_the_last_day_of_its_date_only_window(
+    ctx, store, adobe_client, code_record_factory
+):
+    # Airtable returns Adobe's "2026-08-31T23:59:59Z" end as the bare day.
+    store.list_open_codes.return_value = [code_record_factory(source="API", end_date="2026-08-31")]
 
     await discount_sync.sync_open_discounts(ctx)
 
