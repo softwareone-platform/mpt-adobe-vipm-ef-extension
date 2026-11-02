@@ -1,6 +1,7 @@
 import { ANY_ORDER_TYPE, EMPTY_DRAFT } from "./discountDraft";
 import {
   MAX_TEXT_LENGTH,
+  firstInvalidStep,
   validateDefinition,
   validateReview,
   validateScope,
@@ -358,5 +359,38 @@ describe("validateReview", () => {
     const result = validateReview(completeDraft({ discountType: "PERCENTAGE", currency: "" }));
 
     expect(result).toBeNull();
+  });
+});
+
+describe("firstInvalidStep", () => {
+  function savedDraft(overrides: Partial<DiscountDraft> = {}): DiscountDraft {
+    return draftWith({
+      startDate: "2026-06-01",
+      endDate: "2026-08-31",
+      targetItems: "30001846CB",
+      applicableOrderTypes: ["RENEWAL"],
+      ...overrides,
+    });
+  }
+
+  it("returns null for a draft that satisfies every step", () => {
+    expect(firstInvalidStep(savedDraft())).toBeNull();
+  });
+
+  it.each([
+    ["definition", { name: "" }],
+    ["definition", { discountType: "FIXED_PRICE", currency: "" }],
+    ["validity", { endDate: "2026-06-01" }],
+    ["scope", { targetItems: "" }],
+    // The rule reads the category but the order types are what has to change.
+    ["scope", { category: "INTRO" }],
+  ] as const)("names the %s step for %j", (step, overrides) => {
+    expect(firstInvalidStep(savedDraft(overrides))).toBe(step);
+  });
+
+  it("names the earliest step when several are broken", () => {
+    const result = firstInvalidStep(savedDraft({ name: "", targetItems: "" }));
+
+    expect(result).toBe("definition");
   });
 });

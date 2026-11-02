@@ -335,6 +335,111 @@ describe("request-discount-action App (edit mode)", () => {
     );
   });
 
+  describe("Save from any step", () => {
+    // Part numbers are alphanumeric, so the shared fixture's "ITEM-001" would
+    // fail scope validation before the PUT is reached.
+    const VALID_DISCOUNT = {
+      ...SAMPLE_DISCOUNT,
+      targetOfferIds: ["65322651CA02A12"],
+      qualifyingOfferIds: ["65322651CA02A12"],
+    };
+
+    /** Opens the step and presses its Save through the gate it registered. */
+    async function saveFrom(step: number): Promise<number> {
+      await goToStep(step);
+      let target = 0;
+      await act(async () => {
+        target = await capturedOnNext!({
+          currentStepIndex: step,
+          targetStepIndex: step + 1,
+        } as never);
+      });
+      return target;
+    }
+
+    async function renderSeeded(discount: Record<string, unknown>) {
+      mockEditBackend(discount);
+      await renderApp();
+      await waitFor(() => expect(codeInput()).toHaveValue(SAMPLE_DISCOUNT.code));
+    }
+
+    it.each([
+      ["Definition", 0],
+      ["Validity", 1],
+      ["Scope", 2],
+    ])("saves and closes from %s", async (_label, step) => {
+      mockPut.mockResolvedValue({ data: { data: VALID_DISCOUNT } });
+      await renderSeeded(VALID_DISCOUNT);
+
+      const target = await saveFrom(step);
+
+      expect(target).toBe(-1);
+      expect(mockPut).toHaveBeenCalledTimes(1);
+      expect(mockClose).toHaveBeenCalledWith({
+        updated: expect.objectContaining({ id: "DSC-0001" }),
+      });
+    });
+
+    it.each([
+      ["Definition", 0],
+      ["Validity", 1],
+      ["Scope", 2],
+    ])("shows a server error on %s, where Save was pressed", async (_label, step) => {
+      mockPut.mockRejectedValue(new Error("Request failed with status code 500"));
+      await renderSeeded(VALID_DISCOUNT);
+
+      const target = await saveFrom(step);
+
+      expect(target).toBe(-1);
+      expect(
+        screen.getByText("Request failed with status code 500"),
+      ).toBeInTheDocument();
+      expect(mockClose).not.toHaveBeenCalled();
+    });
+
+    it("shows the reason the API gives for refusing a Save", async () => {
+      mockPut.mockRejectedValue({
+        response: { data: { detail: "The discount code cannot be changed." } },
+      });
+      await renderSeeded(VALID_DISCOUNT);
+
+      await saveFrom(1);
+
+      expect(
+        screen.getByText("The discount code cannot be changed."),
+      ).toBeInTheDocument();
+      expect(mockClose).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        "Validity",
+        1,
+        { endDate: SAMPLE_DISCOUNT.startDate },
+        "The start date must be before the end date.",
+      ],
+      // INTRO only applies to Add seats, and the fetched code targets renewals.
+      [
+        "Scope",
+        2,
+        { category: "INTRO" },
+        "Intro discounts apply to Add seats orders only.",
+      ],
+    ])(
+      "opens %s when a Save on Definition fails one of its rules",
+      async (_label, step, overrides, message) => {
+        await renderSeeded({ ...VALID_DISCOUNT, ...overrides });
+
+        const target = await saveFrom(0);
+
+        expect(target).toBe(-1);
+        expect(mockPut).not.toHaveBeenCalled();
+        expect(capturedProps!.activeStepIndex).toBe(step);
+        expect(screen.getByText(message)).toBeInTheDocument();
+      },
+    );
+  });
+
   it("locks the code, which the API refuses to change on update", async () => {
     await renderApp();
 

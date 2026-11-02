@@ -6,12 +6,21 @@ import { ValidityStep } from "./steps/validity-step/ValidityStep";
 
 import type { DiscountWizardStep } from "./DiscountWizard";
 import type { DiscountDraft } from "./discountDraft";
+import type { DiscountStep } from "./discountValidation";
+
+/** Where each step sits in the edit wizard, so a failed Save can open the one at fault. */
+export const EDIT_STEP_INDEX: Record<DiscountStep, number> = {
+  definition: 0,
+  validity: 1,
+  scope: 2,
+};
 
 export interface EditStepsInput {
   draft: DiscountDraft;
   updateDraft: (patch: Partial<DiscountDraft>) => void;
   customerId: string;
   segment: string;
+  /** Why the last Save failed. Every step shows it, since Save runs from any of them. */
   submitError: string;
   isSubmitting: boolean;
   /** Saves the draft and closes. Returns -1 so the wizard stays where it is. */
@@ -54,6 +63,7 @@ export function editSteps({
           updateDraft={updateDraft}
           customerId={customerId}
           segment={segment}
+          submitError={submitError}
           onSave={onSave}
           isCodeLocked
         />
@@ -72,6 +82,7 @@ export function editSteps({
           updateDraft={updateDraft}
           customerId={customerId}
           segment={segment}
+          submitError={submitError}
           onSave={onSave}
         />
       ),
