@@ -190,6 +190,22 @@ describe('TimingStep', () => {
     ).toBeTruthy();
   });
 
+  it.each([
+    ['before any renewal order', null, /takes effect today and is included in this week's invoice/],
+    [
+      'after an early renewal',
+      'now',
+      /anything you add now is included in the weekly invoice for the week you place it/,
+    ],
+  ] as const)('states that renewing now is invoiced weekly %s', (_, lockedPath, weeklyInvoice) => {
+    const { getByText, queryByText } = renderStep({
+      pathState: { ...pathState, lockedPath },
+    });
+
+    expect(getByText(weeklyInvoice)).toBeTruthy();
+    expect(queryByText(/invoiced immediately|invoiced when you place it/)).toBeNull();
+  });
+
   it('presents a staged at-anniversary renewal as the only path', () => {
     const { getByText, getByTestId, queryByTestId } = renderStep({
       pathState: { ...pathState, lockedPath: 'anniversary' },
