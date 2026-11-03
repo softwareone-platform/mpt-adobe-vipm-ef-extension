@@ -18,7 +18,7 @@ const INPUT = {
   recommendationTrackerId: 'TRACKER-1',
   flexDiscountCodes: ['UPGRADE10'],
 };
-const QUOTE = { lineItems: [{ offerId: '65322651CA02A12', pricing: { partnerPrice: 50 } }] };
+const QUOTE = { lineItems: [{ offerId: '65322651CA02A12', pricing: { discountedPriceRatio: 0.75 } }] };
 
 describe('useSwitchDiscountValidation', () => {
   beforeEach(() => {
