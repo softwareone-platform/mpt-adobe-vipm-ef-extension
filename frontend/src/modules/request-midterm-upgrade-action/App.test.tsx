@@ -915,7 +915,7 @@ describe('request-midterm-upgrade-action App', () => {
         lineItems: [
           {
             offerId: '65322651CA02A12',
-            pricing: { partnerPrice: 50, discountedPartnerPrice: 35 },
+            pricing: { discountedPriceRatio: 0.7 },
           },
         ],
       }),
@@ -927,6 +927,30 @@ describe('request-midterm-upgrade-action App', () => {
 
     const rows = reviewOrderProps.subscriptions as Array<Record<string, unknown>>;
     expect(rows[1]).toMatchObject({ discountCode: 'SAVE10', unitSP: '70.00', spxY: '420.00' });
+  });
+
+  it('prices the review target at the customer discount level Adobe quoted', async () => {
+    const { rerender } = await selectPromotedTarget();
+    mockActiveStepIndex = 2;
+    rerender(<App />);
+    await waitFor(() => expect(promotionsProps.discountCode).toBe(''));
+    act(() =>
+      promotionsProps.onPreview({
+        lineItems: [
+          {
+            offerId: '65322651CA13A12',
+            pricing: { discountedPriceRatio: 1, quotedUnitSP: 80 },
+          },
+        ],
+      }),
+    );
+
+    mockActiveStepIndex = 5;
+    rerender(<App />);
+    expect(await screen.findByText('Review order step')).toBeTruthy();
+
+    const rows = reviewOrderProps.subscriptions as Array<Record<string, unknown>>;
+    expect(rows[1]).toMatchObject({ discountCode: '', unitSP: '80.00', spxY: '480.00' });
   });
 
   it('never allows side navigation, so only back and next move the wizard', async () => {

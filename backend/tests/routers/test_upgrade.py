@@ -32,6 +32,12 @@ _TARGET_SKU = "65322651CA"
 _TARGET_ITEM_ID = "ITM-TARGET"
 _ADOBE_SUBSCRIPTION_ID = "adobe-sub-1"
 _QUANTITY_ABOVE_SOURCE = 11
+_TARGET_LIST_SP = 300.0
+_TARGET_LIST_PP = 250.0
+_TARGET_QUOTED_SP = 249.1
+_TARGET_DISCOUNT_RATIO = 0.9
+_RATIO_PRECISION = 0.001
+_CENT = 0.01
 
 _ADOBE_API_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
@@ -107,6 +113,14 @@ def _quote(code=None, result="SUCCESS"):
         line["flexDiscountCodes"] = [code]
         line["flexDiscounts"] = [{"code": code, "result": result}]
     return {"orderType": "PREVIEW_SWITCH", "lineItems": [line]}
+
+
+def _client_quote(quoted_unit_sp=None):
+    """The target line as the wizard reads it: selling-side prices only."""
+    pricing = {"discountedPriceRatio": pytest.approx(_TARGET_DISCOUNT_RATIO, abs=_RATIO_PRECISION)}
+    if quoted_unit_sp is not None:
+        pricing["quotedUnitSP"] = pytest.approx(quoted_unit_sp, abs=_CENT)
+    return {"lineItems": [{"offerId": _TARGET_OFFER_ID, "pricing": pricing}]}
 
 
 def _discount_refusal(reason="NEW_TO_PRODUCT_NOT_MET"):
@@ -190,8 +204,32 @@ def accepted_quote(adobe_call):
 
 
 @pytest.fixture
-def preview_deps(
-    upgrade_agreement, source_subscription, resolve_target_item, accepted_quote, renewal_in_place
+def target_selling_prices(mocker):
+    """Patch the price-list selling price lookup, priced for the target item by default."""
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.services.pricing.get_unit_selling_prices",
+        mocker.AsyncMock(return_value={_TARGET_ITEM_ID: _TARGET_LIST_SP}),
+    )
+
+
+@pytest.fixture
+def target_purchase_prices(mocker):
+    """Patch the price-list purchase price lookup, priced for the target item by default."""
+    return mocker.patch(
+        "mpt_adobe_vipm_ef.services.pricing.get_unit_purchase_prices",
+        mocker.AsyncMock(return_value={_TARGET_ITEM_ID: _TARGET_LIST_PP}),
+    )
+
+
+@pytest.fixture
+def preview_deps(  # noqa: WPS211
+    upgrade_agreement,
+    source_subscription,
+    resolve_target_item,
+    accepted_quote,
+    renewal_in_place,
+    target_selling_prices,
+    target_purchase_prices,
 ):
     """Bundle the happy-path collaborators for the preview endpoint."""
 
@@ -512,7 +550,6 @@ async def test_preview_upgrade_order_returns_the_priced_quote(fake_ctx, preview_
     )
 
     assert result.status_code == http.HTTPStatus.OK
-    assert result.payload == {"preview": _quote("UPGRADE10")}
     call_args, call_kwargs = adobe_call.calls[0]
     assert call_args[3] == [
         {
@@ -534,6 +571,49 @@ async def test_preview_upgrade_order_returns_the_priced_quote(fake_ctx, preview_
         "recommendation_tracker_id": "TRACKER-1",
         "fetch_price": True,
     }
+
+
+async def test_preview_upgrade_order_carries_the_quoted_selling_price_onto_the_target(
+    fake_ctx, preview_deps, adobe_call, target_selling_prices, target_purchase_prices
+):
+    adobe_call.returns = _quote("UPGRADE10")
+
+    result = await preview_upgrade_order(
+        _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body(codes=["UPGRADE10"])
+    )
+
+    assert result.payload == {"preview": _client_quote(_TARGET_QUOTED_SP)}
+    target_selling_prices.assert_awaited_once_with(fake_ctx, _AGREEMENT_ID, [_TARGET_ITEM_ID])
+    target_purchase_prices.assert_awaited_once_with(fake_ctx, _AGREEMENT_ID, [_TARGET_ITEM_ID])
+
+
+async def test_preview_upgrade_order_leaves_the_target_unquoted_without_a_list_purchase_price(
+    fake_ctx, preview_deps, target_purchase_prices
+):
+    target_purchase_prices.return_value = {}
+
+    result = await preview_upgrade_order(  # act
+        _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body()
+    )
+
+    assert result.payload == {"preview": _client_quote()}
+
+
+async def test_preview_upgrade_order_answers_no_quote_without_pricing_it(
+    mocker, fake_ctx, preview_deps, target_selling_prices, target_purchase_prices
+):
+    mocker.patch(
+        "mpt_adobe_vipm_ef.routers.api.upgrade.preview_with_discounts",
+        mocker.AsyncMock(return_value=None),
+    )
+
+    result = await preview_upgrade_order(  # act
+        _AGREEMENT_ID, _SUBSCRIPTION_ID, fake_ctx, _preview_body()
+    )
+
+    assert result.payload == {"preview": None}
+    target_selling_prices.assert_not_awaited()
+    target_purchase_prices.assert_not_awaited()
 
 
 async def test_preview_upgrade_order_reports_a_whole_request_refusal(

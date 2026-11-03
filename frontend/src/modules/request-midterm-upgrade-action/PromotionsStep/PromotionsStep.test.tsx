@@ -272,7 +272,7 @@ describe('mid-term upgrade PromotionsStep', () => {
 
   describe('Next', () => {
     it('previews the switch with the code on the target and publishes the quote', async () => {
-      const quote = { lineItems: [{ offerId: '65322651CA02A12', pricing: { partnerPrice: 50 } }] };
+      const quote = { lineItems: [{ offerId: '65322651CA02A12', pricing: { discountedPriceRatio: 0.75 } }] };
       mockPost.mockResolvedValue({ data: { data: { preview: quote } } });
       const onPreview = jest.fn();
       await renderStep({ discountCode: 'UPGRADE25', onPreview });

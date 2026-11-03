@@ -472,16 +472,29 @@ export function isRenewalPreviewRequired(plan: RenewalPlanBody): boolean {
   );
 }
 
-/** A line of Adobe's quote: purchase prices, before the price list's markup. */
+/**
+ * A line of Adobe's quote as the backend hands it to the wizard: what finds its
+ * row and the selling-side prices that price it, never Adobe's purchase prices.
+ */
 export interface RenewalPreviewLine {
   offerId?: string;
   subscriptionId?: string;
-  quantity?: number;
+  /** Absent on a line Adobe did not price. */
   pricing?: {
-    partnerPrice?: number;
-    discountedPartnerPrice?: number;
-    netPartnerPrice?: number;
-    lineItemPartnerPrice?: number;
+    /**
+     * What the discount codes leave of Adobe's price for the line (its
+     * discounted over its list purchase price): below 1 when a code discounts
+     * it. It carries the codes onto a unit SP already at the customer's
+     * discount level (a subscription line's).
+     */
+    discountedPriceRatio?: number;
+    /**
+     * The line's unit SP as the quote prices it, added by the backend to a
+     * line the wizard prices from the price list: that price is at the base
+     * discount level, and only the backend reads the list purchase price that
+     * carries the customer's level onto it.
+     */
+    quotedUnitSP?: number;
   };
 }
 

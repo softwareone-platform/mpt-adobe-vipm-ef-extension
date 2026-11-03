@@ -27,22 +27,24 @@ export function getDiscountedUnitPrice(unitSP: number, discount: Discount): numb
 /**
  * A list unit SP carried through the discount Adobe quoted for its line.
  *
- * Adobe's quotes hold purchase prices, so the discount it applied reaches the
- * selling price as the ratio of the discounted to the list purchase price:
- * the line's markup cancels out and never has to be known. ``discounted``
- * tells a line Adobe priced below its list price. Answers null when the line
- * is not priced, so the caller keeps the list price.
+ * The backend reduces Adobe's quote to selling-side prices: the discount the
+ * codes applied reaches a unit SP already at the customer's discount level (a
+ * subscription line's) as ``discountedPriceRatio``, so the line's markup
+ * never has to be known, while a line priced from the price list, at the base
+ * level, carries the backend's ``quotedUnitSP`` instead, which has the
+ * customer's level too. ``discounted`` tells a line a discount code priced
+ * below Adobe's price. Answers null when the line is not priced, so the caller
+ * keeps the list price.
  */
 export function getQuotedPrice(
   unitSP: number | null | undefined,
   pricing: RenewalPreviewLine['pricing'],
 ): { unitSP: number; discounted: boolean } | null {
-  const partnerPrice = pricing?.partnerPrice;
-  const discountedPartnerPrice = pricing?.discountedPartnerPrice;
-  if (unitSP == null || !partnerPrice || discountedPartnerPrice == null) return null;
+  const ratio = pricing?.discountedPriceRatio;
+  if (unitSP == null || ratio == null) return null;
   return {
-    unitSP: (unitSP * discountedPartnerPrice) / partnerPrice,
-    discounted: discountedPartnerPrice < partnerPrice,
+    unitSP: pricing?.quotedUnitSP ?? unitSP * ratio,
+    discounted: ratio < 1,
   };
 }
 
