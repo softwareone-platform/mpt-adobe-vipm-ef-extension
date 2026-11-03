@@ -53,6 +53,9 @@ _COMMITMENT_END = "2029-08-20"
 _ABOVE_FLOOR_QUANTITY = 12
 _REPEAT_RENEWAL_TOTAL = 12
 _PLAN_PLUS_OUTSIDE_PLAN_LICENSES = 17
+_NET_NEW_QUOTED_SP = 469.18
+_CODE_DISCOUNT_RATIO = 0.9
+_CENT = 0.01
 
 _ADOBE_API_ERROR = AdobeAPIError(
     http.HTTPStatus.BAD_REQUEST,
@@ -1654,26 +1657,49 @@ async def test_get_renewal_path_state_rejects_non_client_account(
 # --- POST /agreements/{id}/renewal-order/preview ---
 
 
-async def test_preview_renewal_plan_returns_the_adobe_quote(
+async def test_preview_renewal_plan_returns_the_quote_reduced_for_the_client(
     fake_ctx, renewal_agreement, renewing_subscription, adobe_call
 ):
-    quote = {
+    adobe_call.returns = {
+        "customerId": "CUST-001",
+        "orderType": "PREVIEW_RENEWAL",
+        "pricingSummary": [{"totalLineItemPartnerPrice": 288, "currencyCode": "USD"}],
         "lineItems": [
             {
                 "extLineItemNumber": 1,
-                "pricing": {},
+                "offerId": _OFFER_ID,
+                "subscriptionId": "",
+                "quantity": 1,
+                "status": "",
+                "proratedDays": 388,
+                "pricing": {
+                    "partnerPrice": 320,
+                    "discountedPartnerPrice": 288,
+                    "netPartnerPrice": 288,
+                    "lineItemPartnerPrice": 288,
+                },
                 "flexDiscounts": [{"code": "ABCD-XV54-HG34-78YT", "result": "SUCCESS"}],
             },
         ],
     }
-    adobe_call.returns = quote
 
     result = await preview_renewal_plan(
         _AGREEMENT_ID, fake_ctx, _preview_body(codes=["ABCD-XV54-HG34-78YT"])
     )
 
     assert result.status_code == http.HTTPStatus.OK
-    assert result.payload == {"preview": quote, "eligibility": {}}
+    assert result.payload == {
+        "preview": {
+            "lineItems": [
+                {
+                    "offerId": _OFFER_ID,
+                    "subscriptionId": "",
+                    "pricing": {"discountedPriceRatio": pytest.approx(_CODE_DISCOUNT_RATIO)},
+                },
+            ],
+        },
+        "eligibility": {},
+    }
     # calls[0] resolves the full offer id from Adobe's live subscriptions;
     # calls[1] is the PREVIEW_RENEWAL quote itself.
     call_args, _ = adobe_call.calls[1]
@@ -1766,6 +1792,60 @@ async def test_preview_renewal_plan_carries_the_early_renewal_additions(
         {"extLineItemNumber": 2, "offerId": _NET_NEW_OFFER_ID, "quantity": 5},
     ]
     net_new_sku_mapping.list_full_skus.assert_called_once_with([_NET_NEW_SKU], "COM")
+
+
+async def test_preview_renewal_plan_carries_the_quoted_selling_price_onto_the_additions(  # noqa: WPS211
+    mocker,
+    fake_ctx,
+    renewal_agreement,
+    renewing_subscription,
+    resolve_net_new_item,
+    net_new_sku_mapping,
+    adobe_call,
+):
+    selling_prices = mocker.patch(
+        "mpt_adobe_vipm_ef.services.pricing.get_unit_selling_prices",
+        mocker.AsyncMock(return_value={_NET_NEW_ITEM_ID: 464.24}),
+    )
+    purchase_prices = mocker.patch(
+        "mpt_adobe_vipm_ef.services.pricing.get_unit_purchase_prices",
+        mocker.AsyncMock(return_value={_NET_NEW_ITEM_ID: 439.8}),
+    )
+    renewing_line = {
+        "extLineItemNumber": 1,
+        "offerId": "65304470CA02A12",
+        "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+        "pricing": {"partnerPrice": 330.48, "discountedPartnerPrice": 330.48},
+    }
+    net_new_line = {
+        "extLineItemNumber": 2,
+        "offerId": "65304481CA02A12",
+        "pricing": {"partnerPrice": 444.48, "discountedPartnerPrice": 444.48},
+    }
+    adobe_call.returns = {"items": [], "lineItems": [renewing_line, net_new_line]}
+
+    result = await preview_renewal_plan(
+        _AGREEMENT_ID,
+        fake_ctx,
+        _preview_body(net_new=[{"offerId": _NET_NEW_SKU, "quantity": 5}], path="now"),
+    )
+
+    assert result.payload["preview"]["lineItems"] == [
+        {
+            "offerId": "65304470CA02A12",
+            "subscriptionId": _ADOBE_SUBSCRIPTION_ID,
+            "pricing": {"discountedPriceRatio": pytest.approx(1)},
+        },
+        {
+            "offerId": "65304481CA02A12",
+            "pricing": {
+                "discountedPriceRatio": pytest.approx(1),
+                "quotedUnitSP": pytest.approx(_NET_NEW_QUOTED_SP, abs=_CENT),
+            },
+        },
+    ]
+    selling_prices.assert_awaited_once_with(fake_ctx, _AGREEMENT_ID, [_NET_NEW_ITEM_ID])
+    purchase_prices.assert_awaited_once_with(fake_ctx, _AGREEMENT_ID, [_NET_NEW_ITEM_ID])
 
 
 async def test_preview_renewal_plan_quotes_only_the_remaining_delta(
@@ -2289,7 +2369,9 @@ async def test_preview_renewal_plan_ignores_a_refused_code_the_line_did_not_send
 
     result = await preview_renewal_plan(_AGREEMENT_ID, fake_ctx, _preview_body())
 
-    assert result.payload["preview"] == preview_call.returns
+    assert result.payload["preview"] == {
+        "lineItems": [{"offerId": _OFFER_ID, "subscriptionId": ""}],
+    }
     assert len(preview_call.calls) == 1
 
 

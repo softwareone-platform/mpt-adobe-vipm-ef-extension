@@ -212,7 +212,7 @@ describe('ReviewOrderStep', () => {
         lineItems: [
           {
             subscriptionId: 'adobe-sub-1',
-            pricing: { partnerPrice: 100, discountedPartnerPrice: 90 },
+            pricing: { discountedPriceRatio: 0.9 },
           },
         ],
       },
@@ -229,7 +229,7 @@ describe('ReviewOrderStep', () => {
       quantities: { 'SUB-1': 16 },
       preview: {
         lineItems: [
-          { offerId: 'OFFER-1', pricing: { partnerPrice: 100, discountedPartnerPrice: 50 } },
+          { offerId: 'OFFER-1', pricing: { discountedPriceRatio: 0.5 } },
         ],
       },
     });
@@ -244,7 +244,7 @@ describe('ReviewOrderStep', () => {
         lineItems: [
           {
             subscriptionId: 'adobe-sub-1',
-            pricing: { partnerPrice: 902.28, discountedPartnerPrice: 902.28 },
+            pricing: { discountedPriceRatio: 1 },
           },
         ],
       },
@@ -269,7 +269,7 @@ describe('ReviewOrderStep', () => {
       netNewItems: [NET_NEW_ITEM],
       preview: {
         lineItems: [
-          { offerId: 'OFFER-3', pricing: { partnerPrice: 200, discountedPartnerPrice: 180 } },
+          { offerId: 'OFFER-3', pricing: { discountedPriceRatio: 0.9 } },
         ],
       },
     });
@@ -278,6 +278,25 @@ describe('ReviewOrderStep', () => {
     expect(row.textContent).toContain('216.00');
     expect(row.textContent).toContain('432.00');
     expect(row.textContent).toContain('Discounted');
+  });
+
+  it('prices a net-new product at the quoted unit SP the backend priced it at', () => {
+    const { getByTestId } = renderStep({
+      netNewItems: [NET_NEW_ITEM],
+      preview: {
+        lineItems: [
+          {
+            offerId: 'OFFER-3',
+            pricing: { discountedPriceRatio: 1, quotedUnitSP: 216 },
+          },
+        ],
+      },
+    });
+
+    const row = getByTestId('row-ITM-3');
+    expect(row.textContent).toContain('216.00');
+    expect(row.textContent).toContain('432.00');
+    expect(row.textContent).not.toContain('Discounted');
   });
 
   it('keeps the stored price when Adobe quoted nothing', () => {

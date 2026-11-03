@@ -92,23 +92,39 @@ describe('appliesToOrderType', () => {
 
 describe('getQuotedPrice', () => {
   it('carries the quoted discount onto the list selling price', () => {
-    const quoted = getQuotedPrice(1266.53, { partnerPrice: 902.28, discountedPartnerPrice: 812.05 });
+    const quoted = getQuotedPrice(1266.53, { discountedPriceRatio: 0.9 });
 
-    expect(quoted?.unitSP).toBeCloseTo(1139.87, 2);
+    expect(quoted?.unitSP).toBeCloseTo(1139.88, 2);
     expect(quoted?.discounted).toBe(true);
   });
 
   it('keeps the list price, undiscounted, when Adobe applied nothing', () => {
-    expect(getQuotedPrice(1266.53, { partnerPrice: 902.28, discountedPartnerPrice: 902.28 })).toEqual({
+    expect(getQuotedPrice(1266.53, { discountedPriceRatio: 1 })).toEqual({
       unitSP: 1266.53,
       discounted: false,
     });
   });
 
+  it('takes the quoted unit SP the backend priced a price-list line at', () => {
+    const pricing = { discountedPriceRatio: 1, quotedUnitSP: 412.95 };
+
+    const quoted = getQuotedPrice(533.05, pricing);
+
+    expect(quoted).toEqual({ unitSP: 412.95, discounted: false });
+  });
+
+  it('tells a quoted unit SP a discount code priced below Adobe price', () => {
+    const pricing = { discountedPriceRatio: 0.9, quotedUnitSP: 371.65 };
+
+    const quoted = getQuotedPrice(533.05, pricing);
+
+    expect(quoted).toEqual({ unitSP: 371.65, discounted: true });
+  });
+
   it('answers null for a line it cannot price', () => {
-    expect(getQuotedPrice(null, { partnerPrice: 100, discountedPartnerPrice: 90 })).toBeNull();
+    expect(getQuotedPrice(null, { discountedPriceRatio: 0.9 })).toBeNull();
     expect(getQuotedPrice(100, undefined)).toBeNull();
-    expect(getQuotedPrice(100, { partnerPrice: 0, discountedPartnerPrice: 90 })).toBeNull();
-    expect(getQuotedPrice(100, { partnerPrice: 100 })).toBeNull();
+    expect(getQuotedPrice(100, {})).toBeNull();
+    expect(getQuotedPrice(100, { quotedUnitSP: 95 })).toBeNull();
   });
 });

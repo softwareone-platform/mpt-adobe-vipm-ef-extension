@@ -75,8 +75,8 @@ frontend/                    TypeScript plug UI (esbuild)
     holds, not only the plan's: one outside the plan counts what Adobe will
     auto-renew, and an inactive one counts nothing. `preview` re-checks the routing and quotes the plan through an
     Adobe `PREVIEW_RENEWAL` order (validating the selected flexible discount
-    codes and returning the renewal pricing plus each line's now-path
-    eligibility); on the `now` path
+    codes and returning the renewal pricing, reduced to selling-side prices by
+    `services/pricing.py`, plus each line's now-path eligibility); on the `now` path
     the quote also carries the net-new additions, which ride the RENEWAL order
     itself, so Adobe rejects the renew-and-add basket it forbids in one order.
     Because the `now` path can be ordered more than once, its quoted and
@@ -242,6 +242,15 @@ frontend/                    TypeScript plug UI (esbuild)
     verdict) together with the customer's held-reusable catalogue into the
     inherited discounts the renewal wizard surfaces and pre-fills, keyed by the
     line's full Adobe offer id.
+  - `pricing.py` — price-list unit prices (the selling price on the caller's
+    token, the purchase price on the vendor's) and the reduction of an Adobe
+    preview quote to what the client wizards show: the renewal and upgrade
+    previews answer each line with only `offerId`, `subscriptionId` and
+    `pricing.discountedPriceRatio` (`discountedPartnerPrice / partnerPrice`),
+    plus `pricing.quotedUnitSP` on a line priced from the price list (an
+    upgrade target, a renewal's new product), where the base-level list price
+    gets the customer's discount level. Neither Adobe's purchase prices nor
+    the price list's ever reach the client.
 - `mpt_adobe_vipm_ef/settings.py` — builds the runtime configuration, including
   the Adobe settings and Airtable credentials, from environment variables and
   credential files.

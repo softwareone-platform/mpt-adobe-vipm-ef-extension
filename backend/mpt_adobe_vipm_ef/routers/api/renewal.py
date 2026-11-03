@@ -57,6 +57,7 @@ from mpt_adobe_vipm_ef.services.inherited_discounts import (
     serialize_inherited_discounts,
 )
 from mpt_adobe_vipm_ef.services.items import get_partial_sku
+from mpt_adobe_vipm_ef.services.pricing import build_client_quote
 from mpt_adobe_vipm_ef.services.renewal import require_scheduled_creation_window
 from mpt_adobe_vipm_ef.services.renewal_auto_renew import (
     check_renewal_plan_auto_renew_support,
@@ -327,9 +328,14 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     fewer seats than already renewed is rejected instead: a partial return is
     not supported.
 
-    Returns the Adobe quote under ``preview`` alongside ``eligibility``, the
+    Returns the quote under ``preview`` alongside ``eligibility``, the
     per-subscription now-path eligibility read from the quote's line statuses —
-    the only place Adobe reports it.
+    the only place Adobe reports it. The quote is reduced to the selling-side
+    prices the wizard shows (see ``reduce_client_quote``): Adobe's purchase prices
+    never reach the client. Each new-product line carries its unit SP as the
+    quote prices it (``pricing.quotedUnitSP``), since the wizard prices it from
+    the price list, at the base discount level, while Adobe quotes it at the
+    customer's level.
     """
     _require_client_account(ctx)
     agreement = await load_agreement(ctx, agreement_id)
@@ -355,9 +361,12 @@ async def preview_renewal_plan(  # noqa: WPS210, WPS217
     currency_code = agreement.authorization.currency or ""
     rows = _line_rows(line_items, net_new_lines)
     preview = await _preview_renewal(ctx, agreement_id, currency_code, line_items, rows)
+    client_preview = await build_client_quote(
+        ctx, agreement_id, preview, _net_new_items_by_line(line_items, net_new_lines)
+    )
     return APIResponse.ok(
         payload={
-            "preview": preview,
+            "preview": client_preview,
             "eligibility": build_now_path_eligibility(preview or {}),
         },
     )
@@ -940,6 +949,22 @@ def _line_rows(line_items: list[Line], net_new_lines: list[NetNewLine]) -> dict[
     return {
         line["extLineItemNumber"]: str(line.get("subscriptionId") or next(net_new_rows, ""))
         for line in line_items
+    }
+
+
+def _net_new_items_by_line(
+    line_items: list[Line], net_new_lines: list[NetNewLine]
+) -> dict[int, str]:
+    """Name the catalog item behind each new-product request line, by line number.
+
+    New-product lines are the ones with no Adobe subscription, and they follow
+    the renewing ones in plan order (see ``_line_rows``).
+    """
+    net_new_items = iter([net_new.item_id for net_new in net_new_lines])
+    return {
+        line["extLineItemNumber"]: next(net_new_items, "")
+        for line in line_items
+        if not line.get("subscriptionId")
     }
 
 

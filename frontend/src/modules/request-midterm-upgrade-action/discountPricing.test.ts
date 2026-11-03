@@ -59,20 +59,38 @@ describe('discountPricing', () => {
   it('carries the quoted discount onto the selling price', () => {
     const preview = {
       lineItems: [
-        { offerId: 'OTHER', pricing: { partnerPrice: 10, discountedPartnerPrice: 1 } },
-        { offerId: '65322651CA02A12', pricing: { partnerPrice: 80, discountedPartnerPrice: 60 } },
+        { offerId: 'OTHER', pricing: { discountedPriceRatio: 0.1 } },
+        { offerId: '65322651CA02A12', pricing: { discountedPriceRatio: 0.75 } },
       ],
     };
 
     expect(getQuotedUnitPrice(TARGET, preview)).toBe(90);
   });
 
+  it('prices the target at the quoted unit SP the backend priced it at', () => {
+    const preview = {
+      lineItems: [
+        {
+          offerId: '65322651CA13A12',
+          pricing: { discountedPriceRatio: 1, quotedUnitSP: 96 },
+        },
+      ],
+    };
+
+    expect(getQuotedUnitPrice(TARGET, preview)).toBe(96);
+  });
+
   it('answers no quoted price without a priced quote for the target', () => {
     expect(getQuotedUnitPrice(TARGET, null)).toBeNull();
+    expect(
+      getQuotedUnitPrice({ ...TARGET, targetBaseOfferId: undefined }, {
+        lineItems: [{ offerId: '', pricing: { discountedPriceRatio: 0.75 } }],
+      }),
+    ).toBeNull();
     expect(getQuotedUnitPrice(TARGET, { lineItems: [{ offerId: '65322651CA02A12' }] })).toBeNull();
     expect(
       getQuotedUnitPrice(TARGET, {
-        lineItems: [{ offerId: '65322651CA02A12', pricing: { partnerPrice: 0, discountedPartnerPrice: 0 } }],
+        lineItems: [{ offerId: '65322651CA02A12', pricing: {} }],
       }),
     ).toBeNull();
   });
