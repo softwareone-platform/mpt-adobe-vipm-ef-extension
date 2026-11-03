@@ -2,6 +2,7 @@ import type { Discount, SwitchPreview } from '../shared/model';
 import { getDiscountedUnitPrice, getQuotedPrice, normalizeDiscountCode } from '../utils/discount';
 import { rankDiscounts } from '../utils/discountRanking';
 import { getMonthlyPrice, getYearlyPrice, parseUnitPrice } from '../utils/price';
+import { getPartialSku } from '../utils/sku';
 import type { TargetSubscription } from './model';
 
 /** The shortlisted discount a (typed or picked) code names, if the shortlist knows it. */
@@ -35,17 +36,20 @@ export function getLocalUnitPrice(
 /**
  * The target's unit SP as Adobe's ``PREVIEW_SWITCH`` quote prices it.
  *
- * The quote holds purchase prices, so the discount Adobe applied is carried
- * onto the selling price as the ratio of the discounted to the list purchase
- * price. Answers null when there is no quote for the target, or it is not
- * priced, so the caller falls back to the local estimate.
+ * Adobe quotes at the customer's discount level, while the list unit SP is at
+ * the base level, so the backend adds the target line's unit SP as the quote
+ * prices it: both the level and the code reach it. Adobe answers with the
+ * customer's level in the offer id, so the line is found by partial SKU.
+ * Answers null when there is no quote for the target, or it is not priced, so
+ * the caller falls back to the local estimate.
  */
 export function getQuotedUnitPrice(
   target: TargetSubscription,
   preview: SwitchPreview | null,
 ): number | null {
+  const sku = getPartialSku(target.targetBaseOfferId ?? '');
   const line = (preview?.lineItems ?? []).find(
-    (item) => item.offerId === target.targetBaseOfferId,
+    (item) => Boolean(sku) && getPartialSku(item.offerId ?? '') === sku,
   );
   return getQuotedPrice(parseUnitPrice(target.unitSP), line?.pricing)?.unitSP ?? null;
 }

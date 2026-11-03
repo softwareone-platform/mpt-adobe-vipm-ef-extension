@@ -36,6 +36,7 @@ from mpt_adobe_vipm_ef.services.discount_preview import (
     request_adobe_preview,
 )
 from mpt_adobe_vipm_ef.services.items import get_partial_sku, resolve_items_by_sku
+from mpt_adobe_vipm_ef.services.pricing import build_client_quote
 from mpt_adobe_vipm_ef.services.renewal_in_place import (
     RenewalInPlace,
     load_renewal_in_place,
@@ -103,12 +104,17 @@ async def preview_upgrade_order(
     quoted switch, so Adobe adjudicates the code before any order exists.
     Every refused code is answered as a ``422`` whose ``errors`` name the
     target offer (``pointer``) and Adobe's reason (``detail``). On success the
-    Adobe quote is returned under ``preview`` so the wizard can show the
-    discounted price on Review order.
+    quote is returned under ``preview``, reduced to the selling-side prices the
+    wizard shows (see ``reduce_client_quote``), its target line carrying its unit
+    SP as the quote prices it (``pricing.quotedUnitSP``), so the wizard can
+    show the target on Review order at the customer's discount level and with
+    the code applied.
     """
     selection = await _resolve_switch_selection(ctx, agreement_id, subscription_id, body)
     preview = await _preview_switch(ctx, agreement_id, selection.switch_payload, fetch_price=True)
-    return APIResponse.ok(payload={"preview": preview})
+    return APIResponse.ok(
+        payload={"preview": await _to_client_preview(ctx, agreement_id, selection, preview)},
+    )
 
 
 @upgrade_router.post(
@@ -282,6 +288,25 @@ async def _preview_switch(
         fetch_price=fetch_price,
     )
     return await preview_with_discounts(quote, payload["lineItems"])
+
+
+async def _to_client_preview(
+    ctx: APIContext,
+    agreement_id: str,
+    selection: _SwitchSelection,
+    preview: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Reduce the switch quote to what the wizard shows, the target priced for it.
+
+    The wizard prices the target from the price list, which is at the base
+    discount level, while Adobe quotes it at the customer's level: the list
+    purchase price is what turns the quote back into a selling price, so it is
+    applied here and never returned.
+    """
+    target_line = selection.switch_payload.line_items[0]
+    return await build_client_quote(
+        ctx, agreement_id, preview, {target_line.ext_line_item_number: selection.target_item_id}
+    )
 
 
 async def _create_change_order(

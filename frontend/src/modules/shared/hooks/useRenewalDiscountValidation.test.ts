@@ -62,7 +62,7 @@ describe('useRenewalDiscountValidation', () => {
   it('publishes the quote the API returns inside its data envelope', async () => {
     const quote = {
       lineItems: [
-        { subscriptionId: 'adobe-sub-1', pricing: { partnerPrice: 273.48, discountedPartnerPrice: 246.13 } },
+        { subscriptionId: 'adobe-sub-1', pricing: { discountedPriceRatio: 0.9 } },
       ],
     };
     mockPost.mockResolvedValue({ data: { data: { preview: quote, eligibility: {} } } });
